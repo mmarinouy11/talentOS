@@ -1,6 +1,19 @@
 import { auth } from '@/lib/auth'
-import { getOpenAI } from '@/lib/openai'
+import { callClaudeJSON } from '@/lib/anthropic'
 import { NextResponse } from 'next/server'
+
+interface CandidateParsed {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string | null
+  country: string | null
+  skills: string[]
+  languages: string[]
+  seniority: 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL'
+  yearsOfExperience: number | null
+  summary: string
+}
 
 export async function POST(request: Request) {
   const session = await auth()
@@ -9,22 +22,23 @@ export async function POST(request: Request) {
   const { cvText } = await request.json()
   if (!cvText) return NextResponse.json({ error: 'cvText is required' }, { status: 400 })
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: 'gpt-4o-mini',
-    response_format: { type: 'json_object' },
-    messages: [
-      {
-        role: 'system',
-        content: `You are a recruiting assistant. Extract structured data from the CV text below and return a JSON object with these fields:
-firstName, lastName, email, phone, country, skills (string[]), languages (string[]),
-seniority (JUNIOR|MID|SENIOR|STAFF|PRINCIPAL), yearsOfExperience (number),
-currentCompensation (number|null), currentCurrency (string|null), currentEmploymentType (string|null),
-summary (2-3 sentence professional summary), strengths (string[], max 5), risks (string[], max 5).`,
-      },
-      { role: 'user', content: cvText },
-    ],
-  })
+  const result = await callClaudeJSON<CandidateParsed>(
+    `Extract structured data from this CV:\n\n${cvText}`,
+    'FAST',
+    `You are a CV parser. Extract the following fields as JSON:
+{
+  "firstName": string,
+  "lastName": string,
+  "email": string,
+  "phone": string | null,
+  "country": string | null,
+  "skills": string[],
+  "languages": string[],
+  "seniority": "JUNIOR" | "MID" | "SENIOR" | "STAFF" | "PRINCIPAL",
+  "yearsOfExperience": number | null,
+  "summary": string
+}`,
+  )
 
-  const parsed = JSON.parse(completion.choices[0].message.content ?? '{}')
-  return NextResponse.json(parsed)
+  return NextResponse.json(result)
 }
