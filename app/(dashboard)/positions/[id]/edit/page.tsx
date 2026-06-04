@@ -44,15 +44,17 @@ export default async function EditPositionPage({
           defaultValues={{
             id: position.id,
             title: position.title,
-            department: position.department,
+            client: position.client,
             description: position.description,
             status: position.status,
-            sla_days: position.sla_days,
-            budget_min: position.budget_min,
-            budget_max: position.budget_max,
-            currency: position.currency,
+            priority: position.priority,
+            target_date_asap: position.target_date_asap,
+            target_date: position.target_date?.toISOString() ?? null,
+            location: position.location,
             recruiterId: position.recruiterId,
-            hiringManagerId: position.hiringManagerId,
+            hiring_manager_name: position.hiring_manager_name,
+            hiring_manager_email: position.hiring_manager_email,
+            sales_contact_email: position.sales_contact_email,
           }}
         />
       </div>

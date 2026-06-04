@@ -5,15 +5,16 @@ import { z } from 'zod'
 
 const positionSchema = z.object({
   title: z.string().min(1),
-  department: z.string().min(1),
+  client: z.string().min(1),
   description: z.string().min(1),
-  status: z.enum(['OPEN', 'ON_HOLD', 'CLOSED', 'FILLED']).default('OPEN'),
-  sla_days: z.number().int().positive().default(30),
-  budget_min: z.number().optional().nullable(),
-  budget_max: z.number().optional().nullable(),
-  currency: z.string().default('USD'),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
+  target_date_asap: z.boolean().default(false),
+  target_date: z.string().datetime().optional().nullable(),
+  location: z.array(z.string()).min(1, 'Select at least one location'),
   recruiterId: z.string().optional(),
-  hiringManagerId: z.string().optional(),
+  hiring_manager_email: z.string().email().optional().nullable(),
+  hiring_manager_name: z.string().optional().nullable(),
+  sales_contact_email: z.string().email().optional().nullable(),
 })
 
 export async function GET() {
@@ -24,7 +25,6 @@ export async function GET() {
     where: { deletedAt: null },
     include: {
       recruiter: { select: { id: true, name: true, email: true } },
-      hiringManager: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -43,14 +43,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { recruiterId, hiringManagerId, ...rest } = parsed.data
-
   const userId = (session.user as { id?: string }).id!
   const position = await db.position.create({
     data: {
-      ...rest,
-      recruiterId: recruiterId || userId,
-      hiringManagerId: hiringManagerId || userId,
+      ...parsed.data,
+      status: 'OPEN',
+      recruiterId: parsed.data.recruiterId || userId,
     },
   })
 

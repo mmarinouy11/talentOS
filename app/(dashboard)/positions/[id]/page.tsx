@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PositionStatusBadge } from '@/components/app/PositionStatusBadge'
+import { PriorityBadge } from '@/components/app/PriorityBadge'
 import type { Stage } from '@prisma/client'
 
 const STAGE_LABELS: Record<Stage, string> = {
@@ -24,6 +25,12 @@ function aging(createdAt: Date) {
   return Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+function fmtTarget(position: { target_date_asap: boolean; target_date: Date | null }) {
+  if (position.target_date_asap) return 'ASAP'
+  if (!position.target_date) return '—'
+  return fmt(position.target_date)
+}
+
 export default async function PositionDetailPage({
   params,
 }: {
@@ -38,7 +45,6 @@ export default async function PositionDetailPage({
     where: { id, deletedAt: null },
     include: {
       recruiter: { select: { id: true, name: true, email: true } },
-      hiringManager: { select: { id: true, name: true, email: true } },
       candidatePositions: {
         where: { candidate: { deletedAt: null } },
         include: {
@@ -52,18 +58,9 @@ export default async function PositionDetailPage({
   if (!position) notFound()
 
   const days = aging(position.createdAt)
-  const overSla = days > position.sla_days
   const activeCandidates = position.candidatePositions.filter(
     (cp) => !['HIRED', 'REJECTED'].includes(cp.stage)
   ).length
-
-  const budgetStr =
-    position.budget_min || position.budget_max
-      ? [position.budget_min, position.budget_max]
-          .filter(Boolean)
-          .map((n) => `${position.currency} ${Number(n).toLocaleString()}`)
-          .join(' – ')
-      : '—'
 
   return (
     <div className="space-y-6">
@@ -78,7 +75,9 @@ export default async function PositionDetailPage({
           <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-semibold text-gray-900">{position.title}</h1>
             <PositionStatusBadge status={position.status} />
+            <PriorityBadge priority={position.priority} />
           </div>
+          <p className="text-sm text-gray-500 mt-1">{position.client}</p>
         </div>
         <Link href={`/positions/${id}/edit`}>
           <Button variant="outline">Edit</Button>
@@ -88,53 +87,70 @@ export default async function PositionDetailPage({
       {/* Info grid */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="grid grid-cols-3 gap-6">
-          {[
-            { label: 'Department', value: position.department },
-            { label: 'Recruiter', value: position.recruiter.name ?? position.recruiter.email },
-            { label: 'Hiring Manager', value: position.hiringManager.name ?? position.hiringManager.email },
-            { label: 'SLA', value: `${position.sla_days} days` },
-            { label: 'Budget', value: budgetStr },
-            { label: 'Created', value: fmt(position.createdAt) },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
-              <p className="text-sm text-gray-900 mt-1">{value}</p>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Client</p>
+            <p className="text-sm text-gray-900 mt-1">{position.client}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recruiter</p>
+            <p className="text-sm text-gray-900 mt-1">{position.recruiter.name ?? position.recruiter.email}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Target Date</p>
+            <p className="text-sm text-gray-900 mt-1">{fmtTarget(position)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Location</p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {position.location.length > 0
+                ? position.location.map((loc) => (
+                    <span key={loc} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                      {loc}
+                    </span>
+                  ))
+                : <span className="text-sm text-gray-900">—</span>
+              }
             </div>
-          ))}
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hiring Manager</p>
+            <p className="text-sm text-gray-900 mt-1">{position.hiring_manager_name ?? '—'}</p>
+            {position.hiring_manager_email && (
+              <p className="text-xs text-gray-500">{position.hiring_manager_email}</p>
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sales Contact</p>
+            <p className="text-sm text-gray-900 mt-1">{position.sales_contact_email ?? '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</p>
+            <p className="text-sm text-gray-900 mt-1">{fmt(position.createdAt)}</p>
+          </div>
         </div>
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Aging</p>
-          <p className={`text-3xl font-semibold mt-1 ${overSla ? 'text-red-600' : 'text-gray-900'}`}>{days}d</p>
-          {overSla && <p className="text-xs text-red-500 mt-1">Exceeds {position.sla_days}d SLA</p>}
+          <p className="text-3xl font-semibold mt-1 text-gray-900">{days}d</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Candidates</p>
           <p className="text-3xl font-semibold mt-1 text-gray-900">{position.candidatePositions.length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Candidates</p>
-          <p className="text-3xl font-semibold mt-1 text-blue-600">{activeCandidates}</p>
-        </div>
       </div>
 
-      {/* Tabs — static for now, JS-free server render */}
+      {/* Candidates */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-100">
-          <div className="flex">
-            <span className="px-6 py-3 text-sm font-medium text-gray-900 border-b-2 border-gray-900">
-              Candidates ({position.candidatePositions.length})
-            </span>
-            <span className="px-6 py-3 text-sm font-medium text-gray-500">
-              Job Description
-            </span>
-          </div>
+        <div className="border-b border-gray-100 px-6 py-3">
+          <span className="text-sm font-medium text-gray-900">
+            Candidates ({position.candidatePositions.length})
+          </span>
+          <span className="ml-4 text-sm text-gray-500">{activeCandidates} active</span>
         </div>
 
-        {/* Candidates tab */}
         {position.candidatePositions.length === 0 ? (
           <div className="py-12 text-center text-sm text-gray-400">No candidates yet.</div>
         ) : (
@@ -151,7 +167,9 @@ export default async function PositionDetailPage({
               {position.candidatePositions.map((cp) => (
                 <tr key={cp.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">
-                    {cp.candidate.firstName} {cp.candidate.lastName}
+                    <Link href={`/candidates/${cp.candidate.id}`} className="hover:underline">
+                      {cp.candidate.firstName} {cp.candidate.lastName}
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{cp.candidate.email}</td>
                   <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>

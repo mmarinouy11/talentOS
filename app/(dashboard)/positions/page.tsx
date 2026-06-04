@@ -15,7 +15,6 @@ export default async function PositionsPage() {
     where: { deletedAt: null },
     include: {
       recruiter: { select: { id: true, name: true, email: true } },
-      hiringManager: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -25,10 +24,16 @@ export default async function PositionsPage() {
   for (const p of positions) counts[p.status]++
 
   const serialized = positions.map((p) => ({
-    ...p,
+    id: p.id,
+    title: p.title,
+    client: p.client,
+    status: p.status,
+    priority: p.priority,
+    target_date_asap: p.target_date_asap,
+    target_date: p.target_date?.toISOString() ?? null,
     createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-    deletedAt: p.deletedAt?.toISOString() ?? null,
+    recruiter: p.recruiter,
+    _count: p._count,
   }))
 
   return (

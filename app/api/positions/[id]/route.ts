@@ -5,15 +5,17 @@ import { z } from 'zod'
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
-  department: z.string().min(1).optional(),
+  client: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
   status: z.enum(['OPEN', 'ON_HOLD', 'CLOSED', 'FILLED']).optional(),
-  sla_days: z.number().int().positive().optional(),
-  budget_min: z.number().optional().nullable(),
-  budget_max: z.number().optional().nullable(),
-  currency: z.string().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  target_date_asap: z.boolean().optional(),
+  target_date: z.string().datetime().optional().nullable(),
+  location: z.array(z.string()).min(1).optional(),
   recruiterId: z.string().optional(),
-  hiringManagerId: z.string().optional(),
+  hiring_manager_email: z.string().email().optional().nullable(),
+  hiring_manager_name: z.string().optional().nullable(),
+  sales_contact_email: z.string().email().optional().nullable(),
 })
 
 export async function GET(
@@ -29,7 +31,6 @@ export async function GET(
     where: { id, deletedAt: null },
     include: {
       recruiter: { select: { id: true, name: true, email: true } },
-      hiringManager: { select: { id: true, name: true, email: true } },
       candidatePositions: {
         include: {
           candidate: {
@@ -71,10 +72,7 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const position = await db.position.update({
-    where: { id },
-    data: parsed.data,
-  })
+  const position = await db.position.update({ where: { id }, data: parsed.data })
 
   return NextResponse.json(position)
 }

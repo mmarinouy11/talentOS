@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
-import type { Role } from '@prisma/client'
+import type { Role, Priority, PositionStatus } from '@prisma/client'
 
 export interface UserOption {
   id: string
@@ -16,20 +16,44 @@ export interface UserOption {
   role: Role
 }
 
+const LATAM_LOCATIONS = [
+  'Anywhere LATAM',
+  'Argentina',
+  'Uruguay',
+  'Chile',
+  'Colombia',
+  'Mexico',
+  'Peru',
+  'Brazil',
+  'Bolivia',
+  'Paraguay',
+  'Ecuador',
+  'Venezuela',
+]
+
+const PRIORITY_COLORS: Record<Priority, string> = {
+  LOW: 'text-gray-500',
+  MEDIUM: 'text-blue-600',
+  HIGH: 'text-orange-600',
+  URGENT: 'text-red-600',
+}
+
 interface PositionFormProps {
   users: UserOption[]
   defaultValues?: {
     id?: string
     title?: string
-    department?: string
+    client?: string
     description?: string
-    status?: string
-    sla_days?: number
-    budget_min?: number | null
-    budget_max?: number | null
-    currency?: string
+    status?: PositionStatus
+    priority?: Priority
+    target_date_asap?: boolean
+    target_date?: string | null
+    location?: string[]
     recruiterId?: string
-    hiringManagerId?: string
+    hiring_manager_name?: string | null
+    hiring_manager_email?: string | null
+    sales_contact_email?: string | null
   }
   mode: 'create' | 'edit'
 }
@@ -38,28 +62,54 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
   const router = useRouter()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isAsap, setIsAsap] = useState(defaultValues.target_date_asap ?? false)
+  const [locations, setLocations] = useState<string[]>(defaultValues.location ?? [])
 
   const recruiters = users.filter((u) => u.role === 'RECRUITER' || u.role === 'ADMIN')
-  const hiringManagers = users.filter((u) => u.role === 'HIRING_MANAGER' || u.role === 'ADMIN')
+
+  function addLocation(loc: string) {
+    if (!loc) return
+    if (loc === 'Anywhere LATAM') {
+      setLocations(['Anywhere LATAM'])
+      return
+    }
+    if (locations.includes('Anywhere LATAM')) return
+    if (!locations.includes(loc)) setLocations((prev) => [...prev, loc])
+  }
+
+  function removeLocation(loc: string) {
+    setLocations((prev) => prev.filter((l) => l !== loc))
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
+    if (locations.length === 0) {
+      setError('Select at least one location.')
+      setLoading(false)
+      return
+    }
+
     const fd = new FormData(e.currentTarget)
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       title: fd.get('title') as string,
-      department: fd.get('department') as string,
+      client: fd.get('client') as string,
       description: fd.get('description') as string,
-      status: fd.get('status') as string,
-      sla_days: Number(fd.get('sla_days')),
-      budget_min: fd.get('budget_min') ? Number(fd.get('budget_min')) : null,
-      budget_max: fd.get('budget_max') ? Number(fd.get('budget_max')) : null,
-      currency: fd.get('currency') as string,
-      recruiterId: fd.get('recruiterId') as string || undefined,
-      hiringManagerId: fd.get('hiringManagerId') as string || undefined,
+      priority: fd.get('priority') as string,
+      target_date_asap: isAsap,
+      target_date: isAsap ? null : (fd.get('target_date') ? new Date(fd.get('target_date') as string).toISOString() : null),
+      location: locations,
+      recruiterId: (fd.get('recruiterId') as string) || undefined,
+      hiring_manager_name: (fd.get('hiring_manager_name') as string) || null,
+      hiring_manager_email: (fd.get('hiring_manager_email') as string) || null,
+      sales_contact_email: (fd.get('sales_contact_email') as string) || null,
+    }
+
+    if (mode === 'edit') {
+      payload.status = fd.get('status') as string
     }
 
     const url = mode === 'edit' ? `/api/positions/${defaultValues.id}` : '/api/positions'
@@ -75,13 +125,20 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
 
     if (!res.ok) {
       const data = await res.json()
-      setError(data.error?.formErrors?.[0] ?? 'Something went wrong.')
+      const msg =
+        data.error?.fieldErrors
+          ? Object.values(data.error.fieldErrors as Record<string, string[]>).flat()[0]
+          : data.error?.formErrors?.[0] ?? 'Something went wrong.'
+      setError(msg)
       return
     }
 
     router.push('/positions')
     router.refresh()
   }
+
+  const anywhereSelected = locations.includes('Anywhere LATAM')
+  const availableLocations = LATAM_LOCATIONS.filter((l) => !locations.includes(l))
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
@@ -92,76 +149,192 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
       )}
 
       <div className="grid grid-cols-2 gap-4">
+        {/* Title */}
         <div className="col-span-2">
           <Label htmlFor="title">Title *</Label>
-          <Input id="title" name="title" required defaultValue={defaultValues.title} placeholder="e.g. Senior Software Engineer" />
+          <Input
+            id="title"
+            name="title"
+            required
+            defaultValue={defaultValues.title}
+            placeholder="e.g. Senior Software Engineer"
+          />
         </div>
 
+        {/* Client */}
         <div>
-          <Label htmlFor="department">Department *</Label>
-          <Input id="department" name="department" required defaultValue={defaultValues.department} placeholder="e.g. Engineering" />
+          <Label htmlFor="client">Client *</Label>
+          <Input
+            id="client"
+            name="client"
+            required
+            defaultValue={defaultValues.client}
+            placeholder="e.g. Acme Corp"
+          />
         </div>
 
+        {/* Priority */}
         <div>
-          <Label htmlFor="status">Status</Label>
-          <Select id="status" name="status" defaultValue={defaultValues.status ?? 'OPEN'}>
-            <option value="OPEN">Open</option>
-            <option value="ON_HOLD">On Hold</option>
+          <Label htmlFor="priority">Priority</Label>
+          <Select
+            id="priority"
+            name="priority"
+            defaultValue={defaultValues.priority ?? 'MEDIUM'}
+          >
+            {(['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as Priority[]).map((p) => (
+              <option key={p} value={p} className={PRIORITY_COLORS[p]}>
+                {p.charAt(0) + p.slice(1).toLowerCase()}
+              </option>
+            ))}
           </Select>
         </div>
 
+        {/* Description */}
         <div className="col-span-2">
           <Label htmlFor="description">Job Description *</Label>
-          <Textarea id="description" name="description" required defaultValue={defaultValues.description} placeholder="Describe the role, responsibilities, and requirements…" className="min-h-[180px]" />
+          <Textarea
+            id="description"
+            name="description"
+            required
+            defaultValue={defaultValues.description}
+            placeholder="Describe the role, responsibilities, and requirements…"
+            className="min-h-[180px]"
+          />
         </div>
 
-        <div>
-          <Label htmlFor="sla_days">SLA (days)</Label>
-          <Input id="sla_days" name="sla_days" type="number" min="1" defaultValue={defaultValues.sla_days ?? 30} />
+        {/* Target Date */}
+        <div className="col-span-2">
+          <Label>Target Date</Label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isAsap}
+                onChange={(e) => setIsAsap(e.target.checked)}
+                className="rounded border-gray-300 text-gray-900"
+              />
+              <span className="text-sm text-gray-700 font-medium">ASAP</span>
+            </label>
+            {!isAsap && (
+              <Input
+                type="date"
+                name="target_date"
+                defaultValue={
+                  defaultValues.target_date
+                    ? new Date(defaultValues.target_date).toISOString().slice(0, 10)
+                    : ''
+                }
+                required={!isAsap}
+              />
+            )}
+          </div>
         </div>
 
-        <div>
-          <Label htmlFor="currency">Currency</Label>
-          <Select id="currency" name="currency" defaultValue={defaultValues.currency ?? 'USD'}>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="UYU">UYU</option>
+        {/* Location */}
+        <div className="col-span-2">
+          <Label>Location * (select all that apply)</Label>
+          <Select
+            onChange={(e) => {
+              addLocation(e.target.value)
+              e.target.value = ''
+            }}
+            value=""
+            disabled={anywhereSelected}
+          >
+            <option value="">— Add location —</option>
+            {availableLocations.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
           </Select>
+          {locations.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {locations.map((loc) => (
+                <span
+                  key={loc}
+                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium"
+                >
+                  {loc}
+                  <button
+                    type="button"
+                    onClick={() => removeLocation(loc)}
+                    className="text-gray-400 hover:text-gray-600 ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div>
-          <Label htmlFor="budget_min">Budget Min</Label>
-          <Input id="budget_min" name="budget_min" type="number" min="0" defaultValue={defaultValues.budget_min ?? ''} placeholder="Optional" />
-        </div>
-
-        <div>
-          <Label htmlFor="budget_max">Budget Max</Label>
-          <Input id="budget_max" name="budget_max" type="number" min="0" defaultValue={defaultValues.budget_max ?? ''} placeholder="Optional" />
-        </div>
-
+        {/* Recruiter */}
         {recruiters.length > 0 && (
           <div>
             <Label htmlFor="recruiterId">Recruiter</Label>
-            <Select id="recruiterId" name="recruiterId" defaultValue={defaultValues.recruiterId ?? ''}>
+            <Select
+              id="recruiterId"
+              name="recruiterId"
+              defaultValue={defaultValues.recruiterId ?? ''}
+            >
               <option value="">— Select recruiter —</option>
               {recruiters.map((u) => (
-                <option key={u.id} value={u.id}>{u.name ?? u.email}</option>
+                <option key={u.id} value={u.id}>
+                  {u.name ?? u.email}
+                </option>
               ))}
             </Select>
           </div>
         )}
 
-        {hiringManagers.length > 0 && (
+        {/* Status (edit only) */}
+        {mode === 'edit' && (
           <div>
-            <Label htmlFor="hiringManagerId">Hiring Manager</Label>
-            <Select id="hiringManagerId" name="hiringManagerId" defaultValue={defaultValues.hiringManagerId ?? ''}>
-              <option value="">— Select hiring manager —</option>
-              {hiringManagers.map((u) => (
-                <option key={u.id} value={u.id}>{u.name ?? u.email}</option>
-              ))}
+            <Label htmlFor="status">Status</Label>
+            <Select
+              id="status"
+              name="status"
+              defaultValue={defaultValues.status ?? 'OPEN'}
+            >
+              <option value="OPEN">Open</option>
+              <option value="ON_HOLD">On Hold</option>
+              <option value="CLOSED">Closed</option>
+              <option value="FILLED">Filled</option>
             </Select>
           </div>
         )}
+
+        {/* Hiring Manager */}
+        <div>
+          <Label htmlFor="hiring_manager_name">Hiring Manager Name</Label>
+          <Input
+            id="hiring_manager_name"
+            name="hiring_manager_name"
+            defaultValue={defaultValues.hiring_manager_name ?? ''}
+            placeholder="Optional"
+          />
+        </div>
+        <div>
+          <Label htmlFor="hiring_manager_email">Hiring Manager Email</Label>
+          <Input
+            id="hiring_manager_email"
+            name="hiring_manager_email"
+            type="email"
+            defaultValue={defaultValues.hiring_manager_email ?? ''}
+            placeholder="Optional"
+          />
+        </div>
+
+        {/* Sales Contact */}
+        <div className="col-span-2">
+          <Label htmlFor="sales_contact_email">Sales Contact Email</Label>
+          <Input
+            id="sales_contact_email"
+            name="sales_contact_email"
+            type="email"
+            defaultValue={defaultValues.sales_contact_email ?? ''}
+            placeholder="Optional"
+          />
+        </div>
       </div>
 
       <div className="flex gap-3 pt-2">

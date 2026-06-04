@@ -20,6 +20,13 @@ enum PositionStatus {
   FILLED
 }
 
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 enum Seniority {
   JUNIOR
   MID
@@ -54,18 +61,14 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // NextAuth relations
   accounts Account[]
   sessions Session[]
 
-  // App relations
-  positionsAsRecruiter      Position[]          @relation("RecruiterPositions")
-  positionsAsHiringManager  Position[]          @relation("HiringManagerPositions")
-  candidatePositions        CandidatePosition[] @relation("RecruiterCandidatePositions")
-  stageHistoryMoves         StageHistory[]
+  positionsAsRecruiter Position[]          @relation("RecruiterPositions")
+  candidatePositions   CandidatePosition[] @relation("RecruiterCandidatePositions")
+  stageHistoryMoves    StageHistory[]
 }
 
-// NextAuth required models
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -102,48 +105,49 @@ model VerificationToken {
 }
 
 model Position {
-  id               String         @id @default(cuid())
-  title            String
-  department       String
-  description      String         @db.Text
-  status           PositionStatus @default(OPEN)
-  sla_days         Int
-  budget_min       Float?
-  budget_max       Float?
-  currency         String         @default("USD")
-  recruiterId      String
-  hiringManagerId  String
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  deletedAt        DateTime?
+  id                   String         @id @default(cuid())
+  title                String
+  client               String
+  description          String         @db.Text
+  status               PositionStatus @default(OPEN)
+  priority             Priority       @default(MEDIUM)
+  target_date_asap     Boolean        @default(false)
+  target_date          DateTime?
+  location             String[]
+  recruiterId          String
+  hiring_manager_name  String?
+  hiring_manager_email String?
+  sales_contact_email  String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  deletedAt            DateTime?
 
-  recruiter       User                @relation("RecruiterPositions", fields: [recruiterId], references: [id])
-  hiringManager   User                @relation("HiringManagerPositions", fields: [hiringManagerId], references: [id])
+  recruiter          User                @relation("RecruiterPositions", fields: [recruiterId], references: [id])
   candidatePositions CandidatePosition[]
 }
 
 model Candidate {
-  id                     String    @id @default(cuid())
-  firstName              String
-  lastName               String
-  email                  String    @unique
-  phone                  String?
-  country                String?
-  cvDriveId              String?
-  cvOriginalName         String?
-  skills                 String[]
-  languages              String[]
-  seniority              Seniority?
-  yearsOfExperience      Int?
-  currentCompensation    Float?
-  currentCurrency        String?
-  currentEmploymentType  String?
-  summary                String?   @db.Text
-  strengths              String[]
-  risks                  String[]
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-  deletedAt              DateTime?
+  id                    String     @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String     @unique
+  phone                 String?
+  country               String?
+  cvDriveId             String?
+  cvOriginalName        String?
+  skills                String[]
+  languages             String[]
+  seniority             Seniority?
+  yearsOfExperience     Int?
+  currentCompensation   Float?
+  currentCurrency       String?
+  currentEmploymentType String?
+  summary               String?    @db.Text
+  strengths             String[]
+  risks                 String[]
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  deletedAt             DateTime?
 
   candidatePositions CandidatePosition[]
 }
