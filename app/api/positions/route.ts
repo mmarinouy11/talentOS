@@ -17,12 +17,15 @@ const positionSchema = z.object({
   sales_contact_email: z.string().email().optional().nullable(),
 })
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const url = new URL(request.url)
+  const status = url.searchParams.get('status')
+
   const positions = await db.position.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, ...(status ? { status: status as import('@prisma/client').PositionStatus } : {}) },
     include: {
       recruiter: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true } },
