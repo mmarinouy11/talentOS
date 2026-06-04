@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  RECRUITER
+  INTERVIEWER
+  HIRING_MANAGER
+}
+
+enum PositionStatus {
+  OPEN
+  ON_HOLD
+  CLOSED
+  FILLED
+}
+
+enum Seniority {
+  JUNIOR
+  MID
+  SENIOR
+  STAFF
+  PRINCIPAL
+}
+
+enum Stage {
+  APPLIED
+  SCREENING
+  TECHNICAL_INTERVIEW
+  CLIENT_INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum CompensationRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  role         Role     @default(RECRUITER)
+  image        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
+
+  // App relations
+  positionsAsRecruiter      Position[]          @relation("RecruiterPositions")
+  positionsAsHiringManager  Position[]          @relation("HiringManagerPositions")
+  candidatePositions        CandidatePosition[] @relation("RecruiterCandidatePositions")
+  stageHistoryMoves         StageHistory[]
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Position {
+  id               String         @id @default(cuid())
+  title            String
+  department       String
+  description      String         @db.Text
+  status           PositionStatus @default(OPEN)
+  sla_days         Int
+  budget_min       Float?
+  budget_max       Float?
+  currency         String         @default("USD")
+  recruiterId      String
+  hiringManagerId  String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+
+  recruiter       User                @relation("RecruiterPositions", fields: [recruiterId], references: [id])
+  hiringManager   User                @relation("HiringManagerPositions", fields: [hiringManagerId], references: [id])
+  candidatePositions CandidatePosition[]
+}
+
+model Candidate {
+  id                     String    @id @default(cuid())
+  firstName              String
+  lastName               String
+  email                  String    @unique
+  phone                  String?
+  country                String?
+  cvDriveId              String?
+  cvOriginalName         String?
+  skills                 String[]
+  languages              String[]
+  seniority              Seniority?
+  yearsOfExperience      Int?
+  currentCompensation    Float?
+  currentCurrency        String?
+  currentEmploymentType  String?
+  summary                String?   @db.Text
+  strengths              String[]
+  risks                  String[]
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  deletedAt              DateTime?
+
+  candidatePositions CandidatePosition[]
+}
+
+model CandidatePosition {
+  id                  String            @id @default(cuid())
+  candidateId         String
+  positionId          String
+  stage               Stage             @default(APPLIED)
+  stageEnteredAt      DateTime          @default(now())
+  fitScore            Float?
+  technicalScore      Float?
+  communicationScore  Float?
+  desiredCompensation Float?
+  minimumCompensation Float?
+  noticePeriodDays    Int?
+  earliestStartDate   DateTime?
+  compensationRisk    CompensationRisk?
+  notes               String?           @db.Text
+  recruiterId         String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  candidate    Candidate      @relation(fields: [candidateId], references: [id])
+  position     Position       @relation(fields: [positionId], references: [id])
+  recruiter    User           @relation("RecruiterCandidatePositions", fields: [recruiterId], references: [id])
+  stageHistory StageHistory[]
+
+  @@unique([candidateId, positionId])
+}
+
+model StageHistory {
+  id                  String   @id @default(cuid())
+  candidatePositionId String
+  fromStage           Stage?
+  toStage             Stage
+  movedAt             DateTime @default(now())
+  movedById           String
+  notes               String?  @db.Text
+
+  candidatePosition CandidatePosition @relation(fields: [candidatePositionId], references: [id])
+  movedBy           User              @relation(fields: [movedById], references: [id])
+}
