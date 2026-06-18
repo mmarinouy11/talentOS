@@ -16,13 +16,14 @@ Return ONLY valid JSON with these exact fields:
   "seniority": one of "JUNIOR"|"MID"|"SENIOR"|"STAFF"|"PRINCIPAL" or null,
   "yearsOfExperience": number or null,
   "skills": array of strings,
-  "languages": array of strings,
+  "languages": array of strings — SPOKEN/WRITTEN human languages only (e.g. "English", "Spanish", "Portuguese"). NOT programming languages. Infer from CV content, education, or location if not explicitly stated,
   "summary": string or null
 }
 Rules:
 - Skills should be specific technologies, not soft skills
 - Seniority: 0-2 years = JUNIOR, 2-5 = MID, 5-8 = SENIOR, 8-12 = STAFF, 12+ = PRINCIPAL
 - Return null for fields you cannot determine, never guess email or phone
+- "languages" must only contain human spoken languages, never programming languages or frameworks
 - No markdown, no explanation, only the JSON object`
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
