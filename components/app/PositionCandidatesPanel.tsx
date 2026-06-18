@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddCandidateToPositionModal } from './AddCandidateToPositionModal'
@@ -23,6 +23,15 @@ function scoreColor(score: number): string {
   return 'text-red-600'
 }
 
+function Spinner() {
+  return (
+    <svg className="animate-spin h-4 w-4 text-gray-400 inline" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+    </svg>
+  )
+}
+
 interface CandidatePosition {
   id: string
   stage: Stage
@@ -42,22 +51,74 @@ interface Props {
   activeCandidates: number
 }
 
-export function PositionCandidatesPanel({ positionId, candidatePositions, activeCandidates }: Props) {
+export function PositionCandidatesPanel({ positionId, candidatePositions: initial, activeCandidates }: Props) {
   const [showModal, setShowModal] = useState(false)
+  // live fit scores: cpId → number | null (null = still scoring)
+  const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
+  // set of cpIds currently being polled
+  const [scoringIds, setScoringIds] = useState<Set<string>>(new Set())
+
+  // Poll a candidatePositionId until fitScore arrives
+  const startPolling = useCallback((cpId: string) => {
+    setScoringIds((prev) => new Set([...prev, cpId]))
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/candidate-positions/${cpId}`)
+        if (!res.ok) { clearInterval(interval); return }
+        const data = await res.json()
+        if (data.fitScore != null) {
+          clearInterval(interval)
+          setLiveScores((prev) => ({ ...prev, [cpId]: data.fitScore }))
+          setScoringIds((prev) => {
+            const next = new Set(prev)
+            next.delete(cpId)
+            return next
+          })
+        }
+      } catch {
+        clearInterval(interval)
+      }
+    }, 3000)
+
+    // Safety: stop polling after 2 minutes regardless
+    setTimeout(() => clearInterval(interval), 120_000)
+  }, [])
+
+  function handleAdded(cpId: string) {
+    startPolling(cpId)
+  }
+
+  const existingCandidateIds = new Set(initial.map((cp) => cp.candidate.id))
+
+  function fitCell(cp: CandidatePosition) {
+    // live score arrived
+    if (liveScores[cp.id] != null) {
+      const score = liveScores[cp.id]!
+      return <span className={`font-medium ${scoreColor(score)}`}>{Math.round(score)}</span>
+    }
+    // currently scoring
+    if (scoringIds.has(cp.id)) return <Spinner />
+    // already had a score from server
+    if (cp.fitScore != null) {
+      return <span className={`font-medium ${scoreColor(cp.fitScore)}`}>{Math.round(cp.fitScore)}</span>
+    }
+    return <span className="text-gray-400">—</span>
+  }
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="border-b border-gray-100 px-6 py-3 flex items-center justify-between">
         <div>
           <span className="text-sm font-medium text-gray-900">
-            Candidates ({candidatePositions.length})
+            Candidates ({initial.length})
           </span>
           <span className="ml-4 text-sm text-gray-500">{activeCandidates} active</span>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>Add Candidate</Button>
       </div>
 
-      {candidatePositions.length === 0 ? (
+      {initial.length === 0 && !scoringIds.size ? (
         <div className="py-12 text-center text-sm text-gray-400">No candidates yet.</div>
       ) : (
         <table className="w-full text-sm">
@@ -71,11 +132,11 @@ export function PositionCandidatesPanel({ positionId, candidatePositions, active
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {candidatePositions.map((cp) => (
+            {initial.map((cp) => (
               <tr
                 key={cp.id}
                 className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => window.location.href = `/positions/${positionId}/candidates/${cp.id}`}
+                onClick={() => { window.location.href = `/positions/${positionId}/candidates/${cp.id}` }}
               >
                 <td className="px-4 py-3 font-medium text-gray-900">
                   <Link
@@ -93,12 +154,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions, active
                     {STAGE_LABELS[cp.stage]}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  {cp.fitScore != null
-                    ? <span className={`font-medium ${scoreColor(cp.fitScore)}`}>{Math.round(cp.fitScore)}</span>
-                    : <span className="text-gray-400">—</span>
-                  }
-                </td>
+                <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
               </tr>
             ))}
           </tbody>
@@ -108,6 +164,8 @@ export function PositionCandidatesPanel({ positionId, candidatePositions, active
       {showModal && (
         <AddCandidateToPositionModal
           positionId={positionId}
+          existingCandidateIds={existingCandidateIds}
+          onAdded={handleAdded}
           onClose={() => setShowModal(false)}
         />
       )}
