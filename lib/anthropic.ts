@@ -49,7 +49,12 @@ export async function callClaudeJSON<T>(
     '\nRespond ONLY with valid JSON. No markdown, no backticks, no explanation.'
   const text = await callClaude(prompt, model, system)
   try {
-    return JSON.parse(text) as T
+    const clean = text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim()
+    return JSON.parse(clean) as T
   } catch {
     throw new Error(`Claude returned invalid JSON: ${text.slice(0, 200)}`)
   }
