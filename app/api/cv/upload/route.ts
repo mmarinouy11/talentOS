@@ -34,7 +34,13 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .flatMap((page: any) => page.Texts)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((t: any) => decodeURIComponent(t.R.map((r: any) => r.T).join('')))
+        .map((t: any) => {
+          try {
+            return decodeURIComponent(t.R.map((r: any) => r.T).join(''))
+          } catch {
+            return t.R.map((r: any) => r.T).join('')
+          }
+        })
         .join(' ')
       resolve(text)
     })
