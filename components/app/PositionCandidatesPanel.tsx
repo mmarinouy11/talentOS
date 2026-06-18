@@ -52,6 +52,7 @@ interface Props {
 }
 
 export function PositionCandidatesPanel({ positionId, candidatePositions: initial, activeCandidates }: Props) {
+  const [rows, setRows] = useState<CandidatePosition[]>(initial)
   const [showModal, setShowModal] = useState(false)
   // live fit scores: cpId → number | null (null = still scoring)
   const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
@@ -85,11 +86,12 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
     setTimeout(() => clearInterval(interval), 120_000)
   }, [])
 
-  function handleAdded(cpId: string) {
-    startPolling(cpId)
+  function handleCandidateAdded(newRow: CandidatePosition) {
+    setRows((prev) => [...prev, newRow])
+    startPolling(newRow.id)
   }
 
-  const existingCandidateIds = new Set(initial.map((cp) => cp.candidate.id))
+  const existingCandidateIds = new Set(rows.map((cp) => cp.candidate.id))
 
   function fitCell(cp: CandidatePosition) {
     // live score arrived
@@ -111,14 +113,14 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
       <div className="border-b border-gray-100 px-6 py-3 flex items-center justify-between">
         <div>
           <span className="text-sm font-medium text-gray-900">
-            Candidates ({initial.length})
+            Candidates ({rows.length})
           </span>
           <span className="ml-4 text-sm text-gray-500">{activeCandidates} active</span>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>Add Candidate</Button>
       </div>
 
-      {initial.length === 0 && !scoringIds.size ? (
+      {rows.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-400">No candidates yet.</div>
       ) : (
         <table className="w-full text-sm">
@@ -132,7 +134,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {initial.map((cp) => (
+            {rows.map((cp) => (
               <tr
                 key={cp.id}
                 className="hover:bg-gray-50 cursor-pointer"
@@ -165,7 +167,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         <AddCandidateToPositionModal
           positionId={positionId}
           existingCandidateIds={existingCandidateIds}
-          onAdded={handleAdded}
+          onCandidateAdded={handleCandidateAdded}
           onClose={() => setShowModal(false)}
         />
       )}

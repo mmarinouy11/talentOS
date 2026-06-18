@@ -14,14 +14,27 @@ interface Candidate {
   seniority: Seniority | null
 }
 
+interface NewCandidatePosition {
+  id: string
+  stage: 'APPLIED'
+  fitScore: null
+  candidate: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    seniority: Seniority | null
+  }
+}
+
 interface Props {
   positionId: string
   existingCandidateIds: Set<string>
-  onAdded: (candidatePositionId: string) => void
+  onCandidateAdded: (newRow: NewCandidatePosition) => void
   onClose: () => void
 }
 
-export function AddCandidateToPositionModal({ positionId, existingCandidateIds, onAdded, onClose }: Props) {
+export function AddCandidateToPositionModal({ positionId, existingCandidateIds, onCandidateAdded, onClose }: Props) {
   const [filter, setFilter] = useState('')
   const [allCandidates, setAllCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,7 +71,12 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
     if (res.ok) {
       const cp = await res.json()
       setAdded((prev) => new Set([...prev, candidateId]))
-      onAdded(cp.id)
+      onCandidateAdded({
+        id: cp.id,
+        stage: 'APPLIED',
+        fitScore: null,
+        candidate: cp.candidate,
+      })
     } else {
       const data = await res.json()
       setError(data.error ?? 'Failed to add candidate')

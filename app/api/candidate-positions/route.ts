@@ -42,6 +42,9 @@ export async function POST(request: Request) {
       notes,
       recruiterId: resolvedRecruiterId,
     },
+    include: {
+      candidate: { select: { id: true, firstName: true, lastName: true, email: true, seniority: true } },
+    },
   })
 
   await db.stageHistory.create({
