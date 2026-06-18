@@ -92,6 +92,12 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
     startPolling(newRow.id)
   }
 
+  async function handleRemove(cpId: string, name: string) {
+    if (!confirm(`Remove ${name} from this position?`)) return
+    const res = await fetch(`/api/candidate-positions/${cpId}`, { method: 'DELETE' })
+    if (res.ok) setRows((prev) => prev.filter((r) => r.id !== cpId))
+  }
+
   const existingCandidateIds = new Set(rows.map((cp) => cp.candidate.id))
 
   function fitCell(cp: CandidatePosition) {
@@ -132,6 +138,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
               <th className="text-left px-4 py-3 font-medium text-gray-600">Seniority</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Stage</th>
               <th className="text-right px-4 py-3 font-medium text-gray-600">Fit</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -161,6 +168,20 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRemove(cp.id, `${cp.candidate.firstName} ${cp.candidate.lastName}`)
+                    }}
+                    className="text-gray-400 hover:text-red-600 transition-colors"
+                    title="Remove from position"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

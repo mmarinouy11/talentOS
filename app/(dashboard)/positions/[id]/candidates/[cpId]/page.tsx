@@ -110,6 +110,9 @@ export default async function CandidateInPositionPage({
             <Link href={`/candidates/${candidate.id}`}>
               <Button variant="outline" size="sm">Full Profile</Button>
             </Link>
+            <Link href={`/candidates/${candidate.id}/edit`}>
+              <Button variant="outline" size="sm">Edit Candidate</Button>
+            </Link>
             <Link href={`/positions/${positionId}`}>
               <Button variant="ghost" size="sm">← Back to Position</Button>
             </Link>

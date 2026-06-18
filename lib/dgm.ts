@@ -21,5 +21,9 @@ export async function computePositionDGM(
   if (!clientRate || !internalCostBudget) return { dgm: null, dgmAtRisk: false }
   const dgm = calculateDGM(clientRate, internalCostBudget)
   const threshold = await getMinDGMThreshold()
-  return { dgm, dgmAtRisk: dgm < threshold }
+  // Round to 3 decimal places before comparing so a displayed "40.0%" (0.3999... stored)
+  // is never incorrectly flagged when threshold is exactly 40%.
+  const dgmRounded = Math.round(dgm * 1000) / 1000
+  const thresholdRounded = Math.round(threshold * 1000) / 1000
+  return { dgm, dgmAtRisk: dgmRounded < thresholdRounded }
 }

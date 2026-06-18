@@ -59,3 +59,23 @@ export async function GET(
 
   return NextResponse.json(cp)
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+
+  const existing = await db.candidatePosition.findFirst({ where: { id } })
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  await db.$transaction([
+    db.stageHistory.deleteMany({ where: { candidatePositionId: id } }),
+    db.candidatePosition.delete({ where: { id } }),
+  ])
+
+  return NextResponse.json({ ok: true })
+}
