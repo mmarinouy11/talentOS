@@ -1,0 +1,145 @@
+import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { redirect, notFound } from 'next/navigation'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { SeniorityBadge } from '@/components/app/SeniorityBadge'
+import { StageBadge } from '@/components/app/StageBadge'
+import { SkillTags } from '@/components/app/SkillTags'
+import { FitScoreCard } from '@/components/app/FitScoreCard'
+
+export default async function CandidateInPositionPage({
+  params,
+}: {
+  params: Promise<{ id: string; cpId: string }>
+}) {
+  const session = await auth()
+  if (!session?.user) redirect('/login')
+
+  const { id: positionId, cpId } = await params
+
+  const cp = await db.candidatePosition.findFirst({
+    where: { id: cpId },
+    include: {
+      candidate: true,
+      position: { select: { id: true, title: true, client: true } },
+      stageHistory: { orderBy: { movedAt: 'desc' }, include: { movedBy: { select: { name: true, email: true } } } },
+    },
+  })
+
+  if (!cp) notFound()
+
+  const { candidate, position } = cp
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <nav className="text-sm text-gray-500 mb-1 flex items-center gap-2">
+          <Link href={`/positions/${positionId}`} className="hover:text-gray-900">{position.title}</Link>
+          <span>›</span>
+          <span className="text-gray-900">{candidate.firstName} {candidate.lastName}</span>
+        </nav>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-gray-900">{candidate.firstName} {candidate.lastName}</h1>
+          {candidate.seniority && <SeniorityBadge seniority={candidate.seniority} />}
+          <StageBadge stage={cp.stage} />
+        </div>
+        <p className="text-sm text-gray-500 mt-0.5">{position.title} · {position.client}</p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-6">
+        {/* Left: candidate profile */}
+        <div className="col-span-1 space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+            <h2 className="text-sm font-medium text-gray-900">Profile</h2>
+            <div className="text-sm space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</p>
+                <p className="text-gray-900 mt-0.5">{candidate.email}</p>
+              </div>
+              {candidate.phone && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</p>
+                  <p className="text-gray-900 mt-0.5">{candidate.phone}</p>
+                </div>
+              )}
+              {candidate.country && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Country</p>
+                  <p className="text-gray-900 mt-0.5">{candidate.country}</p>
+                </div>
+              )}
+              {candidate.yearsOfExperience != null && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Experience</p>
+                  <p className="text-gray-900 mt-0.5">{candidate.yearsOfExperience} years</p>
+                </div>
+              )}
+              {candidate.skills.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Skills</p>
+                  <div className="mt-1"><SkillTags tags={candidate.skills} /></div>
+                </div>
+              )}
+              {candidate.languages.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Languages</p>
+                  <div className="mt-1"><SkillTags tags={candidate.languages} /></div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {candidate.summary && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="text-sm font-medium text-gray-900 mb-2">Summary</h2>
+              <p className="text-sm text-gray-700 leading-relaxed">{candidate.summary}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Link href={`/candidates/${candidate.id}`}>
+              <Button variant="outline" size="sm">Full Profile</Button>
+            </Link>
+            <Link href={`/positions/${positionId}`}>
+              <Button variant="ghost" size="sm">← Back to Position</Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Right: Fit Score + Stage */}
+        <div className="col-span-2 space-y-4">
+          <FitScoreCard
+            candidatePositionId={cp.id}
+            fitScore={cp.fitScore}
+            technicalFitScore={cp.technicalFitScore}
+            seniorityFitScore={cp.seniorityFitScore}
+            domainFitScore={cp.domainFitScore}
+            communicationFitScore={cp.communicationFitScore}
+            fitSummary={cp.fitSummary}
+            fitStrengths={cp.fitStrengths}
+            fitGaps={cp.fitGaps}
+            fitScoredAt={cp.fitScoredAt?.toISOString() ?? null}
+          />
+
+          {/* Stage history */}
+          {cp.stageHistory.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="text-sm font-medium text-gray-900 mb-3">Stage History</h2>
+              <div className="space-y-2">
+                {cp.stageHistory.map((h) => (
+                  <div key={h.id} className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-400 text-xs">{new Date(h.movedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    {h.fromStage && <><span className="text-gray-500">{h.fromStage}</span><span className="text-gray-400">→</span></>}
+                    <span className="font-medium text-gray-900">{h.toStage}</span>
+                    <span className="text-gray-400">by {h.movedBy.name ?? h.movedBy.email}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

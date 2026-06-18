@@ -5,7 +5,15 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PositionStatusBadge } from '@/components/app/PositionStatusBadge'
 import { PriorityBadge } from '@/components/app/PriorityBadge'
+import { JDIntelligence } from '@/components/app/JDIntelligence'
 import type { Stage } from '@prisma/client'
+
+function fitScoreColor(score: number): string {
+  if (score >= 85) return 'text-green-600'
+  if (score >= 70) return 'text-yellow-600'
+  if (score >= 50) return 'text-orange-600'
+  return 'text-red-600'
+}
 
 const STAGE_LABELS: Record<Stage, string> = {
   APPLIED: 'Applied',
@@ -130,6 +138,16 @@ export default async function PositionDetailPage({
         </div>
       </div>
 
+      {/* JD Intelligence */}
+      <JDIntelligence
+        positionId={id}
+        jdParsed={position.jdParsed}
+        jdSummary={position.jdSummary}
+        jdSkills={position.jdSkills}
+        jdSeniority={position.jdSeniority}
+        jdLanguages={position.jdLanguages}
+      />
+
       {/* Metrics */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
@@ -161,13 +179,14 @@ export default async function PositionDetailPage({
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Seniority</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Stage</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Fit Score</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {position.candidatePositions.map((cp) => (
                 <tr key={cp.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">
-                    <Link href={`/candidates/${cp.candidate.id}`} className="hover:underline">
+                    <Link href={`/positions/${id}/candidates/${cp.id}`} className="hover:underline">
                       {cp.candidate.firstName} {cp.candidate.lastName}
                     </Link>
                   </td>
@@ -177,6 +196,11 @@ export default async function PositionDetailPage({
                     <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                       {STAGE_LABELS[cp.stage]}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {cp.fitScore != null
+                      ? <span className={`font-medium text-sm ${fitScoreColor(cp.fitScore)}`}>{Math.round(cp.fitScore)}</span>
+                      : <span className="text-gray-400">—</span>}
                   </td>
                 </tr>
               ))}

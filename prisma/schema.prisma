@@ -118,6 +118,11 @@ model Position {
   hiring_manager_name  String?
   hiring_manager_email String?
   sales_contact_email  String?
+  jdParsed             Boolean    @default(false)
+  jdSkills             String[]
+  jdSeniority          Seniority?
+  jdLanguages          String[]
+  jdSummary            String?    @db.Text
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   deletedAt            DateTime?
@@ -158,12 +163,18 @@ model CandidatePosition {
   id                  String            @id @default(cuid())
   candidateId         String
   positionId          String
-  stage               Stage             @default(APPLIED)
-  stageEnteredAt      DateTime          @default(now())
-  fitScore            Float?
-  technicalScore      Float?
-  communicationScore  Float?
-  desiredCompensation Float?
+  stage                 Stage             @default(APPLIED)
+  stageEnteredAt        DateTime          @default(now())
+  fitScore              Float?
+  technicalFitScore     Float?
+  seniorityFitScore     Float?
+  domainFitScore        Float?
+  communicationFitScore Float?
+  fitSummary            String?           @db.Text
+  fitStrengths          String[]
+  fitGaps               String[]
+  fitScoredAt           DateTime?
+  desiredCompensation   Float?
   minimumCompensation Float?
   noticePeriodDays    Int?
   earliestStartDate   DateTime?
