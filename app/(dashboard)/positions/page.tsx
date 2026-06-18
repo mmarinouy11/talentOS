@@ -32,6 +32,8 @@ export default async function PositionsPage() {
     target_date_asap: p.target_date_asap,
     target_date: p.target_date?.toISOString() ?? null,
     createdAt: p.createdAt.toISOString(),
+    dgm: p.dgm,
+    dgmAtRisk: p.dgmAtRisk,
     recruiter: p.recruiter,
     _count: p._count,
   }))

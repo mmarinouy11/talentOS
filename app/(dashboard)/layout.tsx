@@ -22,6 +22,11 @@ export default async function DashboardLayout({
 
   const user = session.user as { name?: string | null; email?: string | null; role?: Role }
 
+  const items = [...navItems]
+  if (user.role === 'ADMIN') {
+    items.push({ href: '/settings', label: 'Settings' })
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <aside className="w-56 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
@@ -30,7 +35,7 @@ export default async function DashboardLayout({
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => (
+          {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}

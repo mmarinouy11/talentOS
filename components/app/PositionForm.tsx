@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,6 +54,8 @@ interface PositionFormProps {
     hiring_manager_name?: string | null
     hiring_manager_email?: string | null
     sales_contact_email?: string | null
+    clientRate?: number | null
+    internalCostBudget?: number | null
   }
   mode: 'create' | 'edit'
 }
@@ -64,6 +66,29 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
   const [loading, setLoading] = useState(false)
   const [isAsap, setIsAsap] = useState(defaultValues.target_date_asap ?? false)
   const [locations, setLocations] = useState<string[]>(defaultValues.location ?? [])
+  const [clientRate, setClientRate] = useState<string>(
+    defaultValues.clientRate != null ? String(defaultValues.clientRate) : ''
+  )
+  const [internalCostBudget, setInternalCostBudget] = useState<string>(
+    defaultValues.internalCostBudget != null ? String(defaultValues.internalCostBudget) : ''
+  )
+  const [dgmThreshold, setDgmThreshold] = useState<number>(0.4)
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((settings: { key: string; value: string }[]) => {
+        const s = settings.find((x) => x.key === 'MIN_DGM_PERCENT')
+        if (s) setDgmThreshold(parseFloat(s.value) / 100)
+      })
+      .catch(() => {})
+  }, [])
+
+  const crNum = parseFloat(clientRate)
+  const icbNum = parseFloat(internalCostBudget)
+  const dgm =
+    !isNaN(crNum) && crNum > 0 && !isNaN(icbNum) ? (crNum - icbNum) / crNum : null
+  const dgmAtRisk = dgm != null && dgm < dgmThreshold
 
   const recruiters = users.filter((u) => u.role === 'RECRUITER' || u.role === 'ADMIN')
 
@@ -106,6 +131,8 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
       hiring_manager_name: (fd.get('hiring_manager_name') as string) || null,
       hiring_manager_email: (fd.get('hiring_manager_email') as string) || null,
       sales_contact_email: (fd.get('sales_contact_email') as string) || null,
+      clientRate: clientRate !== '' && !isNaN(crNum) ? crNum : null,
+      internalCostBudget: internalCostBudget !== '' && !isNaN(icbNum) ? icbNum : null,
     }
 
     if (mode === 'edit') {
@@ -335,6 +362,48 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             placeholder="Optional"
           />
         </div>
+      </div>
+
+      {/* Compensation & Margin */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-sm font-medium text-gray-900 mb-3">Compensation &amp; Margin</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="clientRate">Client Rate ($/month)</Label>
+            <Input
+              id="clientRate"
+              type="number"
+              min={0}
+              value={clientRate}
+              onChange={(e) => setClientRate(e.target.value)}
+              placeholder="e.g. 10000"
+            />
+          </div>
+          <div>
+            <Label htmlFor="internalCostBudget">Internal Cost Budget ($/month)</Label>
+            <Input
+              id="internalCostBudget"
+              type="number"
+              min={0}
+              value={internalCostBudget}
+              onChange={(e) => setInternalCostBudget(e.target.value)}
+              placeholder="e.g. 5500"
+            />
+          </div>
+        </div>
+        {dgm != null && (
+          <div className="mt-3 text-sm">
+            <span className="text-gray-500">Delivery Gross Margin: </span>
+            <span className={`font-semibold ${dgmAtRisk ? 'text-red-600' : 'text-green-600'}`}>
+              {(dgm * 100).toFixed(1)}%
+            </span>
+            {dgmAtRisk && (
+              <span className="ml-2 text-red-600">
+                ⚠️ Below minimum threshold ({(dgmThreshold * 100).toFixed(0)}%)
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 pt-2">

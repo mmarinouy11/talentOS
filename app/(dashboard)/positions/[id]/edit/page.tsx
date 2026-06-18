@@ -55,6 +55,8 @@ export default async function EditPositionPage({
             hiring_manager_name: position.hiring_manager_name,
             hiring_manager_email: position.hiring_manager_email,
             sales_contact_email: position.sales_contact_email,
+            clientRate: position.clientRate,
+            internalCostBudget: position.internalCostBudget,
           }}
         />
       </div>

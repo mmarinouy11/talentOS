@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJDInBackground } from '@/lib/jd-parser'
+import { computePositionDGM } from '@/lib/dgm'
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -17,6 +18,8 @@ const patchSchema = z.object({
   hiring_manager_email: z.string().email().optional().nullable(),
   hiring_manager_name: z.string().optional().nullable(),
   sales_contact_email: z.string().email().optional().nullable(),
+  clientRate: z.number().optional().nullable(),
+  internalCostBudget: z.number().optional().nullable(),
 })
 
 export async function GET(
@@ -73,7 +76,15 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const position = await db.position.update({ where: { id }, data: parsed.data })
+  const clientRate = parsed.data.clientRate !== undefined ? parsed.data.clientRate : existing.clientRate
+  const internalCostBudget =
+    parsed.data.internalCostBudget !== undefined ? parsed.data.internalCostBudget : existing.internalCostBudget
+  const { dgm, dgmAtRisk } = await computePositionDGM(clientRate, internalCostBudget)
+
+  const position = await db.position.update({
+    where: { id },
+    data: { ...parsed.data, dgm, dgmAtRisk },
+  })
 
   if (parsed.data.description) parseJDInBackground(position.id)
 

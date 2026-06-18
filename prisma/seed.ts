@@ -19,6 +19,16 @@ async function main() {
     },
   })
 
+  await db.systemSettings.upsert({
+    where: { key: 'MIN_DGM_PERCENT' },
+    update: {},
+    create: {
+      key: 'MIN_DGM_PERCENT',
+      value: '40',
+      description: 'Minimum acceptable Delivery Gross Margin percentage. Positions below this are flagged at risk.',
+    },
+  })
+
   console.log('Seeded admin user:', user.email, '— role:', user.role)
   await db.$disconnect()
 }

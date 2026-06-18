@@ -118,6 +118,10 @@ model Position {
   hiring_manager_name  String?
   hiring_manager_email String?
   sales_contact_email  String?
+  clientRate          Float?
+  internalCostBudget  Float?
+  dgm                 Float?
+  dgmAtRisk           Boolean @default(false)
   jdParsed             Boolean    @default(false)
   jdSkills             String[]
   jdSeniority          Seniority?
@@ -179,6 +183,7 @@ model CandidatePosition {
   noticePeriodDays      Int?
   earliestStartDate     DateTime?
   compensationRisk      CompensationRisk?
+  compensationOutOfRange Boolean          @default(false)
   notes                 String?           @db.Text
   recruiterId           String
   createdAt             DateTime          @default(now())
@@ -203,4 +208,12 @@ model StageHistory {
 
   candidatePosition CandidatePosition @relation(fields: [candidatePositionId], references: [id])
   movedBy           User              @relation(fields: [movedById], references: [id])
+}
+
+model SystemSettings {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
 }

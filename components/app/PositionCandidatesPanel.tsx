@@ -36,6 +36,7 @@ interface CandidatePosition {
   id: string
   stage: Stage
   fitScore: number | null
+  compensationOutOfRange?: boolean
   candidate: {
     id: string
     firstName: string
@@ -148,6 +149,9 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
                   >
                     {cp.candidate.firstName} {cp.candidate.lastName}
                   </Link>
+                  {cp.compensationOutOfRange && (
+                    <span className="ml-1.5 text-red-600" title="Compensation out of range">💰</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-gray-600">{cp.candidate.email}</td>
                 <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>

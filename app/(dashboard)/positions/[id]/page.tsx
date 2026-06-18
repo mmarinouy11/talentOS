@@ -121,6 +121,35 @@ export default async function PositionDetailPage({
         </div>
       </div>
 
+      {/* Financials */}
+      {(position.clientRate || position.internalCostBudget) && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-sm font-medium text-gray-900 mb-4">Financials</h2>
+          {position.dgmAtRisk && (
+            <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <span className="text-red-600">⚠️</span>
+              <p className="text-sm text-red-700 font-medium">This position&apos;s margin is below the minimum threshold</p>
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Client Rate</p>
+              <p className="text-sm text-gray-900 mt-1">{position.clientRate ? `$${position.clientRate.toLocaleString()}/mo` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Internal Budget</p>
+              <p className="text-sm text-gray-900 mt-1">{position.internalCostBudget ? `$${position.internalCostBudget.toLocaleString()}/mo` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">DGM</p>
+              <p className={`text-sm font-medium mt-1 ${position.dgmAtRisk ? 'text-red-600' : 'text-green-600'}`}>
+                {position.dgm != null ? `${(position.dgm * 100).toFixed(1)}%` : '—'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* JD Intelligence */}
       <JDIntelligence
         positionId={id}
@@ -150,6 +179,7 @@ export default async function PositionDetailPage({
           id: cp.id,
           stage: cp.stage,
           fitScore: cp.fitScore,
+          compensationOutOfRange: cp.compensationOutOfRange,
           candidate: {
             id: cp.candidate.id,
             firstName: cp.candidate.firstName,

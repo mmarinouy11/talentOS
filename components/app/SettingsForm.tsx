@@ -1,0 +1,87 @@
+'use client'
+
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+interface Setting {
+  id: string
+  key: string
+  value: string
+  description: string | null
+}
+
+const LABELS: Record<string, { label: string; type?: string; min?: number; max?: number }> = {
+  MIN_DGM_PERCENT: { label: 'Minimum DGM Threshold (%)', type: 'number', min: 0, max: 100 },
+}
+
+function SettingRow({ setting }: { setting: Setting }) {
+  const meta = LABELS[setting.key] ?? { label: setting.key }
+  const [value, setValue] = useState(setting.value)
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  async function save() {
+    setSaving(true)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/settings/${setting.key}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setFeedback({ ok: false, msg: data.error ?? 'Failed to save' })
+      } else {
+        setFeedback({ ok: true, msg: 'Saved' })
+      }
+    } catch {
+      setFeedback({ ok: false, msg: 'Network error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <Label htmlFor={setting.key}>{meta.label}</Label>
+      {setting.description && (
+        <p className="text-xs text-gray-500 mt-0.5 mb-2">{setting.description}</p>
+      )}
+      <div className="flex items-center gap-3 mt-1">
+        <Input
+          id={setting.key}
+          type={meta.type ?? 'text'}
+          min={meta.min}
+          max={meta.max}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="max-w-xs"
+        />
+        <Button type="button" onClick={save} disabled={saving || value === setting.value}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+        {feedback && (
+          <span className={`text-sm ${feedback.ok ? 'text-green-600' : 'text-red-600'}`}>
+            {feedback.msg}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function SettingsForm({ settings }: { settings: Setting[] }) {
+  if (settings.length === 0) {
+    return <p className="text-sm text-gray-400">No settings configured.</p>
+  }
+  return (
+    <div className="space-y-4 max-w-2xl">
+      {settings.map((s) => (
+        <SettingRow key={s.id} setting={s} />
+      ))}
+    </div>
+  )
+}

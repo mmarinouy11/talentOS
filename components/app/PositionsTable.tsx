@@ -18,8 +18,16 @@ export interface PositionRow {
   target_date_asap: boolean
   target_date: string | null
   createdAt: string
+  dgm: number | null
+  dgmAtRisk: boolean
   recruiter: { name: string | null; email: string } | null
   _count: { candidatePositions: number }
+}
+
+function dgmColor(dgm: number, atRisk: boolean): string {
+  if (atRisk) return 'text-red-600'
+  if (dgm >= 0.5) return 'text-green-600'
+  return 'text-orange-600'
 }
 
 function aging(createdAt: string) {
@@ -93,6 +101,7 @@ export function PositionsTable({ positions }: { positions: PositionRow[] }) {
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Client</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Priority</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-600">DGM</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Recruiter</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Target</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-600">Aging</th>
@@ -105,13 +114,25 @@ export function PositionsTable({ positions }: { positions: PositionRow[] }) {
                 const days = aging(p.createdAt)
                 return (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900">{p.title}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {p.dgmAtRisk && <span className="text-red-600 mr-1" title="Margin at risk">⚠</span>}
+                      {p.title}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{p.client}</td>
                     <td className="px-4 py-3">
                       <PositionStatusBadge status={p.status} />
                     </td>
                     <td className="px-4 py-3">
                       <PriorityBadge priority={p.priority} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {p.dgm != null ? (
+                        <span className={`font-medium ${dgmColor(p.dgm, p.dgmAtRisk)}`}>
+                          {(p.dgm * 100).toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {p.recruiter?.name ?? p.recruiter?.email ?? '—'}

@@ -7,6 +7,7 @@ import { SeniorityBadge } from '@/components/app/SeniorityBadge'
 import { StageBadge } from '@/components/app/StageBadge'
 import { SkillTags } from '@/components/app/SkillTags'
 import { FitScoreCard } from '@/components/app/FitScoreCard'
+import { CompensationEditor } from '@/components/app/CompensationEditor'
 
 export default async function CandidateInPositionPage({
   params,
@@ -22,7 +23,7 @@ export default async function CandidateInPositionPage({
     where: { id: cpId },
     include: {
       candidate: true,
-      position: { select: { id: true, title: true, client: true } },
+      position: { select: { id: true, title: true, client: true, internalCostBudget: true } },
       stageHistory: {
         orderBy: { movedAt: 'desc' },
         include: { movedBy: { select: { name: true, email: true } } },
@@ -128,6 +129,13 @@ export default async function CandidateInPositionPage({
             fitStrengths={cp.fitStrengths}
             fitGaps={cp.fitGaps}
             fitScoredAt={cp.fitScoredAt?.toISOString() ?? null}
+          />
+
+          <CompensationEditor
+            candidatePositionId={cp.id}
+            desiredCompensation={cp.desiredCompensation}
+            minimumCompensation={cp.minimumCompensation}
+            internalCostBudget={position.internalCostBudget}
           />
 
           {cp.stageHistory.length > 0 && (
