@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON } from '@/lib/anthropic'
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 const SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -23,6 +24,20 @@ Rules:
 - Seniority: 0-2 years = JUNIOR, 2-5 = MID, 5-8 = SENIOR, 8-12 = STAFF, 12+ = PRINCIPAL
 - Return null for fields you cannot determine, never guess email or phone
 - No markdown, no explanation, only the JSON object`
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const uint8Array = new Uint8Array(buffer)
+  const pdf = await getDocument({ data: uint8Array }).promise
+  const pages = await Promise.all(
+    Array.from({ length: pdf.numPages }, async (_, i) => {
+      const page = await pdf.getPage(i + 1)
+      const content = await page.getTextContent()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ')
+    })
+  )
+  return pages.join('\n')
+}
 
 export async function POST(request: Request) {
   const session = await auth()
@@ -53,10 +68,7 @@ export async function POST(request: Request) {
     // Extract text
     let text = ''
     if (mimeType === 'application/pdf') {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
-      const result = await pdfParse(buffer)
-      text = result.text
+      text = await extractPdfText(buffer)
     } else {
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ buffer })
@@ -67,7 +79,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not extract text from file' }, { status: 422 })
     }
 
-    // Upload to Google Drive
+    // Upload to Google Drive (non-fatal if it fails)
     const timestamp = Date.now()
     const driveFileName = `${timestamp}_${originalName}`
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID!
@@ -80,10 +92,9 @@ export async function POST(request: Request) {
       driveFileName2 = uploaded.fileName
     } catch (err) {
       console.error('Drive upload failed:', err)
-      // Continue even if Drive upload fails — parsing still works
     }
 
-    // Parse with Claude
+    // Parse with Claude Haiku
     const parsed = await callClaudeJSON<{
       firstName: string | null
       lastName: string | null
