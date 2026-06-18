@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON } from '@/lib/anthropic'
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import PDFParser from 'pdf2json'
 
 const SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -26,17 +26,21 @@ Rules:
 - No markdown, no explanation, only the JSON object`
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  const uint8Array = new Uint8Array(buffer)
-  const pdf = await getDocument({ data: uint8Array }).promise
-  const pages = await Promise.all(
-    Array.from({ length: pdf.numPages }, async (_, i) => {
-      const page = await pdf.getPage(i + 1)
-      const content = await page.getTextContent()
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser()
+    pdfParser.on('pdfParser_dataReady', (pdfData) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ')
+      const text = (pdfData as any).Pages
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .flatMap((page: any) => page.Texts)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((t: any) => decodeURIComponent(t.R.map((r: any) => r.T).join('')))
+        .join(' ')
+      resolve(text)
     })
-  )
-  return pages.join('\n')
+    pdfParser.on('pdfParser_dataError', reject)
+    pdfParser.parseBuffer(buffer)
+  })
 }
 
 export async function POST(request: Request) {
