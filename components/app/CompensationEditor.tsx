@@ -71,13 +71,20 @@ export function CompensationEditor({
         )}
       </div>
 
-      {outOfRange && (
-        <div className="mb-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          <span className="text-red-600">💰</span>
-          <p className="text-sm text-red-700 font-medium">
-            Minimum compensation exceeds the internal cost budget
-          </p>
-        </div>
+      {minimum != null && internalCostBudget != null && (
+        outOfRange ? (
+          <div className="mb-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <span className="text-red-600">⚠</span>
+            <p className="text-sm text-red-700 font-medium">
+              This candidate&apos;s minimum expectation ({fmt(minimum)}) exceeds the position budget ({fmt(internalCostBudget)})
+            </p>
+          </div>
+        ) : (
+          <div className="mb-3 flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <span className="text-green-600">✓</span>
+            <p className="text-sm text-green-700 font-medium">Within budget</p>
+          </div>
+        )
       )}
 
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
@@ -95,7 +102,7 @@ export function CompensationEditor({
             />
           </div>
           <div>
-            <Label htmlFor="minComp">Minimum Compensation ($/hour)</Label>
+            <Label htmlFor="minComp">Minimum Acceptable Compensation ($/hour)</Label>
             <Input
               id="minComp"
               type="number"
@@ -129,7 +136,7 @@ export function CompensationEditor({
             <p className="text-gray-900 mt-0.5">{fmt(desired)}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Minimum</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Minimum Acceptable</p>
             <p className="text-gray-900 mt-0.5">{fmt(minimum)}</p>
           </div>
           <div>
