@@ -13,7 +13,7 @@ interface Props {
 }
 
 function fmt(n: number | null) {
-  return n != null ? `$${n.toLocaleString()}/mo` : '—'
+  return n != null ? `$${n.toLocaleString()}/hr` : '—'
 }
 
 export function CompensationEditor({
@@ -85,7 +85,7 @@ export function CompensationEditor({
       {editing ? (
         <div className="space-y-3">
           <div>
-            <Label htmlFor="desiredComp">Desired Compensation ($/month)</Label>
+            <Label htmlFor="desiredComp">Desired Compensation ($/hour)</Label>
             <Input
               id="desiredComp"
               type="number"
@@ -95,7 +95,7 @@ export function CompensationEditor({
             />
           </div>
           <div>
-            <Label htmlFor="minComp">Minimum Compensation ($/month)</Label>
+            <Label htmlFor="minComp">Minimum Compensation ($/hour)</Label>
             <Input
               id="minComp"
               type="number"

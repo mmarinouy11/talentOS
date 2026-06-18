@@ -369,7 +369,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
         <h2 className="text-sm font-medium text-gray-900 mb-3">Compensation &amp; Margin</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="clientRate">Client Rate ($/month)</Label>
+            <Label htmlFor="clientRate">Client Rate ($/hour)</Label>
             <Input
               id="clientRate"
               type="number"
@@ -380,7 +380,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             />
           </div>
           <div>
-            <Label htmlFor="internalCostBudget">Internal Cost Budget ($/month)</Label>
+            <Label htmlFor="internalCostBudget">Internal Cost Budget ($/hour)</Label>
             <Input
               id="internalCostBudget"
               type="number"

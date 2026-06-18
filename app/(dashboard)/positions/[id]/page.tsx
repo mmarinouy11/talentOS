@@ -134,11 +134,11 @@ export default async function PositionDetailPage({
           <div className="grid grid-cols-3 gap-6">
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Client Rate</p>
-              <p className="text-sm text-gray-900 mt-1">{position.clientRate ? `$${position.clientRate.toLocaleString()}/mo` : '—'}</p>
+              <p className="text-sm text-gray-900 mt-1">{position.clientRate ? `$${position.clientRate.toLocaleString()}/hr` : '—'}</p>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Internal Budget</p>
-              <p className="text-sm text-gray-900 mt-1">{position.internalCostBudget ? `$${position.internalCostBudget.toLocaleString()}/mo` : '—'}</p>
+              <p className="text-sm text-gray-900 mt-1">{position.internalCostBudget ? `$${position.internalCostBudget.toLocaleString()}/hr` : '—'}</p>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">DGM</p>
