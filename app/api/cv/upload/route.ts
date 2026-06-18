@@ -97,11 +97,12 @@ export async function POST(request: Request) {
     let driveFileId = ''
     let driveFileName2 = driveFileName
     try {
-      const uploaded = await uploadFileToDrive(buffer, driveFileName, mimeType, folderId)
-      driveFileId = uploaded.fileId
-      driveFileName2 = uploaded.fileName
-    } catch (err) {
-      console.error('Drive upload failed:', err)
+      const { fileId, fileName: savedName } = await uploadFileToDrive(buffer, driveFileName, mimeType, folderId)
+      driveFileId = fileId
+      driveFileName2 = savedName
+    } catch (driveError) {
+      console.error('Drive upload failed (non-fatal):', driveError)
+      // continue — CV parsing works independently of Drive
     }
 
     // Parse with Claude Haiku

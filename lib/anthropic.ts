@@ -29,7 +29,7 @@ export async function callClaude(
   const anthropic = getAnthropic()
   const response = await anthropic.messages.create({
     model: MODELS[model],
-    max_tokens: 1024,
+    max_tokens: 4096,
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
   })
