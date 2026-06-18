@@ -135,6 +135,8 @@ model Candidate {
   country               String?
   cvDriveId             String?
   cvOriginalName        String?
+  linkedinUrl           String?
+  notes                 String?    @db.Text
   skills                String[]
   languages             String[]
   seniority             Seniority?
