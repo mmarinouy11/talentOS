@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 
 const schema = z.object({
   candidateId: z.string(),
@@ -52,6 +53,8 @@ export async function POST(request: Request) {
       notes,
     },
   })
+
+  scoreCandidateForPosition(cp.id).catch(console.error)
 
   return NextResponse.json(cp, { status: 201 })
 }

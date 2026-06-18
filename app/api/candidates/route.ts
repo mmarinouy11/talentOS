@@ -19,12 +19,26 @@ const candidateSchema = z.object({
   cvOriginalName: z.string().optional().nullable(),
 })
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { searchParams } = new URL(request.url)
+  const search = searchParams.get('search')?.trim()
+
   const candidates = await db.candidate.findMany({
-    where: { deletedAt: null },
+    where: {
+      deletedAt: null,
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: 'insensitive' } },
+              { lastName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    },
     select: {
       id: true,
       firstName: true,
