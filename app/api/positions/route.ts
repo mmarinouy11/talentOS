@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { parseJDInBackground } from '@/lib/jd-parser'
 
 const positionSchema = z.object({
   title: z.string().min(1),
@@ -54,6 +55,8 @@ export async function POST(request: Request) {
       recruiterId: parsed.data.recruiterId || userId,
     },
   })
+
+  parseJDInBackground(position.id)
 
   return NextResponse.json(position, { status: 201 })
 }

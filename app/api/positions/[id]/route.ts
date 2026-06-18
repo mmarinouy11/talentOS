@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { parseJDInBackground } from '@/lib/jd-parser'
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -73,6 +74,8 @@ export async function PATCH(
   }
 
   const position = await db.position.update({ where: { id }, data: parsed.data })
+
+  if (parsed.data.description) parseJDInBackground(position.id)
 
   return NextResponse.json(position)
 }
