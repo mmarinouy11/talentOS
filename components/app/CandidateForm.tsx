@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { TagInput } from './TagInput'
+import { CVUpload, type ParsedCV } from './CVUpload'
 import type { Seniority } from '@prisma/client'
 
 const LATAM_COUNTRIES = [
@@ -25,6 +26,18 @@ const LATAM_COUNTRIES = [
   'Other',
 ]
 
+interface Fields {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  country: string
+  linkedinUrl: string
+  seniority: Seniority | ''
+  yearsOfExperience: string
+  notes: string
+}
+
 interface CandidateFormProps {
   mode: 'create' | 'edit'
   defaultValues?: {
@@ -40,6 +53,8 @@ interface CandidateFormProps {
     skills?: string[]
     languages?: string[]
     notes?: string | null
+    cvDriveId?: string | null
+    cvOriginalName?: string | null
   }
 }
 
@@ -49,27 +64,64 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
   const [loading, setLoading] = useState(false)
   const [skills, setSkills] = useState<string[]>(defaultValues.skills ?? [])
   const [languages, setLanguages] = useState<string[]>(defaultValues.languages ?? [])
+  const [cvDriveId, setCvDriveId] = useState(defaultValues.cvDriveId ?? '')
+  const [cvOriginalName, setCvOriginalName] = useState(defaultValues.cvOriginalName ?? '')
+  const [cvBanner, setCvBanner] = useState(false)
+
+  const [fields, setFields] = useState<Fields>({
+    firstName: defaultValues.firstName ?? '',
+    lastName: defaultValues.lastName ?? '',
+    email: defaultValues.email ?? '',
+    phone: defaultValues.phone ?? '',
+    country: defaultValues.country ?? '',
+    linkedinUrl: defaultValues.linkedinUrl ?? '',
+    seniority: defaultValues.seniority ?? '',
+    yearsOfExperience: defaultValues.yearsOfExperience?.toString() ?? '',
+    notes: defaultValues.notes ?? '',
+  })
+
+  function setField<K extends keyof Fields>(key: K, value: Fields[K]) {
+    setFields((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function handleParsed(parsed: ParsedCV, fileId: string, fileName: string) {
+    setCvDriveId(fileId)
+    setCvOriginalName(fileName)
+    setCvBanner(true)
+    setFields({
+      firstName: parsed.firstName ?? '',
+      lastName: parsed.lastName ?? '',
+      email: parsed.email ?? '',
+      phone: parsed.phone ?? '',
+      country: parsed.country ?? '',
+      linkedinUrl: parsed.linkedinUrl ?? '',
+      seniority: (parsed.seniority ?? '') as Seniority | '',
+      yearsOfExperience: parsed.yearsOfExperience?.toString() ?? '',
+      notes: parsed.summary ?? '',
+    })
+    if (parsed.skills.length) setSkills(parsed.skills)
+    if (parsed.languages.length) setLanguages(parsed.languages)
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const fd = new FormData(e.currentTarget)
-
-    const yearsStr = fd.get('yearsOfExperience') as string
     const payload: Record<string, unknown> = {
-      firstName: fd.get('firstName') as string,
-      lastName: fd.get('lastName') as string,
-      email: fd.get('email') as string,
-      phone: (fd.get('phone') as string) || null,
-      country: (fd.get('country') as string) || null,
-      linkedinUrl: (fd.get('linkedinUrl') as string) || null,
-      seniority: (fd.get('seniority') as string) || undefined,
-      yearsOfExperience: yearsStr ? parseInt(yearsStr, 10) : null,
+      firstName: fields.firstName,
+      lastName: fields.lastName,
+      email: fields.email,
+      phone: fields.phone || null,
+      country: fields.country || null,
+      linkedinUrl: fields.linkedinUrl || null,
+      seniority: fields.seniority || undefined,
+      yearsOfExperience: fields.yearsOfExperience ? parseInt(fields.yearsOfExperience, 10) : null,
       skills,
       languages,
-      notes: (fd.get('notes') as string) || null,
+      notes: fields.notes || null,
+      cvDriveId: cvDriveId || undefined,
+      cvOriginalName: cvOriginalName || undefined,
     }
 
     const url = mode === 'edit' ? `/api/candidates/${defaultValues.id}` : '/api/candidates'
@@ -109,27 +161,72 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
       )}
 
       <div className="grid grid-cols-2 gap-4">
+        {mode === 'create' && (
+          <div className="col-span-2">
+            <Label>Upload CV (optional)</Label>
+            <CVUpload
+              onParsed={handleParsed}
+              className="mt-1"
+            />
+            {cvBanner && (
+              <p className="mt-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                CV parsed successfully — fields have been pre-filled. Please review before saving.
+              </p>
+            )}
+          </div>
+        )}
+
         <div>
           <Label htmlFor="firstName">First Name *</Label>
-          <Input id="firstName" name="firstName" required defaultValue={defaultValues.firstName} />
+          <Input
+            id="firstName"
+            name="firstName"
+            required
+            value={fields.firstName}
+            onChange={(e) => setField('firstName', e.target.value)}
+          />
         </div>
         <div>
           <Label htmlFor="lastName">Last Name *</Label>
-          <Input id="lastName" name="lastName" required defaultValue={defaultValues.lastName} />
+          <Input
+            id="lastName"
+            name="lastName"
+            required
+            value={fields.lastName}
+            onChange={(e) => setField('lastName', e.target.value)}
+          />
         </div>
 
         <div>
           <Label htmlFor="email">Email *</Label>
-          <Input id="email" name="email" type="email" required defaultValue={defaultValues.email} />
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            required
+            value={fields.email}
+            onChange={(e) => setField('email', e.target.value)}
+          />
         </div>
         <div>
           <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" name="phone" defaultValue={defaultValues.phone ?? ''} placeholder="Optional" />
+          <Input
+            id="phone"
+            name="phone"
+            value={fields.phone}
+            onChange={(e) => setField('phone', e.target.value)}
+            placeholder="Optional"
+          />
         </div>
 
         <div>
           <Label htmlFor="country">Country</Label>
-          <Select id="country" name="country" defaultValue={defaultValues.country ?? ''}>
+          <Select
+            id="country"
+            name="country"
+            value={fields.country}
+            onChange={(e) => setField('country', e.target.value)}
+          >
             <option value="">— Select country —</option>
             {LATAM_COUNTRIES.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -138,12 +235,24 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
         </div>
         <div>
           <Label htmlFor="linkedinUrl">LinkedIn URL</Label>
-          <Input id="linkedinUrl" name="linkedinUrl" type="url" defaultValue={defaultValues.linkedinUrl ?? ''} placeholder="https://linkedin.com/in/…" />
+          <Input
+            id="linkedinUrl"
+            name="linkedinUrl"
+            type="url"
+            value={fields.linkedinUrl}
+            onChange={(e) => setField('linkedinUrl', e.target.value)}
+            placeholder="https://linkedin.com/in/…"
+          />
         </div>
 
         <div>
           <Label htmlFor="seniority">Seniority</Label>
-          <Select id="seniority" name="seniority" defaultValue={defaultValues.seniority ?? ''}>
+          <Select
+            id="seniority"
+            name="seniority"
+            value={fields.seniority}
+            onChange={(e) => setField('seniority', e.target.value as Seniority | '')}
+          >
             <option value="">— Select seniority —</option>
             {(['JUNIOR', 'MID', 'SENIOR', 'STAFF', 'PRINCIPAL'] as Seniority[]).map((s) => (
               <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
@@ -157,7 +266,8 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
             name="yearsOfExperience"
             type="number"
             min={0}
-            defaultValue={defaultValues.yearsOfExperience ?? ''}
+            value={fields.yearsOfExperience}
+            onChange={(e) => setField('yearsOfExperience', e.target.value)}
             placeholder="Optional"
           />
         </div>
@@ -177,7 +287,8 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Textarea
             id="notes"
             name="notes"
-            defaultValue={defaultValues.notes ?? ''}
+            value={fields.notes}
+            onChange={(e) => setField('notes', e.target.value)}
             placeholder="Any additional notes…"
             className="min-h-[100px]"
           />

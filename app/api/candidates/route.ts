@@ -15,6 +15,8 @@ const candidateSchema = z.object({
   skills: z.array(z.string()).default([]),
   languages: z.array(z.string()).default([]),
   notes: z.string().optional().nullable(),
+  cvDriveId: z.string().optional().nullable(),
+  cvOriginalName: z.string().optional().nullable(),
 })
 
 export async function GET() {
@@ -79,7 +81,13 @@ export async function POST(request: Request) {
   // Candidate model does not have linkedinUrl or notes fields — drop them
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
-  const candidate = await db.candidate.create({ data: rest })
+  const candidate = await db.candidate.create({
+    data: {
+      ...rest,
+      cvDriveId: rest.cvDriveId ?? null,
+      cvOriginalName: rest.cvOriginalName ?? null,
+    },
+  })
 
   return NextResponse.json(candidate, { status: 201 })
 }

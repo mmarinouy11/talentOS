@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { SeniorityBadge } from '@/components/app/SeniorityBadge'
 import { SkillTags } from '@/components/app/SkillTags'
 import { CandidateDetailClient } from '@/components/app/CandidateDetailClient'
+import { CvSection } from '@/components/app/CvSection'
 
 export default async function CandidateDetailPage({
   params,
@@ -103,6 +104,12 @@ export default async function CandidateDetailPage({
               )}
             </div>
           </div>
+
+          <CvSection
+            candidateId={id}
+            cvDriveId={candidate.cvDriveId ?? null}
+            cvOriginalName={candidate.cvOriginalName ?? null}
+          />
 
           {candidate.summary && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">

@@ -15,6 +15,8 @@ const patchSchema = z.object({
   skills: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   notes: z.string().optional().nullable(),
+  cvDriveId: z.string().optional().nullable(),
+  cvOriginalName: z.string().optional().nullable(),
 })
 
 export async function GET(
