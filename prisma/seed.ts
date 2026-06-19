@@ -29,6 +29,16 @@ async function main() {
     },
   })
 
+  await db.systemSettings.upsert({
+    where: { key: 'MONTHLY_HOURS_BASELINE' },
+    update: {},
+    create: {
+      key: 'MONTHLY_HOURS_BASELINE',
+      value: '168',
+      description: 'Hours per month used to convert between hourly position rates and monthly candidate compensation.',
+    },
+  })
+
   console.log('Seeded admin user:', user.email, '— role:', user.role)
   await db.$disconnect()
 }

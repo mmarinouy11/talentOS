@@ -71,6 +71,9 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
   const [cvDriveId, setCvDriveId] = useState(defaultValues.cvDriveId ?? '')
   const [cvOriginalName, setCvOriginalName] = useState(defaultValues.cvOriginalName ?? '')
   const [cvBanner, setCvBanner] = useState(false)
+  const [minimumManuallyEdited, setMinimumManuallyEdited] = useState(
+    defaultValues.minimumCompensation != null && defaultValues.minimumCompensation !== defaultValues.desiredCompensation
+  )
 
   const [fields, setFields] = useState<Fields>({
     firstName: defaultValues.firstName ?? '',
@@ -287,30 +290,41 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
         </div>
 
         <div>
-          <Label htmlFor="desiredCompensation">Desired Compensation ($/hour)</Label>
+          <Label htmlFor="desiredCompensation">Desired Compensation ($/month, cost to company)</Label>
           <Input
             id="desiredCompensation"
             name="desiredCompensation"
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={fields.desiredCompensation}
-            onChange={(e) => setField('desiredCompensation', e.target.value)}
+            onChange={(e) => {
+              setField('desiredCompensation', e.target.value)
+              if (!minimumManuallyEdited) {
+                setField('minimumCompensation', e.target.value)
+              }
+            }}
             placeholder="Optional"
           />
         </div>
         <div>
-          <Label htmlFor="minimumCompensation">Minimum Acceptable Compensation ($/hour)</Label>
+          <Label htmlFor="minimumCompensation">Minimum Acceptable Compensation ($/month, cost to company)</Label>
           <Input
             id="minimumCompensation"
             name="minimumCompensation"
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={fields.minimumCompensation}
-            onChange={(e) => setField('minimumCompensation', e.target.value)}
+            onChange={(e) => {
+              setMinimumManuallyEdited(true)
+              setField('minimumCompensation', e.target.value)
+            }}
             placeholder="Optional"
           />
+          {!minimumManuallyEdited && fields.minimumCompensation !== '' && (
+            <p className="text-xs text-gray-400 mt-1">Auto-filled from Desired Compensation — you can adjust it</p>
+          )}
         </div>
 
         <div className="col-span-2">

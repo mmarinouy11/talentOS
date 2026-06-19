@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 import { PositionStatusBadge } from '@/components/app/PositionStatusBadge'
 import { PriorityBadge } from '@/components/app/PriorityBadge'
 import { JDIntelligence } from '@/components/app/JDIntelligence'
@@ -48,6 +49,7 @@ export default async function PositionDetailPage({
 
   if (!position) notFound()
 
+  const hoursBaseline = await getMonthlyHoursBaseline()
   const days = aging(position.createdAt)
   const activeCandidates = position.candidatePositions.filter(
     (cp) => !['HIRED', 'REJECTED'].includes(cp.stage)
@@ -181,7 +183,7 @@ export default async function PositionDetailPage({
           fitScore: cp.fitScore,
           compensationOutOfRange:
             cp.candidate.minimumCompensation != null && position.internalCostBudget != null
-              ? cp.candidate.minimumCompensation > position.internalCostBudget
+              ? cp.candidate.minimumCompensation > hourlyToMonthly(position.internalCostBudget, hoursBaseline)
               : false,
           candidate: {
             id: cp.candidate.id,

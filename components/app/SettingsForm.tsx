@@ -14,6 +14,7 @@ interface Setting {
 
 const LABELS: Record<string, { label: string; type?: string; min?: number; max?: number }> = {
   MIN_DGM_PERCENT: { label: 'Minimum DGM Threshold (%)', type: 'number', min: 0, max: 100 },
+  MONTHLY_HOURS_BASELINE: { label: 'Monthly Hours Baseline', type: 'number', min: 1, max: 744 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {

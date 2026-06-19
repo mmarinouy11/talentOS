@@ -1,5 +1,22 @@
 import { db } from './db'
 
+export async function getMonthlyHoursBaseline(): Promise<number> {
+  try {
+    const setting = await db.systemSettings.findUnique({ where: { key: 'MONTHLY_HOURS_BASELINE' } })
+    return setting ? parseFloat(setting.value) : 168
+  } catch {
+    return 168
+  }
+}
+
+export function hourlyToMonthly(hourlyRate: number, hoursBaseline: number): number {
+  return hourlyRate * hoursBaseline
+}
+
+export function monthlyToHourly(monthlyRate: number, hoursBaseline: number): number {
+  return monthlyRate / hoursBaseline
+}
+
 export function calculateDGM(clientRate: number, internalCostBudget: number): number {
   if (clientRate <= 0) return 0
   return (clientRate - internalCostBudget) / clientRate
