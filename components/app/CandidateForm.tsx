@@ -290,7 +290,7 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
         </div>
 
         <div>
-          <Label htmlFor="desiredCompensation">Desired Compensation ($/month, cost to company)</Label>
+          <Label htmlFor="desiredCompensation">Desired Compensation ($/mo, CTC)</Label>
           <Input
             id="desiredCompensation"
             name="desiredCompensation"
@@ -308,7 +308,7 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           />
         </div>
         <div>
-          <Label htmlFor="minimumCompensation">Minimum Acceptable Compensation ($/month, cost to company)</Label>
+          <Label htmlFor="minimumCompensation">Minimum Acceptable Compensation ($/mo, CTC)</Label>
           <Input
             id="minimumCompensation"
             name="minimumCompensation"

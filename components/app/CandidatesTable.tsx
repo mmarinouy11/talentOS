@@ -79,9 +79,12 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
                     {c._count.candidatePositions}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-1">
                       <Link href={`/candidates/${c.id}`}>
                         <Button variant="ghost" size="sm">View</Button>
+                      </Link>
+                      <Link href={`/candidates/${c.id}/edit`}>
+                        <Button variant="ghost" size="sm">Edit</Button>
                       </Link>
                     </div>
                   </td>
