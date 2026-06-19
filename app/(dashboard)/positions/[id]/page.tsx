@@ -39,7 +39,7 @@ export default async function PositionDetailPage({
       candidatePositions: {
         where: { candidate: { deletedAt: null } },
         include: {
-          candidate: { select: { id: true, firstName: true, lastName: true, email: true, seniority: true } },
+          candidate: { select: { id: true, firstName: true, lastName: true, email: true, seniority: true, minimumCompensation: true } },
         },
         orderBy: { createdAt: 'desc' },
       },
@@ -179,7 +179,10 @@ export default async function PositionDetailPage({
           id: cp.id,
           stage: cp.stage,
           fitScore: cp.fitScore,
-          compensationOutOfRange: cp.compensationOutOfRange,
+          compensationOutOfRange:
+            cp.candidate.minimumCompensation != null && position.internalCostBudget != null
+              ? cp.candidate.minimumCompensation > position.internalCostBudget
+              : false,
           candidate: {
             id: cp.candidate.id,
             firstName: cp.candidate.firstName,

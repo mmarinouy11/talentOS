@@ -153,6 +153,8 @@ model Candidate {
   currentCompensation   Float?
   currentCurrency       String?
   currentEmploymentType String?
+  desiredCompensation   Float?
+  minimumCompensation   Float?
   summary               String?    @db.Text
   strengths             String[]
   risks                 String[]
@@ -178,12 +180,9 @@ model CandidatePosition {
   fitStrengths          String[]
   fitGaps               String[]
   fitScoredAt           DateTime?
-  desiredCompensation   Float?
-  minimumCompensation   Float?
   noticePeriodDays      Int?
   earliestStartDate     DateTime?
   compensationRisk      CompensationRisk?
-  compensationOutOfRange Boolean          @default(false)
   notes                 String?           @db.Text
   recruiterId           String
   createdAt             DateTime          @default(now())

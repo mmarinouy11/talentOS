@@ -17,6 +17,8 @@ const patchSchema = z.object({
   notes: z.string().optional().nullable(),
   cvDriveId: z.string().optional().nullable(),
   cvOriginalName: z.string().optional().nullable(),
+  desiredCompensation: z.number().optional().nullable(),
+  minimumCompensation: z.number().optional().nullable(),
 })
 
 export async function GET(

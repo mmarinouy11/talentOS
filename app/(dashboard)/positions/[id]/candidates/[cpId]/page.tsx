@@ -7,7 +7,6 @@ import { SeniorityBadge } from '@/components/app/SeniorityBadge'
 import { StageBadge } from '@/components/app/StageBadge'
 import { SkillTags } from '@/components/app/SkillTags'
 import { FitScoreCard } from '@/components/app/FitScoreCard'
-import { CompensationEditor } from '@/components/app/CompensationEditor'
 
 export default async function CandidateInPositionPage({
   params,
@@ -134,12 +133,54 @@ export default async function CandidateInPositionPage({
             fitScoredAt={cp.fitScoredAt?.toISOString() ?? null}
           />
 
-          <CompensationEditor
-            candidatePositionId={cp.id}
-            desiredCompensation={cp.desiredCompensation}
-            minimumCompensation={cp.minimumCompensation}
-            internalCostBudget={position.internalCostBudget}
-          />
+          {/* Budget Fit (read-only) */}
+          {(() => {
+            const min = candidate.minimumCompensation
+            const budget = position.internalCostBudget
+            const fmt = (n: number) => `$${n.toLocaleString()}/hr`
+            const outOfRange = min != null && budget != null && min > budget
+            const withinBudget = min != null && budget != null && min <= budget
+            return (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h2 className="text-sm font-medium text-gray-900 mb-3">Budget Fit</h2>
+                <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Desired</p>
+                    <p className="text-gray-900 mt-0.5">
+                      {candidate.desiredCompensation != null ? fmt(candidate.desiredCompensation) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Minimum Acceptable</p>
+                    <p className="text-gray-900 mt-0.5">{min != null ? fmt(min) : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Position Budget</p>
+                    <p className="text-gray-900 mt-0.5">{budget != null ? fmt(budget) : '—'}</p>
+                  </div>
+                </div>
+                {outOfRange && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    <span className="text-red-600">⚠</span>
+                    <p className="text-sm text-red-700 font-medium">
+                      Exceeds position budget by {fmt(min! - budget!)}
+                    </p>
+                  </div>
+                )}
+                {withinBudget && (
+                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <span className="text-green-600">✓</span>
+                    <p className="text-sm text-green-700 font-medium">Within budget</p>
+                  </div>
+                )}
+                {(min == null || budget == null) && (
+                  <p className="text-xs text-gray-400">
+                    {min == null ? 'Set minimum compensation on the candidate profile' : 'No budget set on this position'} to see budget fit.
+                  </p>
+                )}
+              </div>
+            )
+          })()}
 
           {cp.stageHistory.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">

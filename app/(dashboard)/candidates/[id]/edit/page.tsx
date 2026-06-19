@@ -45,6 +45,8 @@ export default async function EditCandidatePage({
           country: candidate.country,
           seniority: candidate.seniority,
           yearsOfExperience: candidate.yearsOfExperience,
+          desiredCompensation: candidate.desiredCompensation,
+          minimumCompensation: candidate.minimumCompensation,
           skills: candidate.skills,
           languages: candidate.languages,
         }}

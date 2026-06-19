@@ -35,6 +35,8 @@ interface Fields {
   linkedinUrl: string
   seniority: Seniority | ''
   yearsOfExperience: string
+  desiredCompensation: string
+  minimumCompensation: string
   notes: string
 }
 
@@ -50,6 +52,8 @@ interface CandidateFormProps {
     linkedinUrl?: string | null
     seniority?: Seniority | null
     yearsOfExperience?: number | null
+    desiredCompensation?: number | null
+    minimumCompensation?: number | null
     skills?: string[]
     languages?: string[]
     notes?: string | null
@@ -77,6 +81,8 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
     linkedinUrl: defaultValues.linkedinUrl ?? '',
     seniority: defaultValues.seniority ?? '',
     yearsOfExperience: defaultValues.yearsOfExperience?.toString() ?? '',
+    desiredCompensation: defaultValues.desiredCompensation?.toString() ?? '',
+    minimumCompensation: defaultValues.minimumCompensation?.toString() ?? '',
     notes: defaultValues.notes ?? '',
   })
 
@@ -97,6 +103,8 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
       linkedinUrl: parsed.linkedinUrl ?? '',
       seniority: (parsed.seniority ?? '') as Seniority | '',
       yearsOfExperience: parsed.yearsOfExperience?.toString() ?? '',
+      desiredCompensation: '',
+      minimumCompensation: '',
       notes: parsed.summary ?? '',
     })
     if (parsed.skills.length) setSkills(parsed.skills)
@@ -117,6 +125,8 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
       linkedinUrl: fields.linkedinUrl || null,
       seniority: fields.seniority || undefined,
       yearsOfExperience: fields.yearsOfExperience ? parseInt(fields.yearsOfExperience, 10) : null,
+      desiredCompensation: fields.desiredCompensation ? parseFloat(fields.desiredCompensation) : null,
+      minimumCompensation: fields.minimumCompensation ? parseFloat(fields.minimumCompensation) : null,
       skills,
       languages,
       notes: fields.notes || null,
@@ -268,6 +278,37 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
             min={0}
             value={fields.yearsOfExperience}
             onChange={(e) => setField('yearsOfExperience', e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+
+        <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
+          <p className="text-sm font-medium text-gray-700 mb-3">Compensation Expectation</p>
+        </div>
+
+        <div>
+          <Label htmlFor="desiredCompensation">Desired Compensation ($/hour)</Label>
+          <Input
+            id="desiredCompensation"
+            name="desiredCompensation"
+            type="number"
+            min={0}
+            step="0.01"
+            value={fields.desiredCompensation}
+            onChange={(e) => setField('desiredCompensation', e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+        <div>
+          <Label htmlFor="minimumCompensation">Minimum Acceptable Compensation ($/hour)</Label>
+          <Input
+            id="minimumCompensation"
+            name="minimumCompensation"
+            type="number"
+            min={0}
+            step="0.01"
+            value={fields.minimumCompensation}
+            onChange={(e) => setField('minimumCompensation', e.target.value)}
             placeholder="Optional"
           />
         </div>
