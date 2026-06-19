@@ -4,10 +4,13 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
+import { getFunnelData, getTimeInStage, getLeadTime } from '@/lib/analytics'
 import { PositionStatusBadge } from '@/components/app/PositionStatusBadge'
 import { PriorityBadge } from '@/components/app/PriorityBadge'
 import { JDIntelligence } from '@/components/app/JDIntelligence'
 import { PositionCandidatesPanel } from '@/components/app/PositionCandidatesPanel'
+import { FunnelChart } from '@/components/app/FunnelChart'
+import { VelocityTable } from '@/components/app/VelocityTable'
 
 function fmt(date: Date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -49,7 +52,12 @@ export default async function PositionDetailPage({
 
   if (!position) notFound()
 
-  const hoursBaseline = await getMonthlyHoursBaseline()
+  const [hoursBaseline, positionFunnel, positionTimeInStage, positionLeadTime] = await Promise.all([
+    getMonthlyHoursBaseline(),
+    getFunnelData(id),
+    getTimeInStage(id),
+    getLeadTime(id),
+  ])
   const days = aging(position.createdAt)
   const activeCandidates = position.candidatePositions.filter(
     (cp) => !['HIRED', 'REJECTED'].includes(cp.stage)
@@ -195,6 +203,38 @@ export default async function PositionDetailPage({
         }))}
         activeCandidates={activeCandidates}
       />
+
+      {/* Position Velocity */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Position Velocity</h2>
+
+        {/* Lead time for this position */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Lead Time</p>
+          {positionLeadTime.positionLeadTime != null ? (
+            <p className="text-2xl font-bold text-gray-900">
+              {positionLeadTime.positionLeadTime}d
+              <span className="text-sm font-normal text-gray-400 ml-2">to fill / close</span>
+            </p>
+          ) : (
+            <p className="text-sm text-gray-400">
+              {days}d and counting <span className="text-gray-300">(still open)</span>
+            </p>
+          )}
+        </div>
+
+        {/* Compact funnel */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Candidate Funnel</p>
+          <FunnelChart data={positionFunnel} size="compact" />
+        </div>
+
+        {/* Time in stage */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Time in Stage</p>
+          <VelocityTable data={positionTimeInStage} label="Avg Days in Stage" />
+        </div>
+      </div>
 
       {/* Job Description */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
