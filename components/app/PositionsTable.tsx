@@ -113,7 +113,11 @@ export function PositionsTable({ positions }: { positions: PositionRow[] }) {
               {filtered.map((p) => {
                 const days = aging(p.createdAt)
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={p.id}
+                    className="hover:bg-[#F5F0EB] transition-colors cursor-pointer"
+                    onClick={() => { window.location.href = `/positions/${p.id}` }}
+                  >
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {p.dgmAtRisk && <span className="text-red-600 mr-1" title="Margin at risk">⚠</span>}
                       {p.title}
@@ -147,11 +151,11 @@ export function PositionsTable({ positions }: { positions: PositionRow[] }) {
                       {p._count.candidatePositions}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link href={`/positions/${p.id}`}>
-                          <Button variant="ghost" size="sm">View</Button>
-                        </Link>
-                        <Link href={`/positions/${p.id}/edit`}>
+                      <div className="flex items-center justify-end">
+                        <Link
+                          href={`/positions/${p.id}/edit`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Button variant="outline" size="sm">Edit</Button>
                         </Link>
                       </div>
