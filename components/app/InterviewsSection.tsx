@@ -6,9 +6,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   DEFAULT_SCHEDULING_TEMPLATE,
+  DEFAULT_REJECTION_TEMPLATE,
+  DEFAULT_NEXT_ROUND_TEMPLATE,
   renderTemplate,
   buildSchedulingTokens,
 } from '@/lib/email-templates'
+import { getNextStage, STAGE_SEQUENCE } from '@/lib/pipeline'
 
 type InterviewStatus = 'PENDING' | 'AWAITING_SCHEDULE' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
 type InterviewDecision = 'ADVANCE' | 'REJECT' | 'HOLD'
@@ -40,6 +43,7 @@ interface Interview {
 interface UserProfile {
   calendarLink: string | null
   schedulingEmailTemplate: string | null
+  rejectionEmailTemplate: string | null
   name: string | null
   email: string
 }
@@ -61,6 +65,14 @@ const INTERVIEW_STAGES: PipelineStage[] = [
   'MANAGER_INTERVIEW',
   'CLIENT_INTERVIEW',
   'OFFER',
+]
+
+// Stages that get an email preview when added
+const EMAIL_PREVIEW_STAGES: PipelineStage[] = [
+  'SCREENING',
+  'TECHNICAL_INTERVIEW',
+  'MANAGER_INTERVIEW',
+  'CLIENT_INTERVIEW',
 ]
 
 const STATUS_COLORS: Record<InterviewStatus, string> = {
@@ -85,10 +97,67 @@ const DECISION_COLORS: Record<InterviewDecision, string> = {
   HOLD: 'bg-yellow-100 text-yellow-700',
 }
 
-function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: string[]) => void }) {
-  function update(i: number, val: string) {
-    const next = [...slots]; next[i] = val; onChange(next)
+// ─── helpers ───────────────────────────────────────────────────────────────
+
+function selectClass() {
+  return 'mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]'
+}
+
+function buildSchedulingEmailContent(
+  interview: Interview,
+  userProfile: UserProfile | null,
+  positionTitle: string,
+  clientName: string,
+) {
+  const recruiterName = userProfile?.name ?? userProfile?.email ?? 'Recruiter'
+  const isScreening = interview.stage === 'SCREENING'
+
+  const tokens = buildSchedulingTokens({
+    candidateName: '', // will be set by caller context
+    positionTitle,
+    clientName,
+    recruiterName,
+    roundLabel: interview.roundLabel,
+    slots: interview.proposedSlots,
+    calendarLink: interview.calendarLinkUsed,
+  })
+
+  const template = isScreening
+    ? (userProfile?.schedulingEmailTemplate ?? DEFAULT_SCHEDULING_TEMPLATE)
+    : DEFAULT_NEXT_ROUND_TEMPLATE
+
+  const subject = `Interview Scheduling – ${positionTitle} at ${clientName}`
+  const html = renderTemplate(template, tokens)
+  return { subject, html }
+}
+
+function buildRejectionEmailContent(
+  interview: Interview,
+  userProfile: UserProfile | null,
+  positionTitle: string,
+  clientName: string,
+) {
+  const recruiterName = userProfile?.name ?? userProfile?.email ?? 'Recruiter'
+  const tokens: Record<string, string> = {
+    candidateName: '',
+    positionTitle,
+    clientName,
+    recruiterName,
+    roundLabel: interview.roundLabel,
+    schedulingLink: '',
+    slotsList: '',
+    nextRoundLabel: '',
   }
+  const template = userProfile?.rejectionEmailTemplate ?? DEFAULT_REJECTION_TEMPLATE
+  const subject = `Update on your application – ${positionTitle} at ${clientName}`
+  const html = renderTemplate(template, tokens)
+  return { subject, html }
+}
+
+// ─── SlotList ──────────────────────────────────────────────────────────────
+
+function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: string[]) => void }) {
+  function update(i: number, val: string) { const n = [...slots]; n[i] = val; onChange(n) }
   function remove(i: number) { onChange(slots.filter((_, idx) => idx !== i)) }
   return (
     <div className="space-y-2">
@@ -107,44 +176,35 @@ function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: stri
   )
 }
 
-function EmailPreviewModal({
-  interview,
-  userProfile,
+// ─── GenericEmailPreviewModal ───────────────────────────────────────────────
+
+function GenericEmailPreviewModal({
+  title,
   candidateName,
   candidateEmail,
-  positionTitle,
-  clientName,
+  defaultSubject,
+  defaultHtml,
+  sendEndpoint,
   onSend,
   onSkip,
   onCancel,
 }: {
-  interview: Interview
-  userProfile: UserProfile | null
+  title: string
   candidateName: string
   candidateEmail: string
-  positionTitle: string
-  clientName: string
-  onSend: (updated: Interview) => void
+  defaultSubject: string
+  defaultHtml: string
+  sendEndpoint: string
+  onSend: (data: unknown) => void
   onSkip: () => void
   onCancel: () => void
 }) {
-  const recruiterName = userProfile?.name ?? userProfile?.email ?? 'Recruiter'
-  const tokens = buildSchedulingTokens({
-    candidateName,
-    positionTitle,
-    clientName,
-    recruiterName,
-    roundLabel: interview.roundLabel,
-    slots: interview.proposedSlots,
-    calendarLink: interview.calendarLinkUsed,
-  })
-
-  const template = userProfile?.schedulingEmailTemplate ?? DEFAULT_SCHEDULING_TEMPLATE
-  const defaultSubject = `Interview Scheduling – ${positionTitle} at ${clientName}`
-  const defaultHtml = renderTemplate(template, tokens)
-
-  const [subject, setSubject] = useState(defaultSubject)
-  const [html, setHtml] = useState(defaultHtml)
+  const [subject, setSubject] = useState(
+    defaultSubject.replace('{{candidateName}}', candidateName)
+  )
+  const [html, setHtml] = useState(
+    defaultHtml.replace(/\{\{candidateName\}\}/g, candidateName)
+  )
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -152,16 +212,13 @@ function EmailPreviewModal({
     setSending(true)
     setError(null)
     try {
-      const res = await fetch(`/api/interviews/${interview.id}/send-scheduling-email`, {
+      const res = await fetch(sendEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, html }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? 'Send failed')
-        return
-      }
+      if (!res.ok) { setError(data.error ?? 'Send failed'); return }
       onSend(data)
     } catch {
       setError('Network error')
@@ -173,44 +230,32 @@ function EmailPreviewModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Email Preview</h2>
-            <p className="text-sm text-gray-500">
-              To: <span className="font-medium text-gray-700">{candidateName}</span>{' '}
-              <span className="text-gray-400">{'<'}{candidateEmail}{'>'}</span>
-            </p>
-          </div>
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <p className="text-sm text-gray-500">
+            To: <span className="font-medium text-gray-700">{candidateName}</span>{' '}
+            <span className="text-gray-400">{'<'}{candidateEmail}{'>'}</span>
+          </p>
         </div>
 
         <div className="space-y-3 flex-1 overflow-y-auto">
           <div>
             <Label htmlFor="emailSubject">Subject</Label>
-            <Input
-              id="emailSubject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="mt-1"
-            />
+            <Input id="emailSubject" value={subject} onChange={(e) => setSubject(e.target.value)} className="mt-1" />
           </div>
-
-          <div className="flex-1">
+          <div>
             <Label htmlFor="emailBody">Body (HTML)</Label>
             <textarea
               id="emailBody"
               value={html}
               onChange={(e) => setHtml(e.target.value)}
-              rows={12}
+              rows={10}
               className="mt-1 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
             />
           </div>
-
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs font-medium text-gray-500 mb-1">Preview</p>
-            <div
-              className="text-sm text-gray-800 prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
+            <div className="text-sm text-gray-800 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
           </div>
         </div>
 
@@ -219,14 +264,187 @@ function EmailPreviewModal({
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
           <Button type="button" variant="outline" onClick={onSkip}>Skip for now</Button>
-          <Button type="button" onClick={send} disabled={sending}>
-            {sending ? 'Sending…' : 'Send Email'}
-          </Button>
+          <Button type="button" onClick={send} disabled={sending}>{sending ? 'Sending…' : 'Send Email'}</Button>
         </div>
       </div>
     </div>
   )
 }
+
+// ─── NextRoundModal ─────────────────────────────────────────────────────────
+
+function NextRoundModal({
+  candidatePositionId,
+  fromStage,
+  userProfile,
+  candidateName,
+  candidateEmail,
+  positionTitle,
+  clientName,
+  onCreated,
+  onSkip,
+}: {
+  candidatePositionId: string
+  fromStage: PipelineStage
+  userProfile: UserProfile | null
+  candidateName: string
+  candidateEmail: string
+  positionTitle: string
+  clientName: string
+  onCreated: (interview: Interview) => void
+  onSkip: () => void
+}) {
+  const defaultNext = getNextStage(fromStage as Parameters<typeof getNextStage>[0]) ?? 'TECHNICAL_INTERVIEW'
+  const [selectedStage, setSelectedStage] = useState<PipelineStage>(defaultNext as PipelineStage)
+  const [phase, setPhase] = useState<'select' | 'schedule' | 'preview'>('select')
+  const [slots, setSlots] = useState<string[]>([''])
+  const [schedulingMode, setSchedulingMode] = useState<SchedulingMode>('MANUAL_SLOTS')
+  const [creating, setCreating] = useState(false)
+  const [createdInterview, setCreatedInterview] = useState<Interview | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const isScreening = selectedStage === 'SCREENING'
+  const hasCalendarLink = !!userProfile?.calendarLink
+
+  const nextStageOptions = STAGE_SEQUENCE.filter(
+    (s) => s !== 'APPLIED' && s !== 'HIRED'
+  ) as PipelineStage[]
+
+  async function createInterview() {
+    setCreating(true)
+    setError(null)
+    try {
+      const isCalendar = isScreening && schedulingMode === 'CALENDAR_LINK'
+      const res = await fetch(`/api/candidate-positions/${candidatePositionId}/interviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stage: selectedStage,
+          schedulingMode: isCalendar ? 'CALENDAR_LINK' : 'MANUAL_SLOTS',
+          proposedSlots: isCalendar ? [] : slots.filter(Boolean).map((s) => new Date(s).toISOString()),
+          calendarLinkUsed: isCalendar ? userProfile?.calendarLink : null,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setError(d.error ?? 'Failed to create interview')
+        return
+      }
+      const interview: Interview = await res.json()
+      setCreatedInterview(interview)
+      setPhase('preview')
+    } catch {
+      setError('Network error')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  if (phase === 'preview' && createdInterview) {
+    const { subject: defaultSubject, html: defaultHtml } = buildSchedulingEmailContent(
+      createdInterview, userProfile, positionTitle, clientName
+    )
+    return (
+      <GenericEmailPreviewModal
+        title="Schedule Next Round"
+        candidateName={candidateName}
+        candidateEmail={candidateEmail}
+        defaultSubject={defaultSubject}
+        defaultHtml={defaultHtml}
+        sendEndpoint={`/api/interviews/${createdInterview.id}/send-scheduling-email`}
+        onSend={(updated) => onCreated(updated as Interview)}
+        onSkip={() => onCreated(createdInterview)}
+        onCancel={() => onCreated(createdInterview)}
+      />
+    )
+  }
+
+  if (phase === 'schedule') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Schedule Next Round</h2>
+            <p className="text-sm text-gray-500">{STAGE_LABELS[selectedStage]} for {candidateName}</p>
+          </div>
+
+          {isScreening && (
+            <div className="flex gap-3 flex-wrap">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" checked={schedulingMode === 'MANUAL_SLOTS'} onChange={() => setSchedulingMode('MANUAL_SLOTS')} className="accent-[#8DF000]" />
+                <span className="text-sm text-gray-700">Add time slots manually</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" checked={schedulingMode === 'CALENDAR_LINK'} onChange={() => setSchedulingMode('CALENDAR_LINK')} className="accent-[#8DF000]" />
+                <span className="text-sm text-gray-700">Use my Calendar Link</span>
+              </label>
+            </div>
+          )}
+
+          {isScreening && schedulingMode === 'CALENDAR_LINK' ? (
+            hasCalendarLink ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
+                <p className="font-medium truncate">{userProfile!.calendarLink}</p>
+                <p className="text-xs text-blue-500 mt-0.5">Candidate will receive this link.</p>
+              </div>
+            ) : (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-sm text-yellow-700">
+                No calendar link set.{' '}
+                <a href="/profile" className="underline font-medium" target="_blank" rel="noreferrer">Set one in your Profile</a>
+              </div>
+            )
+          ) : (
+            <div>
+              <Label>Proposed Time Slots</Label>
+              <div className="mt-1"><SlotList slots={slots} onChange={setSlots} /></div>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setPhase('select')}>← Back</Button>
+            <Button type="button" onClick={createInterview} disabled={creating}>
+              {creating ? 'Creating…' : 'Next: Preview Email →'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Phase: select
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Create Next Interview Round</h2>
+          <p className="text-sm text-gray-500">Great! Let&apos;s schedule the next step for {candidateName}.</p>
+        </div>
+
+        <div>
+          <Label htmlFor="nextStage">Next Stage</Label>
+          <select
+            id="nextStage"
+            value={selectedStage}
+            onChange={(e) => setSelectedStage(e.target.value as PipelineStage)}
+            className={selectClass()}
+          >
+            {nextStageOptions.map((s) => (
+              <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex gap-3 justify-end pt-2">
+          <Button type="button" variant="outline" onClick={onSkip}>I&apos;ll do this later</Button>
+          <Button type="button" onClick={() => setPhase('schedule')}>Create &amp; Schedule Now</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── AddInterviewModal ──────────────────────────────────────────────────────
 
 function AddInterviewModal({
   candidatePositionId,
@@ -235,6 +453,7 @@ function AddInterviewModal({
   candidateEmail,
   positionTitle,
   clientName,
+  initialStage,
   onClose,
   onSaved,
 }: {
@@ -244,10 +463,11 @@ function AddInterviewModal({
   candidateEmail: string
   positionTitle: string
   clientName: string
+  initialStage?: PipelineStage
   onClose: () => void
   onSaved: (interview: Interview) => void
 }) {
-  const [stage, setStage] = useState<PipelineStage>('SCREENING')
+  const [stage, setStage] = useState<PipelineStage>(initialStage ?? 'SCREENING')
   const [schedulingMode, setSchedulingMode] = useState<SchedulingMode>('MANUAL_SLOTS')
   const [slots, setSlots] = useState<string[]>([''])
   const [saving, setSaving] = useState(false)
@@ -256,6 +476,7 @@ function AddInterviewModal({
 
   const isScreening = stage === 'SCREENING'
   const hasCalendarLink = !!userProfile?.calendarLink
+  const showEmailPreview = EMAIL_PREVIEW_STAGES.includes(stage)
 
   useEffect(() => {
     if (!isScreening) setSchedulingMode('MANUAL_SLOTS')
@@ -283,7 +504,7 @@ function AddInterviewModal({
         return
       }
       const interview: Interview = await res.json()
-      if (isScreening) {
+      if (showEmailPreview) {
         setPendingInterview(interview)
       } else {
         onSaved(interview)
@@ -296,15 +517,16 @@ function AddInterviewModal({
   }
 
   if (pendingInterview) {
+    const { subject, html } = buildSchedulingEmailContent(pendingInterview, userProfile, positionTitle, clientName)
     return (
-      <EmailPreviewModal
-        interview={pendingInterview}
-        userProfile={userProfile}
+      <GenericEmailPreviewModal
+        title="Email Preview"
         candidateName={candidateName}
         candidateEmail={candidateEmail}
-        positionTitle={positionTitle}
-        clientName={clientName}
-        onSend={(updated) => onSaved(updated)}
+        defaultSubject={subject}
+        defaultHtml={html}
+        sendEndpoint={`/api/interviews/${pendingInterview.id}/send-scheduling-email`}
+        onSend={(updated) => onSaved(updated as Interview)}
         onSkip={() => onSaved(pendingInterview)}
         onCancel={() => onSaved(pendingInterview)}
       />
@@ -318,12 +540,7 @@ function AddInterviewModal({
         <form onSubmit={submit} className="space-y-4">
           <div>
             <Label htmlFor="stage">Pipeline Stage</Label>
-            <select
-              id="stage"
-              value={stage}
-              onChange={(e) => setStage(e.target.value as PipelineStage)}
-              className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
-            >
+            <select id="stage" value={stage} onChange={(e) => setStage(e.target.value as PipelineStage)} className={selectClass()}>
               {INTERVIEW_STAGES.map((s) => (
                 <option key={s} value={s}>{STAGE_LABELS[s]}</option>
               ))}
@@ -344,7 +561,6 @@ function AddInterviewModal({
                 </label>
               </div>
             )}
-
             {isScreening && schedulingMode === 'CALENDAR_LINK' ? (
               hasCalendarLink ? (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
@@ -363,7 +579,7 @@ function AddInterviewModal({
             )}
           </div>
 
-          {isScreening && (
+          {showEmailPreview && (
             <p className="text-xs text-gray-400">
               After adding, you&apos;ll be able to preview and send a scheduling email to the candidate.
             </p>
@@ -373,7 +589,7 @@ function AddInterviewModal({
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={saving || (isScreening && schedulingMode === 'CALENDAR_LINK' && !hasCalendarLink)}>
-              {saving ? 'Saving…' : isScreening ? 'Next: Preview Email →' : 'Add Interview'}
+              {saving ? 'Saving…' : showEmailPreview ? 'Next: Preview Email →' : 'Add Interview'}
             </Button>
           </div>
         </form>
@@ -382,24 +598,30 @@ function AddInterviewModal({
   )
 }
 
+// ─── EditInterviewModal ──────────────────────────────────────────────────────
+
 function EditInterviewModal({
   interview,
   userProfile,
   candidateName,
   candidateEmail,
+  candidatePositionId,
   positionTitle,
   clientName,
   onClose,
   onSaved,
+  onInterviewCreated,
 }: {
   interview: Interview
   userProfile: UserProfile | null
   candidateName: string
   candidateEmail: string
+  candidatePositionId: string
   positionTitle: string
   clientName: string
   onClose: () => void
   onSaved: (interview: Interview) => void
+  onInterviewCreated: (interview: Interview) => void
 }) {
   const [currentInterview, setCurrentInterview] = useState(interview)
   const [scheduledAt, setScheduledAt] = useState(
@@ -411,7 +633,7 @@ function EditInterviewModal({
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showEmailPreview, setShowEmailPreview] = useState(false)
+  const [postSaveFlow, setPostSaveFlow] = useState<'rejection-email' | 'next-round' | null>(null)
 
   async function patch(body: Record<string, unknown>): Promise<Interview | null> {
     const res = await fetch(`/api/interviews/${currentInterview.id}`, {
@@ -438,10 +660,21 @@ function EditInterviewModal({
       decisionNotes: decisionNotes || null,
     })
     setSaving(false)
-    if (updated) onSaved(updated)
+    if (!updated) return
+
+    setCurrentInterview(updated)
+
+    const decisionChanged = updated.decision !== interview.decision
+    if (decisionChanged && updated.decision === 'REJECT') {
+      setPostSaveFlow('rejection-email')
+    } else if (decisionChanged && updated.decision === 'ADVANCE') {
+      setPostSaveFlow('next-round')
+    } else {
+      onSaved(updated)
+    }
   }
 
-  async function cancel() {
+  async function cancelInterview() {
     if (!confirm('Cancel this interview? This cannot be undone.')) return
     setCancelling(true)
     setError(null)
@@ -450,24 +683,64 @@ function EditInterviewModal({
     if (updated) onSaved(updated)
   }
 
+  const [showSchedulingEmailPreview, setShowSchedulingEmailPreview] = useState(false)
+
   const canSendSchedulingEmail =
     currentInterview.stage === 'SCREENING' &&
     (currentInterview.status === 'PENDING' || currentInterview.status === 'AWAITING_SCHEDULE')
-
   const isCancelled = currentInterview.status === 'CANCELLED'
 
-  if (showEmailPreview) {
+  // Rejection email preview
+  if (postSaveFlow === 'rejection-email') {
+    const { subject, html } = buildRejectionEmailContent(currentInterview, userProfile, positionTitle, clientName)
     return (
-      <EmailPreviewModal
-        interview={currentInterview}
+      <GenericEmailPreviewModal
+        title="Rejection Email Preview"
+        candidateName={candidateName}
+        candidateEmail={candidateEmail}
+        defaultSubject={subject}
+        defaultHtml={html}
+        sendEndpoint={`/api/interviews/${currentInterview.id}/send-rejection-email`}
+        onSend={() => onSaved(currentInterview)}
+        onSkip={() => onSaved(currentInterview)}
+        onCancel={() => onSaved(currentInterview)}
+      />
+    )
+  }
+
+  // Next round modal
+  if (postSaveFlow === 'next-round') {
+    return (
+      <NextRoundModal
+        candidatePositionId={candidatePositionId}
+        fromStage={currentInterview.stage}
         userProfile={userProfile}
         candidateName={candidateName}
         candidateEmail={candidateEmail}
         positionTitle={positionTitle}
         clientName={clientName}
-        onSend={(updated) => { setCurrentInterview(updated); onSaved(updated) }}
-        onSkip={() => setShowEmailPreview(false)}
-        onCancel={() => setShowEmailPreview(false)}
+        onCreated={(newInterview) => {
+          onInterviewCreated(newInterview)
+          onSaved(currentInterview)
+        }}
+        onSkip={() => onSaved(currentInterview)}
+      />
+    )
+  }
+
+  if (showSchedulingEmailPreview) {
+    const { subject, html } = buildSchedulingEmailContent(currentInterview, userProfile, positionTitle, clientName)
+    return (
+      <GenericEmailPreviewModal
+        title="Email Preview"
+        candidateName={candidateName}
+        candidateEmail={candidateEmail}
+        defaultSubject={subject}
+        defaultHtml={html}
+        sendEndpoint={`/api/interviews/${currentInterview.id}/send-scheduling-email`}
+        onSend={(updated) => { setCurrentInterview(updated as Interview); setShowSchedulingEmailPreview(false) }}
+        onSkip={() => setShowSchedulingEmailPreview(false)}
+        onCancel={() => setShowSchedulingEmailPreview(false)}
       />
     )
   }
@@ -475,24 +748,21 @@ function EditInterviewModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
-        {/* Header */}
         <h2 className="text-lg font-semibold text-gray-900 mb-0.5">Edit Interview</h2>
         <p className="text-sm text-gray-500 mb-4">{currentInterview.roundLabel} · {STAGE_LABELS[currentInterview.stage]}</p>
 
-        {/* Status row */}
         <div className="flex items-center gap-3 mb-4">
           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_COLORS[currentInterview.status]}`}>
             {STATUS_LABELS[currentInterview.status]}
           </span>
           {!isCancelled && (
-            <Button type="button" variant="outline" size="sm" onClick={cancel} disabled={cancelling}>
+            <Button type="button" variant="outline" size="sm" onClick={cancelInterview} disabled={cancelling}>
               {cancelling ? 'Cancelling…' : 'Cancel Interview'}
             </Button>
           )}
         </div>
 
         <form onSubmit={submit} className="space-y-4">
-          {/* Scheduling info (read-only) */}
           {currentInterview.calendarLinkUsed ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
               Calendar link: <span className="font-medium">{currentInterview.calendarLinkUsed}</span>
@@ -506,21 +776,12 @@ function EditInterviewModal({
             </div>
           ) : null}
 
-          {/* Confirmed date → auto-transitions to SCHEDULED */}
           <div>
             <Label htmlFor="scheduledAt">Confirmed Date</Label>
             <p className="text-xs text-gray-400 mb-1">Setting a date will mark this interview as Scheduled.</p>
-            <Input
-              id="scheduledAt"
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              className="mt-0.5"
-              disabled={isCancelled}
-            />
+            <Input id="scheduledAt" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} disabled={isCancelled} className="mt-0.5" />
           </div>
 
-          {/* Feedback → auto-transitions to COMPLETED */}
           <div>
             <Label htmlFor="feedbackText">Feedback Notes</Label>
             <p className="text-xs text-gray-400 mb-1">Adding feedback will mark this interview as Completed.</p>
@@ -535,17 +796,10 @@ function EditInterviewModal({
             />
           </div>
 
-          {/* Decision */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="decision">Decision</Label>
-              <select
-                id="decision"
-                value={decision}
-                onChange={(e) => setDecision(e.target.value as InterviewDecision | '')}
-                disabled={isCancelled}
-                className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
-              >
+              <select id="decision" value={decision} onChange={(e) => setDecision(e.target.value as InterviewDecision | '')} disabled={isCancelled} className={`${selectClass()} disabled:bg-gray-50 disabled:text-gray-400`}>
                 <option value="">— No decision yet —</option>
                 <option value="ADVANCE">Advance</option>
                 <option value="HOLD">Hold</option>
@@ -554,14 +808,7 @@ function EditInterviewModal({
             </div>
             <div>
               <Label htmlFor="decisionNotes">Decision Notes</Label>
-              <Input
-                id="decisionNotes"
-                value={decisionNotes}
-                onChange={(e) => setDecisionNotes(e.target.value)}
-                placeholder="Optional notes"
-                disabled={isCancelled}
-                className="mt-1"
-              />
+              <Input id="decisionNotes" value={decisionNotes} onChange={(e) => setDecisionNotes(e.target.value)} placeholder="Optional notes" disabled={isCancelled} className="mt-1" />
             </div>
           </div>
 
@@ -569,7 +816,7 @@ function EditInterviewModal({
 
           <div className="flex items-center justify-between pt-2">
             {canSendSchedulingEmail ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowEmailPreview(true)}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowSchedulingEmailPreview(true)}>
                 Send Scheduling Email
               </Button>
             ) : <div />}
@@ -585,6 +832,8 @@ function EditInterviewModal({
     </div>
   )
 }
+
+// ─── InterviewsSection ───────────────────────────────────────────────────────
 
 export function InterviewsSection({
   candidatePositionId,
@@ -620,17 +869,11 @@ export function InterviewsSection({
 
   useEffect(() => { load() }, [load])
 
-  function handleAdded(interview: Interview) {
+  function upsertInterview(interview: Interview) {
     setInterviews((prev) => {
-      const existing = prev.find((i) => i.id === interview.id)
-      return existing ? prev.map((i) => i.id === interview.id ? interview : i) : [...prev, interview]
+      const exists = prev.find((i) => i.id === interview.id)
+      return exists ? prev.map((i) => i.id === interview.id ? interview : i) : [...prev, interview]
     })
-    setShowAdd(false)
-  }
-
-  function handleUpdated(interview: Interview) {
-    setInterviews((prev) => prev.map((i) => (i.id === interview.id ? interview : i)))
-    setEditing(null)
   }
 
   function formatSlot(iso: string) {
@@ -692,7 +935,7 @@ export function InterviewsSection({
           positionTitle={positionTitle}
           clientName={clientName}
           onClose={() => setShowAdd(false)}
-          onSaved={handleAdded}
+          onSaved={(i) => { upsertInterview(i); setShowAdd(false) }}
         />
       )}
       {editing && (
@@ -701,10 +944,12 @@ export function InterviewsSection({
           userProfile={userProfile}
           candidateName={candidateName}
           candidateEmail={candidateEmail}
+          candidatePositionId={candidatePositionId}
           positionTitle={positionTitle}
           clientName={clientName}
           onClose={() => setEditing(null)}
-          onSaved={handleUpdated}
+          onSaved={(i) => { upsertInterview(i); setEditing(null) }}
+          onInterviewCreated={(i) => { upsertInterview(i) }}
         />
       )}
     </div>

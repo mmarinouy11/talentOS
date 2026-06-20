@@ -55,13 +55,16 @@ Import from `lib/anthropic.ts`:
 - Enums: `PipelineStage` (APPLIED|SCREENING|TECHNICAL_INTERVIEW|MANAGER_INTERVIEW|CLIENT_INTERVIEW|OFFER|HIRED|REJECTED), `InterviewStatus` (PENDING|AWAITING_SCHEDULE|SCHEDULED|COMPLETED|CANCELLED), `InterviewDecision` (ADVANCE|REJECT|HOLD), `SchedulingMode` (MANUAL_SLOTS|CALENDAR_LINK)
 - Model: `Interview` (candidatePositionId, stage, roundLabel, roundNumber, isInternal, status, schedulingMode, proposedSlots, calendarLinkUsed, scheduledAt, feedbackText/Summary/Strengths/Concerns, decision, decisionNotes, decidedAt, decidedById)
 - Model: `EmailLog` (to, subject, template, status, errorMsg, sentAt, candidateId?, candidatePositionId?, interviewId?, sentById?)
-- Routes: `GET/POST /api/candidate-positions/[id]/interviews`, `PATCH /api/interviews/[id]`, `POST /api/interviews/[id]/send-scheduling-email`
+- Routes: `GET/POST /api/candidate-positions/[id]/interviews`, `PATCH /api/interviews/[id]`, `POST /api/interviews/[id]/send-scheduling-email`, `POST /api/interviews/[id]/send-rejection-email`
 - Component: `components/app/InterviewsSection.tsx` — client component with Add/Edit/EmailPreview modals; props: candidatePositionId, candidateName, candidateEmail, positionTitle, clientName; displayed on `/positions/[id]/candidates/[cpId]`
 - Email: `lib/email.ts` — `sendEmail()` wraps Resend + writes EmailLog; `getFromAddress()` reads SENDER_EMAIL from SystemSettings
 - Templates: `lib/email-templates.ts` — `renderTemplate(template, tokens)`, `buildSchedulingTokens(...)`, `DEFAULT_*_TEMPLATE` constants; `schedulingRequestEmail`, `rejectionEmail`, `advanceNotificationEmail` accept optional `customTemplate`
+- Pipeline helpers: `lib/pipeline.ts` — `STAGE_SEQUENCE`, `getNextStage(stage)`
 - Recruiter templates: User model has `schedulingEmailTemplate`, `rejectionEmailTemplate`, `advanceEmailTemplate` (Text?); editable in `/profile`
-- Email preview: Creating a SCREENING interview shows an editable email preview before sending; "Skip for now" leaves PENDING; "Send Email" → status becomes AWAITING_SCHEDULE
+- Email preview: Creating a SCREENING/TECHNICAL/MANAGER/CLIENT interview shows an editable scheduling email preview before sending; "Skip for now" leaves PENDING; "Send Email" → status becomes AWAITING_SCHEDULE
 - "Send Scheduling Email" button visible on PENDING/AWAITING_SCHEDULE Screening interviews in Edit modal
+- Decision flows: saving REJECT → rejection email preview modal; saving ADVANCE → NextRoundModal (select stage → schedule slots → email preview); HOLD → no email
+- Status auto-derivation: scheduledAt→SCHEDULED, feedbackText→COMPLETED, action:'cancel'→CANCELLED; no direct status field in edit form
 - Settings: SENDER_EMAIL key in SystemSettings; editable via `/settings` (LABELS entry added)
 - Debug page: `/settings/email-test` (ADMIN-only client page) + `POST /api/settings/email-test`
 

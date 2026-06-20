@@ -14,6 +14,11 @@ export const DEFAULT_ADVANCE_TEMPLATE = `<p>Hi {{candidateName}},</p>
 <p>{{schedulingLink}}</p>
 <p>Best,<br/>{{recruiterName}}</p>`
 
+export const DEFAULT_NEXT_ROUND_TEMPLATE = `<p>Hi {{candidateName}},</p>
+<p>Great news! We'd like to move forward with the next step in our process for the <strong>{{positionTitle}}</strong> role: <strong>{{roundLabel}}</strong>.</p>
+<p>{{schedulingLink}}</p>
+<p>Best,<br/>{{recruiterName}}</p>`
+
 export function renderTemplate(template: string, tokens: Record<string, string>): string {
   let result = template
   for (const [key, value] of Object.entries(tokens)) {
