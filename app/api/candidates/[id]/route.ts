@@ -19,6 +19,10 @@ const patchSchema = z.object({
   cvOriginalName: z.string().optional().nullable(),
   desiredCompensation: z.number().optional().nullable(),
   minimumCompensation: z.number().optional().nullable(),
+  sourcedByType: z.enum(['RECRUITER', 'VENDOR', 'OTHER']).optional().nullable(),
+  sourcedByUserId: z.string().optional().nullable(),
+  sourcedByVendorId: z.string().optional().nullable(),
+  sourcedByOther: z.string().optional().nullable(),
 })
 
 export async function GET(

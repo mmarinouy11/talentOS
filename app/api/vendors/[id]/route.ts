@@ -1,0 +1,64 @@
+import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+
+const patchSchema = z.object({
+  name: z.string().min(1).optional(),
+  pocName: z.string().optional().nullable(),
+  pocEmail: z.string().email().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  active: z.boolean().optional(),
+})
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const vendor = await db.vendor.findUnique({ where: { id } })
+  if (!vendor) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  return NextResponse.json(vendor)
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const existing = await db.vendor.findUnique({ where: { id } })
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const body = await request.json()
+  const parsed = patchSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+  }
+
+  const vendor = await db.vendor.update({ where: { id }, data: parsed.data })
+  return NextResponse.json(vendor)
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const existing = await db.vendor.findUnique({ where: { id } })
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Soft delete via active = false
+  const vendor = await db.vendor.update({ where: { id }, data: { active: false } })
+  return NextResponse.json(vendor)
+}

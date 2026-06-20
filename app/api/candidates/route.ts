@@ -19,6 +19,10 @@ const candidateSchema = z.object({
   cvOriginalName: z.string().optional().nullable(),
   desiredCompensation: z.number().optional().nullable(),
   minimumCompensation: z.number().optional().nullable(),
+  sourcedByType: z.enum(['RECRUITER', 'VENDOR', 'OTHER']).optional().nullable(),
+  sourcedByUserId: z.string().optional().nullable(),
+  sourcedByVendorId: z.string().optional().nullable(),
+  sourcedByOther: z.string().optional().nullable(),
 })
 
 export async function GET(request: Request) {
@@ -94,8 +98,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'A candidate with this email already exists.' }, { status: 409 })
   }
 
-  // Candidate model does not have linkedinUrl or notes fields — drop them
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
   const candidate = await db.candidate.create({
     data: {

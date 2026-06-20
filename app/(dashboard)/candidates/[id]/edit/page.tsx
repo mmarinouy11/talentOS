@@ -16,6 +16,13 @@ export default async function EditCandidatePage({
 
   const candidate = await db.candidate.findFirst({
     where: { id, deletedAt: null },
+    select: {
+      id: true, firstName: true, lastName: true, email: true, phone: true,
+      country: true, seniority: true, yearsOfExperience: true,
+      desiredCompensation: true, minimumCompensation: true,
+      skills: true, languages: true,
+      sourcedByType: true, sourcedByUserId: true, sourcedByVendorId: true, sourcedByOther: true,
+    },
   })
 
   if (!candidate) notFound()
@@ -49,6 +56,10 @@ export default async function EditCandidatePage({
           minimumCompensation: candidate.minimumCompensation,
           skills: candidate.skills,
           languages: candidate.languages,
+          sourcedByType: candidate.sourcedByType,
+          sourcedByUserId: candidate.sourcedByUserId,
+          sourcedByVendorId: candidate.sourcedByVendorId,
+          sourcedByOther: candidate.sourcedByOther,
         }}
       />
     </div>

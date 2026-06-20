@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import type { Seniority } from '@prisma/client'
+import type { Seniority, SourceType } from '@prisma/client'
 import { SeniorityBadge } from './SeniorityBadge'
 import { SkillTags } from './SkillTags'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,40 @@ export interface CandidateRow {
   seniority: Seniority | null
   skills: string[]
   _count: { candidatePositions: number }
+  sourcedByType: SourceType | null
+  sourcedByOther: string | null
+  sourcedByUser: { name: string | null; email: string } | null
+  sourcedByVendor: { id: string; name: string } | null
+}
+
+function SourceCell({ row }: { row: CandidateRow }) {
+  if (!row.sourcedByType) return <span className="text-gray-400">—</span>
+
+  if (row.sourcedByType === 'RECRUITER') {
+    return (
+      <span className="text-gray-700 text-xs">
+        {row.sourcedByUser?.name ?? row.sourcedByUser?.email ?? '—'}
+        {' '}
+        <span className="inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">Int.</span>
+      </span>
+    )
+  }
+  if (row.sourcedByType === 'VENDOR') {
+    return (
+      <span className="text-gray-700 text-xs">
+        {row.sourcedByVendor?.name ?? '—'}
+        {' '}
+        <span className="inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">Vendor</span>
+      </span>
+    )
+  }
+  return (
+    <span className="text-gray-700 text-xs">
+      {row.sourcedByOther ?? '—'}
+      {' '}
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-500">Other</span>
+    </span>
+  )
 }
 
 export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) {
@@ -57,6 +91,7 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Country</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Seniority</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Skills</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Source</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-600">Open Positions</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -74,6 +109,9 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
                   </td>
                   <td className="px-4 py-3">
                     <SkillTags tags={c.skills} max={3} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <SourceCell row={c} />
                   </td>
                   <td className="px-4 py-3 text-right text-gray-600">
                     {c._count.candidatePositions}

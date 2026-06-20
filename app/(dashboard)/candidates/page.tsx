@@ -21,6 +21,10 @@ export default async function CandidatesPage() {
       seniority: true,
       skills: true,
       createdAt: true,
+      sourcedByType: true,
+      sourcedByOther: true,
+      sourcedByUser: { select: { name: true, email: true } },
+      sourcedByVendor: { select: { id: true, name: true } },
       candidatePositions: {
         select: { stage: true },
       },
@@ -55,6 +59,10 @@ export default async function CandidatesPage() {
     seniority: c.seniority,
     skills: c.skills,
     _count: c._count,
+    sourcedByType: c.sourcedByType,
+    sourcedByOther: c.sourcedByOther,
+    sourcedByUser: c.sourcedByUser,
+    sourcedByVendor: c.sourcedByVendor,
   }))
 
   return (

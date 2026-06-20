@@ -22,6 +22,21 @@ Import from `lib/anthropic.ts`:
 - Use `SMART` model for: fit scoring, transcript analysis, copilot outputs
 - Always wrap calls in try/catch — never let AI failures crash the UI
 
+## Vendor Management
+
+- Model: `Vendor` (name, pocName, pocEmail, phone, notes, active) — soft-delete via `active=false`
+- Routes: `GET/POST /api/vendors`, `GET/PATCH/DELETE /api/vendors/[id]`
+- Pages: `/vendors` (list), `/vendors/new`, `/vendors/[id]/edit`
+- Sidebar: Vendors link added between Candidates and Reports
+
+## Candidate Sourcing
+
+- `SourceType` enum: `RECRUITER | VENDOR | OTHER`
+- Candidate fields: `sourcedByType`, `sourcedByUserId`, `sourcedByVendorId`, `sourcedByOther`
+- CandidateForm has a "Sourcing" section with conditional second field (user select / vendor select / free text)
+- Sourcing displayed in candidate detail Profile card and candidates list "Source" column
+- `CandidatePosition.recruiterId` displayed as "Owner" on the candidate-in-position detail page
+
 ## Bulk LinkedIn Import
 
 - Route: `POST /api/candidates/bulk-import` — accepts .zip, starts background job, returns `{ jobId, total }` immediately

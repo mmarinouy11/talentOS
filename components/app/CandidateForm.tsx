@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,18 +12,8 @@ import { CVUpload, type ParsedCV } from './CVUpload'
 import type { Seniority } from '@prisma/client'
 
 const LATAM_COUNTRIES = [
-  'Argentina',
-  'Bolivia',
-  'Brazil',
-  'Chile',
-  'Colombia',
-  'Ecuador',
-  'Mexico',
-  'Paraguay',
-  'Peru',
-  'Uruguay',
-  'Venezuela',
-  'Other',
+  'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Ecuador',
+  'Mexico', 'Paraguay', 'Peru', 'Uruguay', 'Venezuela', 'Other',
 ]
 
 interface Fields {
@@ -38,6 +28,10 @@ interface Fields {
   desiredCompensation: string
   minimumCompensation: string
   notes: string
+  sourcedByType: 'RECRUITER' | 'VENDOR' | 'OTHER' | ''
+  sourcedByUserId: string
+  sourcedByVendorId: string
+  sourcedByOther: string
 }
 
 interface CandidateFormProps {
@@ -59,8 +53,15 @@ interface CandidateFormProps {
     notes?: string | null
     cvDriveId?: string | null
     cvOriginalName?: string | null
+    sourcedByType?: 'RECRUITER' | 'VENDOR' | 'OTHER' | null
+    sourcedByUserId?: string | null
+    sourcedByVendorId?: string | null
+    sourcedByOther?: string | null
   }
 }
+
+interface UserOption { id: string; name: string | null; email: string }
+interface VendorOption { id: string; name: string }
 
 export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) {
   const router = useRouter()
@@ -74,6 +75,8 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
   const [minimumManuallyEdited, setMinimumManuallyEdited] = useState(
     defaultValues.minimumCompensation != null && defaultValues.minimumCompensation !== defaultValues.desiredCompensation
   )
+  const [users, setUsers] = useState<UserOption[]>([])
+  const [vendors, setVendors] = useState<VendorOption[]>([])
 
   const [fields, setFields] = useState<Fields>({
     firstName: defaultValues.firstName ?? '',
@@ -87,7 +90,16 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
     desiredCompensation: defaultValues.desiredCompensation?.toString() ?? '',
     minimumCompensation: defaultValues.minimumCompensation?.toString() ?? '',
     notes: defaultValues.notes ?? '',
+    sourcedByType: defaultValues.sourcedByType ?? '',
+    sourcedByUserId: defaultValues.sourcedByUserId ?? '',
+    sourcedByVendorId: defaultValues.sourcedByVendorId ?? '',
+    sourcedByOther: defaultValues.sourcedByOther ?? '',
   })
+
+  useEffect(() => {
+    fetch('/api/users').then((r) => r.json()).then(setUsers).catch(() => {})
+    fetch('/api/vendors?active=true').then((r) => r.json()).then(setVendors).catch(() => {})
+  }, [])
 
   function setField<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields((prev) => ({ ...prev, [key]: value }))
@@ -97,7 +109,8 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
     setCvDriveId(fileId)
     setCvOriginalName(fileName)
     setCvBanner(true)
-    setFields({
+    setFields((prev) => ({
+      ...prev,
       firstName: parsed.firstName ?? '',
       lastName: parsed.lastName ?? '',
       email: parsed.email ?? '',
@@ -109,7 +122,7 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
       desiredCompensation: '',
       minimumCompensation: '',
       notes: parsed.summary ?? '',
-    })
+    }))
     if (parsed.skills.length) setSkills(parsed.skills)
     if (parsed.languages.length) setLanguages(parsed.languages)
   }
@@ -135,6 +148,10 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
       notes: fields.notes || null,
       cvDriveId: cvDriveId || undefined,
       cvOriginalName: cvOriginalName || undefined,
+      sourcedByType: fields.sourcedByType || null,
+      sourcedByUserId: fields.sourcedByType === 'RECRUITER' ? fields.sourcedByUserId || null : null,
+      sourcedByVendorId: fields.sourcedByType === 'VENDOR' ? fields.sourcedByVendorId || null : null,
+      sourcedByOther: fields.sourcedByType === 'OTHER' ? fields.sourcedByOther || null : null,
     }
 
     const url = mode === 'edit' ? `/api/candidates/${defaultValues.id}` : '/api/candidates'
@@ -177,10 +194,7 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
         {mode === 'create' && (
           <div className="col-span-2">
             <Label>Upload CV (optional)</Label>
-            <CVUpload
-              onParsed={handleParsed}
-              className="mt-1"
-            />
+            <CVUpload onParsed={handleParsed} className="mt-1" />
             {cvBanner && (
               <p className="mt-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                 CV parsed successfully — fields have been pre-filled. Please review before saving.
@@ -193,7 +207,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="firstName">First Name *</Label>
           <Input
             id="firstName"
-            name="firstName"
             required
             value={fields.firstName}
             onChange={(e) => setField('firstName', e.target.value)}
@@ -203,7 +216,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="lastName">Last Name *</Label>
           <Input
             id="lastName"
-            name="lastName"
             required
             value={fields.lastName}
             onChange={(e) => setField('lastName', e.target.value)}
@@ -214,7 +226,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="email">Email *</Label>
           <Input
             id="email"
-            name="email"
             type="email"
             required
             value={fields.email}
@@ -225,7 +236,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="phone">Phone</Label>
           <Input
             id="phone"
-            name="phone"
             value={fields.phone}
             onChange={(e) => setField('phone', e.target.value)}
             placeholder="Optional"
@@ -236,7 +246,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="country">Country</Label>
           <Select
             id="country"
-            name="country"
             value={fields.country}
             onChange={(e) => setField('country', e.target.value)}
           >
@@ -250,7 +259,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="linkedinUrl">LinkedIn URL</Label>
           <Input
             id="linkedinUrl"
-            name="linkedinUrl"
             type="url"
             value={fields.linkedinUrl}
             onChange={(e) => setField('linkedinUrl', e.target.value)}
@@ -262,7 +270,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="seniority">Seniority</Label>
           <Select
             id="seniority"
-            name="seniority"
             value={fields.seniority}
             onChange={(e) => setField('seniority', e.target.value as Seniority | '')}
           >
@@ -276,7 +283,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="yearsOfExperience">Years of Experience</Label>
           <Input
             id="yearsOfExperience"
-            name="yearsOfExperience"
             type="number"
             min={0}
             value={fields.yearsOfExperience}
@@ -285,6 +291,7 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           />
         </div>
 
+        {/* Compensation */}
         <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
           <p className="text-sm font-medium text-gray-700 mb-3">Compensation Expectation</p>
         </div>
@@ -293,16 +300,13 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="desiredCompensation">Desired Compensation ($/mo, CTC)</Label>
           <Input
             id="desiredCompensation"
-            name="desiredCompensation"
             type="number"
             min={0}
             step="1"
             value={fields.desiredCompensation}
             onChange={(e) => {
               setField('desiredCompensation', e.target.value)
-              if (!minimumManuallyEdited) {
-                setField('minimumCompensation', e.target.value)
-              }
+              if (!minimumManuallyEdited) setField('minimumCompensation', e.target.value)
             }}
             placeholder="Optional"
           />
@@ -311,7 +315,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="minimumCompensation">Minimum Acceptable Compensation ($/mo, CTC)</Label>
           <Input
             id="minimumCompensation"
-            name="minimumCompensation"
             type="number"
             min={0}
             step="1"
@@ -323,11 +326,75 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
             placeholder="Optional"
           />
           {!minimumManuallyEdited && fields.minimumCompensation !== '' && (
-            <p className="text-xs text-gray-400 mt-1">Auto-filled from Desired Compensation — you can adjust it</p>
+            <p className="text-xs text-gray-400 mt-1">Auto-filled from Desired — you can adjust it</p>
           )}
         </div>
 
-        <div className="col-span-2">
+        {/* Sourcing */}
+        <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
+          <p className="text-sm font-medium text-gray-700 mb-3">Sourcing</p>
+        </div>
+
+        <div>
+          <Label htmlFor="sourcedByType">Sourced By</Label>
+          <Select
+            id="sourcedByType"
+            value={fields.sourcedByType}
+            onChange={(e) => setField('sourcedByType', e.target.value as Fields['sourcedByType'])}
+          >
+            <option value="">— Not specified —</option>
+            <option value="RECRUITER">Internal Recruiter</option>
+            <option value="VENDOR">Vendor</option>
+            <option value="OTHER">Other</option>
+          </Select>
+        </div>
+
+        {fields.sourcedByType === 'RECRUITER' && (
+          <div>
+            <Label htmlFor="sourcedByUserId">Recruiter</Label>
+            <Select
+              id="sourcedByUserId"
+              value={fields.sourcedByUserId}
+              onChange={(e) => setField('sourcedByUserId', e.target.value)}
+            >
+              <option value="">— Select recruiter —</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.name ?? u.email}</option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        {fields.sourcedByType === 'VENDOR' && (
+          <div>
+            <Label htmlFor="sourcedByVendorId">Vendor</Label>
+            <Select
+              id="sourcedByVendorId"
+              value={fields.sourcedByVendorId}
+              onChange={(e) => setField('sourcedByVendorId', e.target.value)}
+            >
+              <option value="">— Select vendor —</option>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        {fields.sourcedByType === 'OTHER' && (
+          <div>
+            <Label htmlFor="sourcedByOther">Source Details</Label>
+            <Input
+              id="sourcedByOther"
+              value={fields.sourcedByOther}
+              onChange={(e) => setField('sourcedByOther', e.target.value)}
+              placeholder="e.g. Referral, Job board, Conference"
+            />
+          </div>
+        )}
+
+        {/* Skills & Languages */}
+        <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
           <Label>Skills</Label>
           <TagInput value={skills} onChange={setSkills} placeholder="Type a skill and press Enter…" />
         </div>
@@ -341,7 +408,6 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           <Label htmlFor="notes">Notes</Label>
           <Textarea
             id="notes"
-            name="notes"
             value={fields.notes}
             onChange={(e) => setField('notes', e.target.value)}
             placeholder="Any additional notes…"

@@ -8,6 +8,20 @@ import { SkillTags } from '@/components/app/SkillTags'
 import { CandidateDetailClient } from '@/components/app/CandidateDetailClient'
 import { CvSection } from '@/components/app/CvSection'
 
+function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' }) {
+  const config = {
+    RECRUITER: { label: 'Internal', className: 'bg-blue-100 text-blue-700' },
+    VENDOR: { label: 'Vendor', className: 'bg-purple-100 text-purple-700' },
+    OTHER: { label: 'Other', className: 'bg-gray-100 text-gray-600' },
+  }
+  const { label, className } = config[type]
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
+      {label}
+    </span>
+  )
+}
+
 export default async function CandidateDetailPage({
   params,
 }: {
@@ -27,6 +41,8 @@ export default async function CandidateDetailPage({
         },
         orderBy: { createdAt: 'desc' },
       },
+      sourcedByUser: { select: { id: true, name: true, email: true } },
+      sourcedByVendor: { select: { id: true, name: true } },
     },
   })
 
@@ -88,6 +104,40 @@ export default async function CandidateDetailPage({
                   <p className="text-gray-900 mt-0.5">{candidate.yearsOfExperience} years</p>
                 </div>
               )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sourced By</p>
+                <div className="mt-0.5">
+                  {!candidate.sourcedByType ? (
+                    <p className="text-gray-400">Not specified</p>
+                  ) : candidate.sourcedByType === 'RECRUITER' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-900">
+                        {candidate.sourcedByUser?.name ?? candidate.sourcedByUser?.email ?? '—'}
+                      </span>
+                      <SourceBadge type="RECRUITER" />
+                    </div>
+                  ) : candidate.sourcedByType === 'VENDOR' ? (
+                    <div className="flex items-center gap-2">
+                      {candidate.sourcedByVendor ? (
+                        <Link
+                          href={`/vendors/${candidate.sourcedByVendor.id}/edit`}
+                          className="text-gray-900 hover:underline"
+                        >
+                          {candidate.sourcedByVendor.name}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-900">—</span>
+                      )}
+                      <SourceBadge type="VENDOR" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-900">{candidate.sourcedByOther ?? '—'}</span>
+                      <SourceBadge type="OTHER" />
+                    </div>
+                  )}
+                </div>
+              </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Skills</p>
                 <div className="mt-1">

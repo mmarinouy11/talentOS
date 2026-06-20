@@ -24,6 +24,7 @@ export default async function CandidateInPositionPage({
     include: {
       candidate: true,
       position: { select: { id: true, title: true, client: true, internalCostBudget: true } },
+      recruiter: { select: { name: true, email: true } },
       stageHistory: {
         orderBy: { movedAt: 'desc' },
         include: { movedBy: { select: { name: true, email: true } } },
@@ -97,6 +98,12 @@ export default async function CandidateInPositionPage({
                   <div className="mt-1"><SkillTags tags={candidate.languages} /></div>
                 </div>
               )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Owner</p>
+                <p className="text-gray-900 mt-0.5 text-sm">
+                  {cp.recruiter.name ?? cp.recruiter.email}
+                </p>
+              </div>
             </div>
           </div>
 

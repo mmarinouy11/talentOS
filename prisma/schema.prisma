@@ -51,6 +51,12 @@ enum CompensationRisk {
   HIGH
 }
 
+enum SourceType {
+  RECRUITER
+  VENDOR
+  OTHER
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -64,9 +70,10 @@ model User {
   accounts Account[]
   sessions Session[]
 
-  positionsAsRecruiter Position[]          @relation("RecruiterPositions")
-  candidatePositions   CandidatePosition[] @relation("RecruiterCandidatePositions")
-  stageHistoryMoves    StageHistory[]
+  positionsAsRecruiter  Position[]          @relation("RecruiterPositions")
+  candidatePositions    CandidatePosition[] @relation("RecruiterCandidatePositions")
+  stageHistoryMoves     StageHistory[]
+  sourcedCandidates     Candidate[]         @relation("CandidateSourcedByUser")
 }
 
 model Account {
@@ -104,6 +111,20 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model Vendor {
+  id        String   @id @default(cuid())
+  name      String
+  pocName   String?
+  pocEmail  String?
+  phone     String?
+  notes     String?  @db.Text
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidates Candidate[]
+}
+
 model Position {
   id                   String         @id @default(cuid())
   title                String
@@ -136,16 +157,16 @@ model Position {
 }
 
 model Candidate {
-  id                    String     @id @default(cuid())
+  id                    String      @id @default(cuid())
   firstName             String
   lastName              String
-  email                 String     @unique
+  email                 String      @unique
   phone                 String?
   country               String?
   cvDriveId             String?
   cvOriginalName        String?
   linkedinUrl           String?
-  notes                 String?    @db.Text
+  notes                 String?     @db.Text
   skills                String[]
   languages             String[]
   seniority             Seniority?
@@ -155,14 +176,20 @@ model Candidate {
   currentEmploymentType String?
   desiredCompensation   Float?
   minimumCompensation   Float?
-  summary               String?    @db.Text
+  summary               String?     @db.Text
   strengths             String[]
   risks                 String[]
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  sourcedByType         SourceType?
+  sourcedByUserId       String?
+  sourcedByVendorId     String?
+  sourcedByOther        String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
   deletedAt             DateTime?
 
   candidatePositions CandidatePosition[]
+  sourcedByUser      User?               @relation("CandidateSourcedByUser", fields: [sourcedByUserId], references: [id])
+  sourcedByVendor    Vendor?             @relation(fields: [sourcedByVendorId], references: [id])
 }
 
 model CandidatePosition {

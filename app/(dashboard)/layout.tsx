@@ -7,6 +7,7 @@ import { SidebarNav } from '@/components/app/SidebarNav'
 const navItems = [
   { href: '/positions', label: 'Positions' },
   { href: '/candidates', label: 'Candidates' },
+  { href: '/vendors', label: 'Vendors' },
   { href: '/reports', label: 'Reports' },
 ]
 
