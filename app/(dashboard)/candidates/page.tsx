@@ -64,9 +64,14 @@ export default async function CandidatesPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Candidates</h1>
           <p className="text-sm text-gray-500 mt-0.5">{candidates.length} total candidates</p>
         </div>
-        <Link href="/candidates/new">
-          <Button>New Candidate</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/candidates/import">
+            <Button variant="outline">Import from LinkedIn</Button>
+          </Link>
+          <Link href="/candidates/new">
+            <Button>New Candidate</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4">

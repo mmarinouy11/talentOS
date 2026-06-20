@@ -22,13 +22,11 @@ Import from `lib/anthropic.ts`:
 - Use `SMART` model for: fit scoring, transcript analysis, copilot outputs
 - Always wrap calls in try/catch — never let AI failures crash the UI
 
-## Backlog (not yet built)
+## Bulk LinkedIn Import
 
-- **Bulk candidate import from LinkedIn export**: Allow uploading a .zip file
-  containing a LinkedIn data export (connections, profile data) to bulk-create
-  candidates. LinkedIn exports typically include CSV files (Connections.csv,
-  Profile.csv, etc.) inside the zip. Will need: zip extraction, CSV parsing,
-  field mapping from LinkedIn's schema to our Candidate model, dedup logic
-  against existing candidates by email, and a review/confirm step before
-  committing the bulk insert. Likely needs a dedicated /candidates/import page
-  with upload + preview + confirm flow.
+- Route: `POST /api/candidates/bulk-import` — accepts .zip, returns preview array (no DB writes)
+- Route: `POST /api/candidates/bulk-import/confirm` — bulk-creates candidates from preview
+- Page: `/candidates/import` — 3-step flow: upload → review table with dedup indicators → done
+- Shared PDF extraction: `lib/pdf-extract.ts` (used by both CV upload and bulk import)
+- Dedup: by email (case-insensitive) against existing non-deleted candidates
+- Max: 50 PDFs per batch, 50MB zip

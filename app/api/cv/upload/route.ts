@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON } from '@/lib/anthropic'
-import PDFParser from 'pdf2json'
+import { extractPdfText } from '@/lib/pdf-extract'
 
 const SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -25,30 +25,6 @@ Rules:
 - Return null for fields you cannot determine, never guess email or phone
 - "languages" must only contain human spoken languages, never programming languages or frameworks
 - No markdown, no explanation, only the JSON object`
-
-async function extractPdfText(buffer: Buffer): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const pdfParser = new PDFParser()
-    pdfParser.on('pdfParser_dataReady', (pdfData) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const text = (pdfData as any).Pages
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .flatMap((page: any) => page.Texts)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((t: any) => {
-          try {
-            return decodeURIComponent(t.R.map((r: any) => r.T).join(''))
-          } catch {
-            return t.R.map((r: any) => r.T).join('')
-          }
-        })
-        .join(' ')
-      resolve(text)
-    })
-    pdfParser.on('pdfParser_dataError', reject)
-    pdfParser.parseBuffer(buffer)
-  })
-}
 
 export async function POST(request: Request) {
   const session = await auth()
