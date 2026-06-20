@@ -49,3 +49,15 @@ Import from `lib/anthropic.ts`:
 - Job state: `lib/import-jobs.ts` — module-level Map, 30-min TTL
 - Dedup: by email (case-insensitive) against existing non-deleted candidates
 - Max: 50 PDFs per batch, 50MB zip
+
+## Interview Pipeline
+
+- Enums: `PipelineStage` (APPLIED|SCREENING|TECHNICAL_INTERVIEW|CLIENT_INTERVIEW|OFFER|HIRED), `InterviewStatus` (PENDING|SCHEDULED|COMPLETED|CANCELLED), `InterviewDecision` (ADVANCE|REJECT|HOLD)
+- Model: `Interview` (candidatePositionId, stage, roundLabel, roundNumber, isInternal, status, scheduledAt, feedbackText/Summary/Strengths/Concerns, decision, decisionNotes, decidedAt, decidedById)
+- Model: `EmailLog` (to, subject, template, status, errorMsg, sentAt, candidateId?, candidatePositionId?, interviewId?, sentById?)
+- Routes: `GET/POST /api/candidate-positions/[id]/interviews`, `PATCH /api/interviews/[id]`
+- Component: `components/app/InterviewsSection.tsx` — client component with Add/Edit modals; displayed on `/positions/[id]/candidates/[cpId]`
+- Email: `lib/email.ts` — `sendEmail()` wraps Resend + writes EmailLog; `getFromAddress()` reads SENDER_EMAIL from SystemSettings
+- Templates: `lib/email-templates.ts` — `schedulingRequestEmail`, `rejectionEmail`, `advanceNotificationEmail`; each returns `{ subject, html }`
+- Settings: SENDER_EMAIL key in SystemSettings; editable via `/settings` (LABELS entry added)
+- Debug page: `/settings/email-test` (ADMIN-only client page) + `POST /api/settings/email-test`

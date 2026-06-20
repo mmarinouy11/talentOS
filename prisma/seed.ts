@@ -39,6 +39,16 @@ async function main() {
     },
   })
 
+  await db.systemSettings.upsert({
+    where: { key: 'SENDER_EMAIL' },
+    update: {},
+    create: {
+      key: 'SENDER_EMAIL',
+      value: 'noreply@example.com',
+      description: 'From address used when sending emails to candidates (must be verified in Resend).',
+    },
+  })
+
   console.log('Seeded admin user:', user.email, '— role:', user.role)
   await db.$disconnect()
 }

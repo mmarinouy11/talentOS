@@ -57,6 +57,28 @@ enum SourceType {
   OTHER
 }
 
+enum PipelineStage {
+  APPLIED
+  SCREENING
+  TECHNICAL_INTERVIEW
+  CLIENT_INTERVIEW
+  OFFER
+  HIRED
+}
+
+enum InterviewStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum InterviewDecision {
+  ADVANCE
+  REJECT
+  HOLD
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -74,6 +96,8 @@ model User {
   candidatePositions    CandidatePosition[] @relation("RecruiterCandidatePositions")
   stageHistoryMoves     StageHistory[]
   sourcedCandidates     Candidate[]         @relation("CandidateSourcedByUser")
+  decidedInterviews     Interview[]         @relation("InterviewDecidedBy")
+  emailLogs             EmailLog[]
 }
 
 model Account {
@@ -190,6 +214,7 @@ model Candidate {
   candidatePositions CandidatePosition[]
   sourcedByUser      User?               @relation("CandidateSourcedByUser", fields: [sourcedByUserId], references: [id])
   sourcedByVendor    Vendor?             @relation(fields: [sourcedByVendorId], references: [id])
+  emailLogs          EmailLog[]
 }
 
 model CandidatePosition {
@@ -219,6 +244,8 @@ model CandidatePosition {
   position     Position       @relation(fields: [positionId], references: [id])
   recruiter    User           @relation("RecruiterCandidatePositions", fields: [recruiterId], references: [id])
   stageHistory StageHistory[]
+  interviews   Interview[]
+  emailLogs    EmailLog[]
 
   @@unique([candidateId, positionId])
 }
@@ -234,6 +261,52 @@ model StageHistory {
 
   candidatePosition CandidatePosition @relation(fields: [candidatePositionId], references: [id])
   movedBy           User              @relation(fields: [movedById], references: [id])
+}
+
+model Interview {
+  id                  String            @id @default(cuid())
+  candidatePositionId String
+  stage               PipelineStage
+  roundLabel          String
+  roundNumber         Int
+  isInternal          Boolean           @default(true)
+  status              InterviewStatus   @default(PENDING)
+  scheduledAt         DateTime?
+  feedbackText        String?           @db.Text
+  feedbackPdfUrl      String?
+  feedbackSummary     String?           @db.Text
+  feedbackStrengths   String[]
+  feedbackConcerns    String[]
+  decision            InterviewDecision?
+  decisionNotes       String?           @db.Text
+  decidedAt           DateTime?
+  decidedById         String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  candidatePosition CandidatePosition @relation(fields: [candidatePositionId], references: [id])
+  decidedBy         User?             @relation("InterviewDecidedBy", fields: [decidedById], references: [id])
+  emailLogs         EmailLog[]
+}
+
+model EmailLog {
+  id          String   @id @default(cuid())
+  to          String
+  subject     String
+  template    String
+  status      String
+  errorMsg    String?
+  sentAt      DateTime @default(now())
+
+  candidateId         String?
+  candidatePositionId String?
+  interviewId         String?
+  sentById            String?
+
+  candidate         Candidate?         @relation(fields: [candidateId], references: [id])
+  candidatePosition CandidatePosition? @relation(fields: [candidatePositionId], references: [id])
+  interview         Interview?         @relation(fields: [interviewId], references: [id])
+  sentBy            User?              @relation(fields: [sentById], references: [id])
 }
 
 model SystemSettings {

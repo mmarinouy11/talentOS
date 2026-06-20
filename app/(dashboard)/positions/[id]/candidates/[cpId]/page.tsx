@@ -8,6 +8,7 @@ import { SeniorityBadge } from '@/components/app/SeniorityBadge'
 import { StageBadge } from '@/components/app/StageBadge'
 import { SkillTags } from '@/components/app/SkillTags'
 import { FitScoreCard } from '@/components/app/FitScoreCard'
+import { InterviewsSection } from '@/components/app/InterviewsSection'
 
 export default async function CandidateInPositionPage({
   params,
@@ -195,6 +196,8 @@ export default async function CandidateInPositionPage({
               </div>
             )
           })()}
+
+          <InterviewsSection candidatePositionId={cp.id} />
 
           {cp.stageHistory.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
