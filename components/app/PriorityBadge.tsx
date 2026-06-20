@@ -10,7 +10,13 @@ const config: Record<Priority, { label: string; className: string }> = {
 export function PriorityBadge({ priority }: { priority: Priority }) {
   const { label, className } = config[priority] ?? config['MEDIUM']
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
+      {priority === 'URGENT' && (
+        <span className="relative flex h-1.5 w-1.5 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#8DF000' }} />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#8DF000' }} />
+        </span>
+      )}
       {label}
     </span>
   )

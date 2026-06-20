@@ -172,11 +172,11 @@ export default async function PositionDetailPage({
 
       {/* Metrics */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Aging</p>
           <p className="text-3xl font-semibold mt-1 text-gray-900">{days}d</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-5 py-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Candidates</p>
           <p className="text-3xl font-semibold mt-1 text-gray-900">{position.candidatePositions.length}</p>
         </div>

@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import Link from 'next/link'
 import Image from 'next/image'
 import type { Role } from '@prisma/client'
+import { SidebarNav } from '@/components/app/SidebarNav'
 
 const navItems = [
   { href: '/positions', label: 'Positions' },
@@ -44,17 +44,7 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center px-3 py-2 text-sm font-medium text-[#6E6A65] rounded-lg hover:text-[#000000] hover:bg-white/50 transition-colors"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <SidebarNav items={items} />
 
         <div className="px-5 py-4 border-t border-[#DADADA]">
           <p className="text-sm font-medium text-[#000000] truncate">
