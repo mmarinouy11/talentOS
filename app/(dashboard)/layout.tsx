@@ -9,6 +9,7 @@ const navItems = [
   { href: '/candidates', label: 'Candidates' },
   { href: '/vendors', label: 'Vendors' },
   { href: '/reports', label: 'Reports' },
+  { href: '/profile', label: 'My Profile' },
 ]
 
 export default async function DashboardLayout({

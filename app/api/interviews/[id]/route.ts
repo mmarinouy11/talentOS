@@ -6,6 +6,9 @@ import { z } from 'zod'
 const patchSchema = z.object({
   status: z.enum(['PENDING', 'SCHEDULED', 'COMPLETED', 'CANCELLED']).optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
+  schedulingMode: z.enum(['MANUAL_SLOTS', 'CALENDAR_LINK']).nullable().optional(),
+  proposedSlots: z.array(z.string().datetime()).optional(),
+  calendarLinkUsed: z.string().nullable().optional(),
   roundLabel: z.string().min(1).optional(),
   roundNumber: z.number().int().min(1).optional(),
   isInternal: z.boolean().optional(),
@@ -32,7 +35,7 @@ export async function PATCH(
   const existing = await db.interview.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { decision, decisionNotes, ...rest } = parsed.data
+  const { decision, decisionNotes, proposedSlots, ...rest } = parsed.data
 
   const decidedFields =
     decision !== undefined
@@ -49,6 +52,7 @@ export async function PATCH(
     data: {
       ...rest,
       scheduledAt: rest.scheduledAt !== undefined ? (rest.scheduledAt ? new Date(rest.scheduledAt) : null) : undefined,
+      proposedSlots: proposedSlots !== undefined ? proposedSlots.map((s) => new Date(s)) : undefined,
       ...decidedFields,
     },
     include: { decidedBy: { select: { name: true, email: true } } },

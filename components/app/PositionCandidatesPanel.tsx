@@ -10,6 +10,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   APPLIED: 'Applied',
   SCREENING: 'Screening',
   TECHNICAL_INTERVIEW: 'Technical',
+  MANAGER_INTERVIEW: 'Manager Interview',
   CLIENT_INTERVIEW: 'Client Interview',
   OFFER: 'Offer',
   HIRED: 'Hired',

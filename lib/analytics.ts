@@ -1,11 +1,12 @@
 import { db } from './db'
 
-export type PipelineStage = 'APPLIED' | 'SCREENING' | 'TECHNICAL_INTERVIEW' | 'CLIENT_INTERVIEW' | 'OFFER' | 'HIRED'
+export type PipelineStage = 'APPLIED' | 'SCREENING' | 'TECHNICAL_INTERVIEW' | 'MANAGER_INTERVIEW' | 'CLIENT_INTERVIEW' | 'OFFER' | 'HIRED'
 
 export const PIPELINE_STAGES: PipelineStage[] = [
   'APPLIED',
   'SCREENING',
   'TECHNICAL_INTERVIEW',
+  'MANAGER_INTERVIEW',
   'CLIENT_INTERVIEW',
   'OFFER',
   'HIRED',

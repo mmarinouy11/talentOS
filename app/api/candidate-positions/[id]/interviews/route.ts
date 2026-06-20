@@ -3,12 +3,22 @@ import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+const STAGE_LABELS: Record<string, string> = {
+  APPLIED: 'Applied',
+  SCREENING: 'Screening',
+  TECHNICAL_INTERVIEW: 'Technical Interview',
+  MANAGER_INTERVIEW: 'Manager Interview',
+  CLIENT_INTERVIEW: 'Client Interview',
+  OFFER: 'Offer',
+  HIRED: 'Hired',
+  REJECTED: 'Rejected',
+}
+
 const createSchema = z.object({
-  stage: z.enum(['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED']),
-  roundLabel: z.string().min(1),
-  roundNumber: z.number().int().min(1),
-  isInternal: z.boolean().default(true),
-  scheduledAt: z.string().datetime().optional().nullable(),
+  stage: z.enum(['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED', 'REJECTED']),
+  schedulingMode: z.enum(['MANUAL_SLOTS', 'CALENDAR_LINK']).optional().nullable(),
+  proposedSlots: z.array(z.string().datetime()).optional(),
+  calendarLinkUsed: z.string().optional().nullable(),
 })
 
 export async function GET(
@@ -44,14 +54,25 @@ export async function POST(
   const cp = await db.candidatePosition.findUnique({ where: { id } })
   if (!cp) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const [existingForStage, existingTotal] = await Promise.all([
+    db.interview.count({ where: { candidatePositionId: id, stage: parsed.data.stage } }),
+    db.interview.count({ where: { candidatePositionId: id } }),
+  ])
+
+  const baseLabel = STAGE_LABELS[parsed.data.stage] ?? parsed.data.stage
+  const roundLabel = existingForStage === 0 ? baseLabel : `${baseLabel} - Round ${existingForStage + 1}`
+  const roundNumber = existingTotal + 1
+
   const interview = await db.interview.create({
     data: {
       candidatePositionId: id,
       stage: parsed.data.stage,
-      roundLabel: parsed.data.roundLabel,
-      roundNumber: parsed.data.roundNumber,
-      isInternal: parsed.data.isInternal,
-      scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
+      roundLabel,
+      roundNumber,
+      isInternal: true,
+      schedulingMode: parsed.data.schedulingMode ?? null,
+      proposedSlots: parsed.data.proposedSlots?.map((s) => new Date(s)) ?? [],
+      calendarLinkUsed: parsed.data.calendarLinkUsed ?? null,
     },
     include: { decidedBy: { select: { name: true, email: true } } },
   })

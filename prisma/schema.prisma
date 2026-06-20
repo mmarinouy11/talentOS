@@ -39,10 +39,16 @@ enum Stage {
   APPLIED
   SCREENING
   TECHNICAL_INTERVIEW
+  MANAGER_INTERVIEW
   CLIENT_INTERVIEW
   OFFER
   HIRED
   REJECTED
+}
+
+enum SchedulingMode {
+  MANUAL_SLOTS
+  CALENDAR_LINK
 }
 
 enum CompensationRisk {
@@ -61,9 +67,11 @@ enum PipelineStage {
   APPLIED
   SCREENING
   TECHNICAL_INTERVIEW
+  MANAGER_INTERVIEW
   CLIENT_INTERVIEW
   OFFER
   HIRED
+  REJECTED
 }
 
 enum InterviewStatus {
@@ -86,6 +94,7 @@ model User {
   passwordHash String?
   role         Role     @default(RECRUITER)
   image        String?
+  calendarLink String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -271,6 +280,9 @@ model Interview {
   roundNumber         Int
   isInternal          Boolean           @default(true)
   status              InterviewStatus   @default(PENDING)
+  schedulingMode      SchedulingMode?
+  proposedSlots       DateTime[]
+  calendarLinkUsed    String?
   scheduledAt         DateTime?
   feedbackText        String?           @db.Text
   feedbackPdfUrl      String?
