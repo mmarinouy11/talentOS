@@ -31,6 +31,9 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   await db.$transaction([
+    db.emailLog.deleteMany({ where: { interview: { candidatePositionId: id } } }),
+    db.emailLog.deleteMany({ where: { candidatePositionId: id } }),
+    db.interview.deleteMany({ where: { candidatePositionId: id } }),
     db.stageHistory.deleteMany({ where: { candidatePositionId: id } }),
     db.candidatePosition.delete({ where: { id } }),
   ])
