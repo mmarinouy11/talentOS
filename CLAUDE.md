@@ -21,3 +21,12 @@ Import from `lib/anthropic.ts`:
 - Use `FAST` model for: CV field extraction, classification, simple summaries
 - Use `SMART` model for: fit scoring, transcript analysis, copilot outputs
 - Always wrap calls in try/catch — never let AI failures crash the UI
+
+## Bulk LinkedIn Import
+
+- Route: `POST /api/candidates/bulk-import` — accepts .zip, returns preview array (no DB writes)
+- Route: `POST /api/candidates/bulk-import/confirm` — bulk-creates candidates from preview
+- Page: `/candidates/import` — 3-step flow: upload → review table with dedup indicators → done
+- Shared PDF extraction: `lib/pdf-extract.ts` (used by both CV upload and bulk import)
+- Dedup: by email (case-insensitive) against existing non-deleted candidates
+- Max: 50 PDFs per batch, 50MB zip
