@@ -3,13 +3,24 @@ import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+const SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  calendarLink: true,
+  role: true,
+  schedulingEmailTemplate: true,
+  rejectionEmailTemplate: true,
+  advanceEmailTemplate: true,
+} as const
+
 export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = await db.user.findUnique({
     where: { id: (session.user as { id?: string }).id! },
-    select: { id: true, name: true, email: true, calendarLink: true, role: true },
+    select: SELECT,
   })
 
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -19,6 +30,9 @@ export async function GET() {
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   calendarLink: z.string().url().nullable().optional().or(z.literal('')),
+  schedulingEmailTemplate: z.string().nullable().optional(),
+  rejectionEmailTemplate: z.string().nullable().optional(),
+  advanceEmailTemplate: z.string().nullable().optional(),
 })
 
 export async function PATCH(req: NextRequest) {
@@ -29,13 +43,17 @@ export async function PATCH(req: NextRequest) {
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
+  const d = parsed.data
   const user = await db.user.update({
     where: { id: (session.user as { id?: string }).id! },
     data: {
-      ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
-      ...(parsed.data.calendarLink !== undefined ? { calendarLink: parsed.data.calendarLink || null } : {}),
+      ...(d.name !== undefined ? { name: d.name } : {}),
+      ...(d.calendarLink !== undefined ? { calendarLink: d.calendarLink || null } : {}),
+      ...(d.schedulingEmailTemplate !== undefined ? { schedulingEmailTemplate: d.schedulingEmailTemplate || null } : {}),
+      ...(d.rejectionEmailTemplate !== undefined ? { rejectionEmailTemplate: d.rejectionEmailTemplate || null } : {}),
+      ...(d.advanceEmailTemplate !== undefined ? { advanceEmailTemplate: d.advanceEmailTemplate || null } : {}),
     },
-    select: { id: true, name: true, email: true, calendarLink: true, role: true },
+    select: SELECT,
   })
 
   return NextResponse.json(user)

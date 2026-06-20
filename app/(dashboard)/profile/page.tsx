@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  DEFAULT_SCHEDULING_TEMPLATE,
+  DEFAULT_REJECTION_TEMPLATE,
+  DEFAULT_ADVANCE_TEMPLATE,
+} from '@/lib/email-templates'
 
 interface UserProfile {
   id: string
@@ -11,12 +16,62 @@ interface UserProfile {
   email: string
   calendarLink: string | null
   role: string
+  schedulingEmailTemplate: string | null
+  rejectionEmailTemplate: string | null
+  advanceEmailTemplate: string | null
+}
+
+const TEMPLATE_TOKENS: Record<string, string[]> = {
+  scheduling: ['{{candidateName}}', '{{positionTitle}}', '{{clientName}}', '{{recruiterName}}', '{{roundLabel}}', '{{schedulingLink}}'],
+  rejection: ['{{candidateName}}', '{{positionTitle}}', '{{clientName}}', '{{recruiterName}}'],
+  advance: ['{{candidateName}}', '{{positionTitle}}', '{{clientName}}', '{{recruiterName}}', '{{nextRoundLabel}}', '{{schedulingLink}}'],
+}
+
+function TemplateEditor({
+  label,
+  tokenKey,
+  value,
+  defaultValue,
+  onChange,
+}: {
+  label: string
+  tokenKey: string
+  value: string
+  defaultValue: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>{label}</Label>
+        <button
+          type="button"
+          onClick={() => onChange(defaultValue)}
+          className="text-xs text-gray-400 hover:text-gray-600 underline"
+        >
+          Reset to Default
+        </button>
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={6}
+        className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+      />
+      <p className="text-xs text-gray-400">
+        Available tokens: {TEMPLATE_TOKENS[tokenKey].join(', ')}
+      </p>
+    </div>
+  )
 }
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [name, setName] = useState('')
   const [calendarLink, setCalendarLink] = useState('')
+  const [schedulingTemplate, setSchedulingTemplate] = useState(DEFAULT_SCHEDULING_TEMPLATE)
+  const [rejectionTemplate, setRejectionTemplate] = useState(DEFAULT_REJECTION_TEMPLATE)
+  const [advanceTemplate, setAdvanceTemplate] = useState(DEFAULT_ADVANCE_TEMPLATE)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
 
@@ -27,6 +82,9 @@ export default function ProfilePage() {
         setProfile(data)
         setName(data.name ?? '')
         setCalendarLink(data.calendarLink ?? '')
+        setSchedulingTemplate(data.schedulingEmailTemplate ?? DEFAULT_SCHEDULING_TEMPLATE)
+        setRejectionTemplate(data.rejectionEmailTemplate ?? DEFAULT_REJECTION_TEMPLATE)
+        setAdvanceTemplate(data.advanceEmailTemplate ?? DEFAULT_ADVANCE_TEMPLATE)
       })
   }, [])
 
@@ -38,7 +96,13 @@ export default function ProfilePage() {
       const res = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, calendarLink: calendarLink || null }),
+        body: JSON.stringify({
+          name,
+          calendarLink: calendarLink || null,
+          schedulingEmailTemplate: schedulingTemplate === DEFAULT_SCHEDULING_TEMPLATE ? null : schedulingTemplate,
+          rejectionEmailTemplate: rejectionTemplate === DEFAULT_REJECTION_TEMPLATE ? null : rejectionTemplate,
+          advanceEmailTemplate: advanceTemplate === DEFAULT_ADVANCE_TEMPLATE ? null : advanceTemplate,
+        }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -57,42 +121,80 @@ export default function ProfilePage() {
   if (!profile) return <p className="text-sm text-gray-400">Loading…</p>
 
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">My Profile</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage your personal settings.</p>
+        <p className="text-sm text-gray-500 mt-0.5">Manage your personal settings and email templates.</p>
       </div>
 
-      <form onSubmit={save} className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <div>
-          <Label htmlFor="name">Name</Label>
-          <Input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1"
-          />
+      <form onSubmit={save} className="space-y-6">
+        {/* Basic info */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <h2 className="text-sm font-medium text-gray-900">Account</h2>
+
+          <div>
+            <Label htmlFor="name">Name</Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1" />
+          </div>
+
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" value={profile.email} disabled className="mt-1 bg-gray-50 text-gray-500" />
+            <p className="text-xs text-gray-400 mt-1">Email cannot be changed here.</p>
+          </div>
+
+          <div>
+            <Label htmlFor="calendarLink">Calendar Booking Link</Label>
+            <Input
+              id="calendarLink"
+              type="url"
+              value={calendarLink}
+              onChange={(e) => setCalendarLink(e.target.value)}
+              placeholder="https://calendly.com/yourname or Google appointment link"
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Used for Screening interviews. Paste your Google Calendar appointment scheduling link or Calendly link here.
+            </p>
+          </div>
         </div>
 
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" value={profile.email} disabled className="mt-1 bg-gray-50 text-gray-500" />
-          <p className="text-xs text-gray-400 mt-1">Email cannot be changed here.</p>
-        </div>
+        {/* Email Templates */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+          <div>
+            <h2 className="text-sm font-medium text-gray-900">Email Templates</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Customize the emails sent to candidates. Use tokens (e.g. {'{{candidateName}}'}) for dynamic content.
+            </p>
+          </div>
 
-        <div>
-          <Label htmlFor="calendarLink">Calendar Booking Link</Label>
-          <Input
-            id="calendarLink"
-            type="url"
-            value={calendarLink}
-            onChange={(e) => setCalendarLink(e.target.value)}
-            placeholder="https://calendly.com/yourname or Google appointment link"
-            className="mt-1"
+          <TemplateEditor
+            label="Scheduling Request"
+            tokenKey="scheduling"
+            value={schedulingTemplate}
+            defaultValue={DEFAULT_SCHEDULING_TEMPLATE}
+            onChange={setSchedulingTemplate}
           />
-          <p className="text-xs text-gray-400 mt-1">
-            Used for Screening interviews. Paste your Google Calendar appointment scheduling link or Calendly link here.
-          </p>
+
+          <div className="border-t border-gray-100 pt-4">
+            <TemplateEditor
+              label="Rejection"
+              tokenKey="rejection"
+              value={rejectionTemplate}
+              defaultValue={DEFAULT_REJECTION_TEMPLATE}
+              onChange={setRejectionTemplate}
+            />
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <TemplateEditor
+              label="Advance Notification"
+              tokenKey="advance"
+              value={advanceTemplate}
+              defaultValue={DEFAULT_ADVANCE_TEMPLATE}
+              onChange={setAdvanceTemplate}
+            />
+          </div>
         </div>
 
         {feedback && (

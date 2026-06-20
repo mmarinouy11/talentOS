@@ -52,12 +52,15 @@ Import from `lib/anthropic.ts`:
 
 ## Interview Pipeline
 
-- Enums: `PipelineStage` (APPLIED|SCREENING|TECHNICAL_INTERVIEW|CLIENT_INTERVIEW|OFFER|HIRED), `InterviewStatus` (PENDING|SCHEDULED|COMPLETED|CANCELLED), `InterviewDecision` (ADVANCE|REJECT|HOLD)
-- Model: `Interview` (candidatePositionId, stage, roundLabel, roundNumber, isInternal, status, scheduledAt, feedbackText/Summary/Strengths/Concerns, decision, decisionNotes, decidedAt, decidedById)
+- Enums: `PipelineStage` (APPLIED|SCREENING|TECHNICAL_INTERVIEW|MANAGER_INTERVIEW|CLIENT_INTERVIEW|OFFER|HIRED|REJECTED), `InterviewStatus` (PENDING|AWAITING_SCHEDULE|SCHEDULED|COMPLETED|CANCELLED), `InterviewDecision` (ADVANCE|REJECT|HOLD), `SchedulingMode` (MANUAL_SLOTS|CALENDAR_LINK)
+- Model: `Interview` (candidatePositionId, stage, roundLabel, roundNumber, isInternal, status, schedulingMode, proposedSlots, calendarLinkUsed, scheduledAt, feedbackText/Summary/Strengths/Concerns, decision, decisionNotes, decidedAt, decidedById)
 - Model: `EmailLog` (to, subject, template, status, errorMsg, sentAt, candidateId?, candidatePositionId?, interviewId?, sentById?)
-- Routes: `GET/POST /api/candidate-positions/[id]/interviews`, `PATCH /api/interviews/[id]`
-- Component: `components/app/InterviewsSection.tsx` — client component with Add/Edit modals; displayed on `/positions/[id]/candidates/[cpId]`
+- Routes: `GET/POST /api/candidate-positions/[id]/interviews`, `PATCH /api/interviews/[id]`, `POST /api/interviews/[id]/send-scheduling-email`
+- Component: `components/app/InterviewsSection.tsx` — client component with Add/Edit/EmailPreview modals; props: candidatePositionId, candidateName, candidateEmail, positionTitle, clientName; displayed on `/positions/[id]/candidates/[cpId]`
 - Email: `lib/email.ts` — `sendEmail()` wraps Resend + writes EmailLog; `getFromAddress()` reads SENDER_EMAIL from SystemSettings
-- Templates: `lib/email-templates.ts` — `schedulingRequestEmail`, `rejectionEmail`, `advanceNotificationEmail`; each returns `{ subject, html }`
+- Templates: `lib/email-templates.ts` — `renderTemplate(template, tokens)`, `buildSchedulingTokens(...)`, `DEFAULT_*_TEMPLATE` constants; `schedulingRequestEmail`, `rejectionEmail`, `advanceNotificationEmail` accept optional `customTemplate`
+- Recruiter templates: User model has `schedulingEmailTemplate`, `rejectionEmailTemplate`, `advanceEmailTemplate` (Text?); editable in `/profile`
+- Email preview: Creating a SCREENING interview shows an editable email preview before sending; "Skip for now" leaves PENDING; "Send Email" → status becomes AWAITING_SCHEDULE
+- "Send Scheduling Email" button visible on PENDING/AWAITING_SCHEDULE Screening interviews in Edit modal
 - Settings: SENDER_EMAIL key in SystemSettings; editable via `/settings` (LABELS entry added)
 - Debug page: `/settings/email-test` (ADMIN-only client page) + `POST /api/settings/email-test`

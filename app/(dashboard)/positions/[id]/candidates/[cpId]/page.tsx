@@ -197,7 +197,13 @@ export default async function CandidateInPositionPage({
             )
           })()}
 
-          <InterviewsSection candidatePositionId={cp.id} />
+          <InterviewsSection
+            candidatePositionId={cp.id}
+            candidateName={`${candidate.firstName} ${candidate.lastName}`}
+            candidateEmail={candidate.email}
+            positionTitle={position.title}
+            clientName={position.client}
+          />
 
           {cp.stageHistory.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
