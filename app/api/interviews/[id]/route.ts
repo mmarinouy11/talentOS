@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const patchSchema = z.object({
-  status: z.enum(['PENDING', 'SCHEDULED', 'COMPLETED', 'CANCELLED']).optional(),
+  action: z.literal('cancel').optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
   schedulingMode: z.enum(['MANUAL_SLOTS', 'CALENDAR_LINK']).nullable().optional(),
   proposedSlots: z.array(z.string().datetime()).optional(),
@@ -19,6 +19,35 @@ const patchSchema = z.object({
   decision: z.enum(['ADVANCE', 'REJECT', 'HOLD']).nullable().optional(),
   decisionNotes: z.string().nullable().optional(),
 })
+
+import type { InterviewStatus } from '@prisma/client'
+
+function deriveStatus(
+  existing: { status: string },
+  data: {
+    action?: 'cancel'
+    scheduledAt?: string | null
+    feedbackText?: string | null
+  }
+): InterviewStatus {
+  if (data.action === 'cancel') return 'CANCELLED'
+
+  const currentStatus = existing.status as InterviewStatus
+
+  // Feedback being set → COMPLETED
+  if (data.feedbackText && data.feedbackText.trim().length > 0) {
+    return 'COMPLETED'
+  }
+
+  // scheduledAt being set → SCHEDULED (only if not already past those states)
+  if (data.scheduledAt != null) {
+    if (currentStatus === 'PENDING' || currentStatus === 'AWAITING_SCHEDULE') {
+      return 'SCHEDULED'
+    }
+  }
+
+  return currentStatus
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -35,7 +64,9 @@ export async function PATCH(
   const existing = await db.interview.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { decision, decisionNotes, proposedSlots, ...rest } = parsed.data
+  const { action, decision, decisionNotes, proposedSlots, ...rest } = parsed.data
+
+  const newStatus = deriveStatus(existing, { action, scheduledAt: rest.scheduledAt, feedbackText: rest.feedbackText })
 
   const decidedFields =
     decision !== undefined
@@ -51,6 +82,7 @@ export async function PATCH(
     where: { id },
     data: {
       ...rest,
+      status: newStatus,
       scheduledAt: rest.scheduledAt !== undefined ? (rest.scheduledAt ? new Date(rest.scheduledAt) : null) : undefined,
       proposedSlots: proposedSlots !== undefined ? proposedSlots.map((s) => new Date(s)) : undefined,
       ...decidedFields,

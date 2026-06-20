@@ -401,60 +401,71 @@ function EditInterviewModal({
   onClose: () => void
   onSaved: (interview: Interview) => void
 }) {
-  const [status, setStatus] = useState<InterviewStatus>(interview.status)
-  const [slots, setSlots] = useState<string[]>(
-    interview.proposedSlots.length > 0
-      ? interview.proposedSlots.map((s) => new Date(s).toISOString().slice(0, 16))
-      : ['']
+  const [currentInterview, setCurrentInterview] = useState(interview)
+  const [scheduledAt, setScheduledAt] = useState(
+    interview.scheduledAt ? new Date(interview.scheduledAt).toISOString().slice(0, 16) : ''
   )
   const [feedbackText, setFeedbackText] = useState(interview.feedbackText ?? '')
   const [decision, setDecision] = useState<InterviewDecision | ''>(interview.decision ?? '')
   const [decisionNotes, setDecisionNotes] = useState(interview.decisionNotes ?? '')
   const [saving, setSaving] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showEmailPreview, setShowEmailPreview] = useState(false)
+
+  async function patch(body: Record<string, unknown>): Promise<Interview | null> {
+    const res = await fetch(`/api/interviews/${currentInterview.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setError(d.error ?? 'Failed to update')
+      return null
+    }
+    return res.json()
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     setError(null)
-    try {
-      const res = await fetch(`/api/interviews/${interview.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status,
-          proposedSlots: slots.filter(Boolean).map((s) => new Date(s).toISOString()),
-          feedbackText: feedbackText || null,
-          decision: decision || null,
-          decisionNotes: decisionNotes || null,
-        }),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        setError(d.error ?? 'Failed to update')
-        return
-      }
-      onSaved(await res.json())
-    } catch {
-      setError('Network error')
-    } finally {
-      setSaving(false)
-    }
+    const updated = await patch({
+      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      feedbackText: feedbackText || null,
+      decision: decision || null,
+      decisionNotes: decisionNotes || null,
+    })
+    setSaving(false)
+    if (updated) onSaved(updated)
   }
 
-  const canSendSchedulingEmail = interview.stage === 'SCREENING' && (interview.status === 'PENDING' || interview.status === 'AWAITING_SCHEDULE')
+  async function cancel() {
+    if (!confirm('Cancel this interview? This cannot be undone.')) return
+    setCancelling(true)
+    setError(null)
+    const updated = await patch({ action: 'cancel' })
+    setCancelling(false)
+    if (updated) onSaved(updated)
+  }
+
+  const canSendSchedulingEmail =
+    currentInterview.stage === 'SCREENING' &&
+    (currentInterview.status === 'PENDING' || currentInterview.status === 'AWAITING_SCHEDULE')
+
+  const isCancelled = currentInterview.status === 'CANCELLED'
 
   if (showEmailPreview) {
     return (
       <EmailPreviewModal
-        interview={interview}
+        interview={currentInterview}
         userProfile={userProfile}
         candidateName={candidateName}
         candidateEmail={candidateEmail}
         positionTitle={positionTitle}
         clientName={clientName}
-        onSend={(updated) => onSaved(updated)}
+        onSend={(updated) => { setCurrentInterview(updated); onSaved(updated) }}
         onSkip={() => setShowEmailPreview(false)}
         onCancel={() => setShowEmailPreview(false)}
       />
@@ -464,48 +475,67 @@ function EditInterviewModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Edit Interview</h2>
-        <p className="text-sm text-gray-500 mb-4">{interview.roundLabel} · {STAGE_LABELS[interview.stage]}</p>
+        {/* Header */}
+        <h2 className="text-lg font-semibold text-gray-900 mb-0.5">Edit Interview</h2>
+        <p className="text-sm text-gray-500 mb-4">{currentInterview.roundLabel} · {STAGE_LABELS[currentInterview.stage]}</p>
+
+        {/* Status row */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_COLORS[currentInterview.status]}`}>
+            {STATUS_LABELS[currentInterview.status]}
+          </span>
+          {!isCancelled && (
+            <Button type="button" variant="outline" size="sm" onClick={cancel} disabled={cancelling}>
+              {cancelling ? 'Cancelling…' : 'Cancel Interview'}
+            </Button>
+          )}
+        </div>
+
         <form onSubmit={submit} className="space-y-4">
+          {/* Scheduling info (read-only) */}
+          {currentInterview.calendarLinkUsed ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
+              Calendar link: <span className="font-medium">{currentInterview.calendarLinkUsed}</span>
+            </div>
+          ) : currentInterview.proposedSlots.length > 0 ? (
+            <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600">
+              <span className="font-medium text-gray-700">Proposed slots:</span>{' '}
+              {currentInterview.proposedSlots
+                .map((s) => new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))
+                .join(' · ')}
+            </div>
+          ) : null}
+
+          {/* Confirmed date → auto-transitions to SCHEDULED */}
           <div>
-            <Label htmlFor="status">Status</Label>
-            <select
-              id="status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as InterviewStatus)}
-              className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
-            >
-              <option value="PENDING">Pending</option>
-              <option value="AWAITING_SCHEDULE">Awaiting Schedule</option>
-              <option value="SCHEDULED">Scheduled</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+            <Label htmlFor="scheduledAt">Confirmed Date</Label>
+            <p className="text-xs text-gray-400 mb-1">Setting a date will mark this interview as Scheduled.</p>
+            <Input
+              id="scheduledAt"
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className="mt-0.5"
+              disabled={isCancelled}
+            />
           </div>
 
-          {interview.schedulingMode !== 'CALENDAR_LINK' && (
-            <div>
-              <Label>Time Slots</Label>
-              <div className="mt-1"><SlotList slots={slots} onChange={setSlots} /></div>
-            </div>
-          )}
-          {interview.calendarLinkUsed && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
-              Calendar link: <span className="font-medium truncate">{interview.calendarLinkUsed}</span>
-            </div>
-          )}
-
+          {/* Feedback → auto-transitions to COMPLETED */}
           <div>
             <Label htmlFor="feedbackText">Feedback Notes</Label>
+            <p className="text-xs text-gray-400 mb-1">Adding feedback will mark this interview as Completed.</p>
             <textarea
               id="feedbackText"
               value={feedbackText}
               onChange={(e) => setFeedbackText(e.target.value)}
               rows={4}
-              className="mt-1 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+              disabled={isCancelled}
+              className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
               placeholder="Interviewer notes…"
             />
           </div>
+
+          {/* Decision */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="decision">Decision</Label>
@@ -513,7 +543,8 @@ function EditInterviewModal({
                 id="decision"
                 value={decision}
                 onChange={(e) => setDecision(e.target.value as InterviewDecision | '')}
-                className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+                disabled={isCancelled}
+                className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
               >
                 <option value="">— No decision yet —</option>
                 <option value="ADVANCE">Advance</option>
@@ -523,10 +554,19 @@ function EditInterviewModal({
             </div>
             <div>
               <Label htmlFor="decisionNotes">Decision Notes</Label>
-              <Input id="decisionNotes" value={decisionNotes} onChange={(e) => setDecisionNotes(e.target.value)} placeholder="Optional notes" className="mt-1" />
+              <Input
+                id="decisionNotes"
+                value={decisionNotes}
+                onChange={(e) => setDecisionNotes(e.target.value)}
+                placeholder="Optional notes"
+                disabled={isCancelled}
+                className="mt-1"
+              />
             </div>
           </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
+
           <div className="flex items-center justify-between pt-2">
             {canSendSchedulingEmail ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setShowEmailPreview(true)}>
@@ -534,8 +574,10 @@ function EditInterviewModal({
               </Button>
             ) : <div />}
             <div className="flex gap-2">
-              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>
+              <Button type="button" variant="ghost" onClick={onClose}>Close</Button>
+              {!isCancelled && (
+                <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>
+              )}
             </div>
           </div>
         </form>

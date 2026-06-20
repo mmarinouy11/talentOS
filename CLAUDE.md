@@ -64,3 +64,10 @@ Import from `lib/anthropic.ts`:
 - "Send Scheduling Email" button visible on PENDING/AWAITING_SCHEDULE Screening interviews in Edit modal
 - Settings: SENDER_EMAIL key in SystemSettings; editable via `/settings` (LABELS entry added)
 - Debug page: `/settings/email-test` (ADMIN-only client page) + `POST /api/settings/email-test`
+
+## Backlog
+
+- Automatic interview scheduling confirmation: currently moving an Interview to
+  SCHEDULED requires the recruiter to manually enter a confirmed date after
+  coordinating with the candidate. Explore automating via Google Calendar webhook
+  or a candidate-facing confirmation page tied to a unique link per Interview.
