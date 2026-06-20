@@ -24,9 +24,13 @@ Import from `lib/anthropic.ts`:
 
 ## Bulk LinkedIn Import
 
-- Route: `POST /api/candidates/bulk-import` — accepts .zip, returns preview array (no DB writes)
-- Route: `POST /api/candidates/bulk-import/confirm` — bulk-creates candidates from preview
-- Page: `/candidates/import` — 3-step flow: upload → review table with dedup indicators → done
+- Route: `POST /api/candidates/bulk-import` — accepts .zip, starts background job, returns `{ jobId, total }` immediately
+- Route: `GET /api/candidates/bulk-import/status/[jobId]` — polls job progress `{ total, completed, done, results }`
+- Route: `POST /api/candidates/bulk-import/confirm` — bulk-creates candidates; optional `positionId` also creates CandidatePosition + triggers scoring
+- Component: `components/app/LinkedInImportFlow.tsx` — shared upload+poll+review flow; used standalone and inside modal
+- Page: `/candidates/import` — standalone wrapper around LinkedInImportFlow
+- Modal: `AddCandidateToPositionModal` — two tabs: "Search Existing" and "Import from LinkedIn" (uses LinkedInImportFlow with positionId)
 - Shared PDF extraction: `lib/pdf-extract.ts` (used by both CV upload and bulk import)
+- Job state: `lib/import-jobs.ts` — module-level Map, 30-min TTL
 - Dedup: by email (case-insensitive) against existing non-deleted candidates
 - Max: 50 PDFs per batch, 50MB zip

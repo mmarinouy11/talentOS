@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { callClaudeJSON } from '@/lib/anthropic'
 import { extractPdfText } from '@/lib/pdf-extract'
 import AdmZip from 'adm-zip'
+import { randomUUID } from 'crypto'
+import { importJobs, scheduleJobCleanup, type ParsedCandidate } from '@/lib/import-jobs'
 
 const LINKEDIN_SYSTEM_PROMPT = `You are a LinkedIn profile PDF parser. Extract structured information from a LinkedIn profile export.
 Return ONLY valid JSON with these exact fields:
@@ -27,22 +29,73 @@ Rules:
 - Languages: only human spoken languages, never programming languages
 - No markdown, no explanation, only the JSON object`
 
-export interface ParsedCandidate {
-  fileName: string
-  firstName: string | null
-  lastName: string | null
-  email: string | null
-  phone: string | null
-  country: string | null
-  linkedinUrl: string | null
-  seniority: 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL' | null
-  yearsOfExperience: number | null
-  skills: string[]
-  languages: string[]
-  summary: string | null
-  duplicate: boolean
-  existingId?: string
-  error?: string
+async function processJob(
+  jobId: string,
+  entries: AdmZip.IZipEntry[],
+  emailMap: Map<string, string>
+) {
+  const job = importJobs.get(jobId)
+  if (!job) return
+
+  const chunkSize = 10
+  for (let i = 0; i < entries.length; i += chunkSize) {
+    const chunk = entries.slice(i, i + chunkSize)
+    const chunkResults = await Promise.all(
+      chunk.map(async (entry): Promise<ParsedCandidate> => {
+        const fileName = entry.entryName.split('/').pop() ?? entry.entryName
+        try {
+          const pdfBuffer = entry.getData()
+          const text = await extractPdfText(pdfBuffer)
+
+          if (!text.trim()) {
+            return {
+              fileName,
+              firstName: null, lastName: null, email: null, phone: null,
+              country: null, linkedinUrl: null, seniority: null,
+              yearsOfExperience: null, skills: [], languages: [], summary: null,
+              duplicate: false,
+              error: 'Could not extract text from PDF',
+            }
+          }
+
+          const parsed = await callClaudeJSON<Omit<ParsedCandidate, 'fileName' | 'duplicate' | 'existingId' | 'error'>>(
+            `Parse this LinkedIn profile PDF and return the structured JSON:\n\n${text.slice(0, 8000)}`,
+            'FAST',
+            LINKEDIN_SYSTEM_PROMPT
+          )
+
+          const email = parsed.email ?? null
+          const isDuplicate = !!(email && emailMap.has(email.toLowerCase()))
+          const existingId = email ? emailMap.get(email.toLowerCase()) : undefined
+
+          return {
+            fileName,
+            ...parsed,
+            skills: parsed.skills ?? [],
+            languages: parsed.languages ?? [],
+            duplicate: isDuplicate,
+            existingId,
+          }
+        } catch (err) {
+          console.error(`Failed to parse ${fileName}:`, err)
+          return {
+            fileName,
+            firstName: null, lastName: null, email: null, phone: null,
+            country: null, linkedinUrl: null, seniority: null,
+            yearsOfExperience: null, skills: [], languages: [], summary: null,
+            duplicate: false,
+            error: 'Parse failed',
+          }
+        }
+      })
+    )
+
+    if (!importJobs.has(jobId)) return // job was cleaned up
+    job.results.push(...chunkResults)
+    job.completed = job.results.length
+  }
+
+  job.done = true
 }
 
 export async function POST(request: Request) {
@@ -84,65 +137,19 @@ export async function POST(request: Request) {
     })
     const emailMap = new Map(existingCandidates.map((c) => [c.email.toLowerCase(), c.id]))
 
-    // Process each PDF in parallel (up to 10 at a time)
-    const results: ParsedCandidate[] = []
-    const chunkSize = 10
+    // Create job and return immediately
+    const jobId = randomUUID()
+    importJobs.set(jobId, { total: entries.length, completed: 0, done: false, results: [] })
+    scheduleJobCleanup(jobId)
 
-    for (let i = 0; i < entries.length; i += chunkSize) {
-      const chunk = entries.slice(i, i + chunkSize)
-      const chunkResults = await Promise.all(
-        chunk.map(async (entry) => {
-          const fileName = entry.entryName.split('/').pop() ?? entry.entryName
-          try {
-            const pdfBuffer = entry.getData()
-            const text = await extractPdfText(pdfBuffer)
+    // Process in background
+    processJob(jobId, entries, emailMap).catch((err) => {
+      const job = importJobs.get(jobId)
+      if (job) { job.done = true; job.error = 'Processing failed unexpectedly' }
+      console.error('Import job failed:', err)
+    })
 
-            if (!text.trim()) {
-              return {
-                fileName,
-                firstName: null, lastName: null, email: null, phone: null,
-                country: null, linkedinUrl: null, seniority: null,
-                yearsOfExperience: null, skills: [], languages: [], summary: null,
-                duplicate: false,
-                error: 'Could not extract text from PDF',
-              } satisfies ParsedCandidate
-            }
-
-            const parsed = await callClaudeJSON<Omit<ParsedCandidate, 'fileName' | 'duplicate' | 'existingId' | 'error'>>(
-              `Parse this LinkedIn profile PDF and return the structured JSON:\n\n${text.slice(0, 8000)}`,
-              'FAST',
-              LINKEDIN_SYSTEM_PROMPT
-            )
-
-            const email = parsed.email ?? null
-            const isDuplicate = !!(email && emailMap.has(email.toLowerCase()))
-            const existingId = email ? emailMap.get(email.toLowerCase()) : undefined
-
-            return {
-              fileName,
-              ...parsed,
-              skills: parsed.skills ?? [],
-              languages: parsed.languages ?? [],
-              duplicate: isDuplicate,
-              existingId,
-            } satisfies ParsedCandidate
-          } catch (err) {
-            console.error(`Failed to parse ${fileName}:`, err)
-            return {
-              fileName,
-              firstName: null, lastName: null, email: null, phone: null,
-              country: null, linkedinUrl: null, seniority: null,
-              yearsOfExperience: null, skills: [], languages: [], summary: null,
-              duplicate: false,
-              error: 'Parse failed',
-            } satisfies ParsedCandidate
-          }
-        })
-      )
-      results.push(...chunkResults)
-    }
-
-    return NextResponse.json({ candidates: results, total: results.length })
+    return NextResponse.json({ jobId, total: entries.length })
   } catch (err) {
     console.error('Bulk import error:', err)
     return NextResponse.json({ error: 'Failed to process zip file' }, { status: 500 })
