@@ -10,13 +10,13 @@ export default async function ReportsPage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
-  const [funnel, timeToStage, timeInStage, leadTime, globalInsights] = await Promise.all([
+  const [funnel, timeToStage, timeInStage, leadTime] = await Promise.all([
     getFunnelData(),
     getTimeToStage(),
     getTimeInStage(),
     getLeadTime(),
-    db.globalInsights.findFirst({ orderBy: { generatedAt: 'desc' } }),
   ])
+  const globalInsights = await db.globalInsights.findFirst({ orderBy: { generatedAt: 'desc' } }).catch(() => null)
 
   return (
     <div className="space-y-6">
