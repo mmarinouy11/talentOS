@@ -1,9 +1,16 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import { writeFile, readFile, mkdtemp, readdir, rm } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
+
+const execFileAsync = promisify(execFile)
 
 const MIN_TEXT_LENGTH = 200
 const MAX_VISION_PAGES = 12
@@ -45,33 +52,25 @@ interface FeedbackParse {
 }
 
 async function renderPdfPages(buffer: Buffer): Promise<Buffer[]> {
-  const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const { createCanvas } = await import('@napi-rs/canvas')
-  const { pathToFileURL } = await import('url')
-  const { resolve } = await import('path')
-
-  // Point to the bundled worker file so pdfjs can spawn it without a network fetch
-  const workerPath = resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
-  GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href
-
-  const data = new Uint8Array(buffer)
-  const pdf = await getDocument({ data, useWorkerFetch: false, isEvalSupported: false }).promise
-
-  const numPages = Math.min(pdf.numPages, MAX_VISION_PAGES)
-  if (pdf.numPages > MAX_VISION_PAGES) {
-    console.warn(`[upload-feedback] PDF has ${pdf.numPages} pages — only first ${MAX_VISION_PAGES} sent to vision model`)
+  const workDir = await mkdtemp(join(tmpdir(), 'pdf-render-'))
+  const inputPath = join(workDir, 'input.pdf')
+  const outputPrefix = join(workDir, 'page')
+  try {
+    await writeFile(inputPath, buffer)
+    await execFileAsync('pdftoppm', [
+      '-png', '-r', '150', '-f', '1', '-l', String(MAX_VISION_PAGES),
+      inputPath, outputPrefix,
+    ])
+    const files = (await readdir(workDir))
+      .filter((f) => f.startsWith('page') && f.endsWith('.png'))
+      .sort()
+    if (files.length > MAX_VISION_PAGES) {
+      console.warn(`[upload-feedback] PDF has more than ${MAX_VISION_PAGES} pages — only first ${MAX_VISION_PAGES} sent to vision model`)
+    }
+    return await Promise.all(files.map((f) => readFile(join(workDir, f))))
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {})
   }
-
-  const pages: Buffer[] = []
-  for (let i = 1; i <= numPages; i++) {
-    const page = await pdf.getPage(i)
-    const viewport = page.getViewport({ scale: 1.5 })
-    const canvas = createCanvas(viewport.width, viewport.height)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await page.render({ canvasContext: canvas.getContext('2d') as any, viewport, canvas: canvas as any }).promise
-    pages.push(canvas.toBuffer('image/png'))
-  }
-  return pages
 }
 
 async function parseVisionFeedback(pageImages: Buffer[]): Promise<FeedbackParse> {
