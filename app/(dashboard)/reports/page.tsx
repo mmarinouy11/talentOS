@@ -1,18 +1,21 @@
 import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { getFunnelData, getTimeToStage, getTimeInStage, getLeadTime } from '@/lib/analytics'
 import { FunnelChart } from '@/components/app/FunnelChart'
 import { VelocityTable } from '@/components/app/VelocityTable'
+import { GlobalInsights } from '@/components/app/GlobalInsights'
 
 export default async function ReportsPage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
-  const [funnel, timeToStage, timeInStage, leadTime] = await Promise.all([
+  const [funnel, timeToStage, timeInStage, leadTime, globalInsights] = await Promise.all([
     getFunnelData(),
     getTimeToStage(),
     getTimeInStage(),
     getLeadTime(),
+    db.globalInsights.findFirst({ orderBy: { generatedAt: 'desc' } }),
   ])
 
   return (
@@ -21,6 +24,9 @@ export default async function ReportsPage() {
         <h1 className="text-2xl font-semibold text-gray-900">Reports</h1>
         <p className="text-sm text-gray-500 mt-0.5">All-time · org-wide</p>
       </div>
+
+      {/* Pipeline Insights */}
+      <GlobalInsights initial={globalInsights} />
 
       {/* Lead Time */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

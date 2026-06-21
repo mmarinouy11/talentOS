@@ -64,11 +64,22 @@ Import from `lib/anthropic.ts`:
 - Email preview: Creating a SCREENING/TECHNICAL/MANAGER/CLIENT interview shows an editable scheduling email preview before sending; "Skip for now" leaves PENDING; "Send Email" → status becomes AWAITING_SCHEDULE
 - "Send Scheduling Email" button visible on PENDING/AWAITING_SCHEDULE Screening interviews in Edit modal
 - Decision flows: saving REJECT → rejection email preview modal; saving ADVANCE → NextRoundModal (select stage → schedule slots → email preview); HOLD → no email
-- Feedback PDF: `POST /api/interviews/[id]/upload-feedback` — PDF only, max 10MB; extracts text via `lib/pdf-extract.ts`, uploads to Drive (prefix `feedback_`), parses with Claude Haiku → feedbackSummary/Strengths/Concerns/aiRecommendedDecision; auto-sets status COMPLETED
-- Interview model: `feedbackPdfUrl` (Drive file ID), `aiRecommendedDecision` (InterviewDecision?) — AI-suggested decision shown as hint near Decision dropdown, never auto-fills recruiter's choice
+- Feedback PDF: `POST /api/interviews/[id]/upload-feedback` — PDF only, max 10MB; extracts text via `lib/pdf-extract.ts`, uploads to Drive (prefix `feedback_`), renders image-based PDFs via `pdftoppm` (poppler-utils), parses with Claude → feedbackSummary/Strengths/Concerns/aiRecommendedDecision/feedbackParseMethod; auto-sets status COMPLETED
+- Interview model: `feedbackPdfUrl` (Drive file ID), `aiRecommendedDecision` (InterviewDecision?), `feedbackParseMethod` ("text"|"vision"), `durationMinutes` — AI-suggested decision shown as hint near Decision dropdown, never auto-fills recruiter's choice
+- Manual feedback text: PATCH /api/interviews/[id] calls Claude Haiku when feedbackText changes, auto-populates same fields
 - Status auto-derivation: scheduledAt→SCHEDULED, feedbackText→COMPLETED, action:'cancel'→CANCELLED; no direct status field in edit form
+- Scheduling slots: 15-min increments, recruiter timezone selector (saved to User.timezone), configurable durationMinutes per interview and as SystemSettings defaults (DEFAULT_DURATION_SCREENING_MANAGER, DEFAULT_DURATION_OTHER)
+- Candidate timezone: slot times formatted in candidate's country timezone in scheduling emails; `lib/timezone.ts` has COUNTRY_TIMEZONE_MAP and formatSlotForCandidate()
 - Settings: SENDER_EMAIL key in SystemSettings; editable via `/settings` (LABELS entry added)
 - Debug page: `/settings/email-test` (ADMIN-only client page) + `POST /api/settings/email-test`
+- nixpacks.toml: `nixPkgs = ["poppler_utils"]` required for pdftoppm in Railway production
+
+## Pipeline Insights
+
+- Position-level: `POST /api/positions/[id]/generate-insights` — requires ≥2 interviews with feedback; calls Claude SMART; saves to Position fields (insightsSummary, insightsCommonStrengths, insightsCommonConcerns, insightsBottleneckStage, insightsRecommendation, insightsGeneratedAt)
+- Global: `POST /api/insights/generate-global` — requires ≥5 interviews org-wide with feedback; calls Claude SMART; upserts single GlobalInsights row (deleteMany + create)
+- Components: `PositionInsights` (on position detail page) and `GlobalInsights` (on /reports page) — client components with Generate/Regenerate button, display summary/strengths/concerns/bottleneck/recommendation
+- Both are on-demand (button-triggered), not automatic
 
 ## Backlog
 

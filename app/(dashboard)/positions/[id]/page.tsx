@@ -11,6 +11,7 @@ import { JDIntelligence } from '@/components/app/JDIntelligence'
 import { PositionCandidatesPanel } from '@/components/app/PositionCandidatesPanel'
 import { FunnelChart } from '@/components/app/FunnelChart'
 import { VelocityTable } from '@/components/app/VelocityTable'
+import { PositionInsights } from '@/components/app/PositionInsights'
 
 function fmt(date: Date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -235,6 +236,19 @@ export default async function PositionDetailPage({
           <VelocityTable data={positionTimeInStage} label="Avg Days in Stage" />
         </div>
       </div>
+
+      {/* Pipeline Insights */}
+      <PositionInsights
+        positionId={id}
+        initial={{
+          summary: position.insightsSummary ?? null,
+          commonStrengths: position.insightsCommonStrengths,
+          commonConcerns: position.insightsCommonConcerns,
+          bottleneckStage: position.insightsBottleneckStage ?? null,
+          recommendation: position.insightsRecommendation ?? null,
+          generatedAt: position.insightsGeneratedAt ?? null,
+        }}
+      />
 
       {/* Job Description */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

@@ -186,6 +186,12 @@ model Position {
   jdSeniority          Seniority?
   jdLanguages          String[]
   jdSummary            String?    @db.Text
+  insightsSummary         String?   @db.Text
+  insightsCommonStrengths String[]
+  insightsCommonConcerns  String[]
+  insightsBottleneckStage String?
+  insightsRecommendation  String?   @db.Text
+  insightsGeneratedAt     DateTime?
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   deletedAt            DateTime?
@@ -327,6 +333,16 @@ model EmailLog {
   candidatePosition CandidatePosition? @relation(fields: [candidatePositionId], references: [id])
   interview         Interview?         @relation(fields: [interviewId], references: [id])
   sentBy            User?              @relation(fields: [sentById], references: [id])
+}
+
+model GlobalInsights {
+  id                String   @id @default(cuid())
+  summary           String?  @db.Text
+  commonStrengths   String[]
+  commonConcerns    String[]
+  bottleneckPattern String?
+  recommendation    String?  @db.Text
+  generatedAt       DateTime @default(now())
 }
 
 model SystemSettings {
