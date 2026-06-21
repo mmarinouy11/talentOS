@@ -27,6 +27,7 @@ export async function uploadFileToDrive(
       body: Readable.from(fileBuffer),
     },
     fields: 'id, name',
+    supportsAllDrives: true,
   })
   return {
     fileId: response.data.id!,
