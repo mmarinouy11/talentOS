@@ -16,6 +16,8 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   MIN_DGM_PERCENT: { label: 'Minimum DGM Threshold (%)', type: 'number', min: 0, max: 100 },
   MONTHLY_HOURS_BASELINE: { label: 'Monthly Hours Baseline', type: 'number', min: 1, max: 744 },
   SENDER_EMAIL: { label: 'Sender Email Address', type: 'text' },
+  DEFAULT_DURATION_SCREENING_MANAGER: { label: 'Default Duration — Screening & Manager (minutes)', type: 'number', min: 5, max: 480 },
+  DEFAULT_DURATION_OTHER: { label: 'Default Duration — Technical & Client (minutes)', type: 'number', min: 5, max: 480 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {

@@ -49,6 +49,26 @@ async function main() {
     },
   })
 
+  await db.systemSettings.upsert({
+    where: { key: 'DEFAULT_DURATION_SCREENING_MANAGER' },
+    update: {},
+    create: {
+      key: 'DEFAULT_DURATION_SCREENING_MANAGER',
+      value: '30',
+      description: 'Default interview duration (minutes) for Screening and Manager Interview rounds.',
+    },
+  })
+
+  await db.systemSettings.upsert({
+    where: { key: 'DEFAULT_DURATION_OTHER' },
+    update: {},
+    create: {
+      key: 'DEFAULT_DURATION_OTHER',
+      value: '60',
+      description: 'Default interview duration (minutes) for Technical and Client Interview rounds.',
+    },
+  })
+
   console.log('Seeded admin user:', user.email, '— role:', user.role)
   await db.$disconnect()
 }

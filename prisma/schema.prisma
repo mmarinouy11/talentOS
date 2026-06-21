@@ -96,6 +96,7 @@ model User {
   role         Role     @default(RECRUITER)
   image        String?
   calendarLink               String?
+  timezone                   String?  @default("America/Montevideo")
   schedulingEmailTemplate    String?  @db.Text
   rejectionEmailTemplate     String?  @db.Text
   advanceEmailTemplate       String?  @db.Text
@@ -294,6 +295,7 @@ model Interview {
   feedbackStrengths   String[]
   feedbackConcerns    String[]
   aiRecommendedDecision InterviewDecision?
+  durationMinutes     Int?
   decision            InterviewDecision?
   decisionNotes       String?           @db.Text
   decidedAt           DateTime?

@@ -9,12 +9,14 @@ import {
   DEFAULT_REJECTION_TEMPLATE,
   DEFAULT_ADVANCE_TEMPLATE,
 } from '@/lib/email-templates'
+import { RECRUITER_TIMEZONES } from '@/lib/timezone'
 
 interface UserProfile {
   id: string
   name: string | null
   email: string
   calendarLink: string | null
+  timezone: string | null
   role: string
   schedulingEmailTemplate: string | null
   rejectionEmailTemplate: string | null
@@ -72,6 +74,7 @@ export default function ProfilePage() {
   const [schedulingTemplate, setSchedulingTemplate] = useState(DEFAULT_SCHEDULING_TEMPLATE)
   const [rejectionTemplate, setRejectionTemplate] = useState(DEFAULT_REJECTION_TEMPLATE)
   const [advanceTemplate, setAdvanceTemplate] = useState(DEFAULT_ADVANCE_TEMPLATE)
+  const [timezone, setTimezone] = useState('America/Montevideo')
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
 
@@ -82,6 +85,7 @@ export default function ProfilePage() {
         setProfile(data)
         setName(data.name ?? '')
         setCalendarLink(data.calendarLink ?? '')
+        setTimezone(data.timezone ?? 'America/Montevideo')
         setSchedulingTemplate(data.schedulingEmailTemplate ?? DEFAULT_SCHEDULING_TEMPLATE)
         setRejectionTemplate(data.rejectionEmailTemplate ?? DEFAULT_REJECTION_TEMPLATE)
         setAdvanceTemplate(data.advanceEmailTemplate ?? DEFAULT_ADVANCE_TEMPLATE)
@@ -99,6 +103,7 @@ export default function ProfilePage() {
         body: JSON.stringify({
           name,
           calendarLink: calendarLink || null,
+          timezone,
           schedulingEmailTemplate: schedulingTemplate === DEFAULT_SCHEDULING_TEMPLATE ? null : schedulingTemplate,
           rejectionEmailTemplate: rejectionTemplate === DEFAULT_REJECTION_TEMPLATE ? null : rejectionTemplate,
           advanceEmailTemplate: advanceTemplate === DEFAULT_ADVANCE_TEMPLATE ? null : advanceTemplate,
@@ -141,6 +146,21 @@ export default function ProfilePage() {
             <Label htmlFor="email">Email</Label>
             <Input id="email" value={profile.email} disabled className="mt-1 bg-gray-50 text-gray-500" />
             <p className="text-xs text-gray-400 mt-1">Email cannot be changed here.</p>
+          </div>
+
+          <div>
+            <Label htmlFor="timezone">Timezone</Label>
+            <select
+              id="timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+            >
+              {RECRUITER_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>{tz.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Default timezone used when entering interview time slots.</p>
           </div>
 
           <div>

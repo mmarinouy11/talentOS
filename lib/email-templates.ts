@@ -35,6 +35,8 @@ export function buildSchedulingTokens({
   roundLabel,
   slots,
   calendarLink,
+  candidateCountry,
+  durationMinutes,
 }: {
   candidateName: string
   positionTitle: string
@@ -43,19 +45,22 @@ export function buildSchedulingTokens({
   roundLabel: string
   slots?: string[]
   calendarLink?: string | null
+  candidateCountry?: string | null
+  durationMinutes?: number | null
 }): Record<string, string> {
+  const { formatSlotForCandidate } = require('./timezone') as typeof import('./timezone')
+  const duration = durationMinutes ? `${durationMinutes} minutes` : ''
+
   let schedulingLink = ''
   if (calendarLink) {
     schedulingLink = `<a href="${calendarLink}">Book a time here</a>`
+    if (duration) schedulingLink += `<p>The call will be ${duration}.</p>`
   } else if (slots && slots.length > 0) {
-    const fmt = (iso: string) =>
-      new Date(iso).toLocaleString('en-US', {
-        weekday: 'long', month: 'long', day: 'numeric',
-        hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
-      })
-    schedulingLink = `<p>Please let us know which of the following times works best for you:</p><ul>${slots.map((s) => `<li>${fmt(s)}</li>`).join('')}</ul>`
+    const formatted = slots.map((s) => formatSlotForCandidate(new Date(s), candidateCountry ?? null))
+    schedulingLink = `<p>Please let us know which of the following times works best for you:</p><ul>${formatted.map((f) => `<li>${f}</li>`).join('')}</ul>`
+    if (duration) schedulingLink += `<p>Each slot is a ${duration} call.</p>`
   }
-  return { candidateName, positionTitle, clientName, recruiterName, roundLabel, schedulingLink, slotsList: schedulingLink, nextRoundLabel: '' }
+  return { candidateName, positionTitle, clientName, recruiterName, roundLabel, schedulingLink, slotsList: schedulingLink, nextRoundLabel: '', duration }
 }
 
 export function schedulingRequestEmail({

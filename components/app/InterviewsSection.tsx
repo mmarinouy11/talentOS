@@ -12,6 +12,7 @@ import {
   buildSchedulingTokens,
 } from '@/lib/email-templates'
 import { getNextStage, STAGE_SEQUENCE } from '@/lib/pipeline'
+import { RECRUITER_TIMEZONES, zonedToUtcIso } from '@/lib/timezone'
 
 type InterviewStatus = 'PENDING' | 'AWAITING_SCHEDULE' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
 type InterviewDecision = 'ADVANCE' | 'REJECT' | 'HOLD'
@@ -35,6 +36,7 @@ interface Interview {
   feedbackStrengths: string[]
   feedbackConcerns: string[]
   aiRecommendedDecision: InterviewDecision | null
+  durationMinutes: number | null
   decision: InterviewDecision | null
   decisionNotes: string | null
   decidedAt: string | null
@@ -44,6 +46,7 @@ interface Interview {
 
 interface UserProfile {
   calendarLink: string | null
+  timezone: string | null
   schedulingEmailTemplate: string | null
   rejectionEmailTemplate: string | null
   name: string | null
@@ -122,6 +125,7 @@ function buildSchedulingEmailContent(
     roundLabel: interview.roundLabel,
     slots: interview.proposedSlots,
     calendarLink: interview.calendarLinkUsed,
+    durationMinutes: interview.durationMinutes,
   })
 
   const template = isScreening
@@ -165,7 +169,7 @@ function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: stri
     <div className="space-y-2">
       {slots.map((slot, i) => (
         <div key={i} className="flex items-center gap-2">
-          <Input type="datetime-local" value={slot} onChange={(e) => update(i, e.target.value)} className="flex-1" required />
+          <Input type="datetime-local" step={900} value={slot} onChange={(e) => update(i, e.target.value)} className="flex-1" required />
           {slots.length > 1 && (
             <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
           )}
@@ -175,6 +179,16 @@ function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: stri
         + Add another slot
       </button>
     </div>
+  )
+}
+
+function TimezoneSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={selectClass()}>
+      {RECRUITER_TIMEZONES.map((tz) => (
+        <option key={tz.value} value={tz.value}>{tz.label}</option>
+      ))}
+    </select>
   )
 }
 
@@ -444,6 +458,8 @@ function NextRoundModal({
   const [phase, setPhase] = useState<'select' | 'schedule' | 'preview'>('select')
   const [slots, setSlots] = useState<string[]>([''])
   const [schedulingMode, setSchedulingMode] = useState<SchedulingMode>('MANUAL_SLOTS')
+  const [slotTimezone, setSlotTimezone] = useState(userProfile?.timezone ?? 'America/Montevideo')
+  const [duration, setDuration] = useState<number>(60)
   const [creating, setCreating] = useState(false)
   const [createdInterview, setCreatedInterview] = useState<Interview | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -466,8 +482,9 @@ function NextRoundModal({
         body: JSON.stringify({
           stage: selectedStage,
           schedulingMode: isCalendar ? 'CALENDAR_LINK' : 'MANUAL_SLOTS',
-          proposedSlots: isCalendar ? [] : slots.filter(Boolean).map((s) => new Date(s).toISOString()),
+          proposedSlots: isCalendar ? [] : slots.filter(Boolean).map((s) => zonedToUtcIso(s, slotTimezone)),
           calendarLinkUsed: isCalendar ? userProfile?.calendarLink : null,
+          durationMinutes: duration || null,
         }),
       })
       if (!res.ok) {
@@ -539,11 +556,22 @@ function NextRoundModal({
               </div>
             )
           ) : (
-            <div>
-              <Label>Proposed Time Slots</Label>
-              <div className="mt-1"><SlotList slots={slots} onChange={setSlots} /></div>
+            <div className="space-y-3">
+              <div>
+                <Label>Your Timezone (slots are in this timezone)</Label>
+                <div className="mt-1"><TimezoneSelect value={slotTimezone} onChange={setSlotTimezone} /></div>
+              </div>
+              <div>
+                <Label>Proposed Time Slots</Label>
+                <div className="mt-1"><SlotList slots={slots} onChange={setSlots} /></div>
+              </div>
             </div>
           )}
+
+          <div>
+            <Label htmlFor="nr-duration">Duration (minutes)</Label>
+            <Input id="nr-duration" type="number" min={5} max={480} step={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
+          </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -615,6 +643,8 @@ function AddInterviewModal({
   const [stage, setStage] = useState<PipelineStage>(initialStage ?? 'SCREENING')
   const [schedulingMode, setSchedulingMode] = useState<SchedulingMode>('MANUAL_SLOTS')
   const [slots, setSlots] = useState<string[]>([''])
+  const [slotTimezone, setSlotTimezone] = useState(userProfile?.timezone ?? 'America/Montevideo')
+  const [duration, setDuration] = useState<number>(stage === 'SCREENING' || stage === 'MANAGER_INTERVIEW' ? 30 : 60)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingInterview, setPendingInterview] = useState<Interview | null>(null)
@@ -626,6 +656,10 @@ function AddInterviewModal({
   useEffect(() => {
     if (!isScreening) setSchedulingMode('MANUAL_SLOTS')
   }, [isScreening])
+
+  useEffect(() => {
+    setDuration(stage === 'SCREENING' || stage === 'MANAGER_INTERVIEW' ? 30 : 60)
+  }, [stage])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -639,8 +673,9 @@ function AddInterviewModal({
         body: JSON.stringify({
           stage,
           schedulingMode: isCalendar ? 'CALENDAR_LINK' : 'MANUAL_SLOTS',
-          proposedSlots: isCalendar ? [] : slots.filter(Boolean).map((s) => new Date(s).toISOString()),
+          proposedSlots: isCalendar ? [] : slots.filter(Boolean).map((s) => zonedToUtcIso(s, slotTimezone)),
           calendarLinkUsed: isCalendar ? userProfile?.calendarLink : null,
+          durationMinutes: duration || null,
         }),
       })
       if (!res.ok) {
@@ -720,8 +755,19 @@ function AddInterviewModal({
                 </div>
               )
             ) : (
-              <SlotList slots={slots} onChange={setSlots} />
+              <div className="space-y-2">
+                <div>
+                  <Label>Your Timezone (slots are in this timezone)</Label>
+                  <div className="mt-1"><TimezoneSelect value={slotTimezone} onChange={setSlotTimezone} /></div>
+                </div>
+                <SlotList slots={slots} onChange={setSlots} />
+              </div>
             )}
+          </div>
+
+          <div>
+            <Label htmlFor="add-duration">Duration (minutes)</Label>
+            <Input id="add-duration" type="number" min={5} max={480} step={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
           </div>
 
           {showEmailPreview && (
@@ -773,6 +819,7 @@ function EditInterviewModal({
     interview.scheduledAt ? new Date(interview.scheduledAt).toISOString().slice(0, 16) : ''
   )
   const [feedbackText, setFeedbackText] = useState(interview.feedbackText ?? '')
+  const [durationMinutes, setDurationMinutes] = useState<number>(interview.durationMinutes ?? (interview.stage === 'SCREENING' || interview.stage === 'MANAGER_INTERVIEW' ? 30 : 60))
   const [decision, setDecision] = useState<InterviewDecision | ''>(interview.decision ?? '')
   const [decisionNotes, setDecisionNotes] = useState(interview.decisionNotes ?? '')
   const [saving, setSaving] = useState(false)
@@ -801,6 +848,7 @@ function EditInterviewModal({
     const updated = await patch({
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       feedbackText: feedbackText || null,
+      durationMinutes: durationMinutes || null,
       decision: decision || null,
       decisionNotes: decisionNotes || null,
     })
@@ -959,6 +1007,11 @@ function EditInterviewModal({
               className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
               placeholder="Interviewer notes…"
             />
+          </div>
+
+          <div>
+            <Label htmlFor="edit-duration">Duration (minutes)</Label>
+            <Input id="edit-duration" type="number" min={5} max={480} step={5} value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} disabled={isCancelled} className="mt-1 w-32" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

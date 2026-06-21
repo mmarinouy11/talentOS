@@ -27,7 +27,7 @@ export async function POST(
     include: {
       candidatePosition: {
         include: {
-          candidate: { select: { id: true, firstName: true, lastName: true, email: true } },
+          candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true } },
           position: { select: { id: true, title: true, client: true } },
           recruiter: { select: { id: true, name: true, email: true, schedulingEmailTemplate: true } },
         },
@@ -57,6 +57,8 @@ export async function POST(
       roundLabel: interview.roundLabel,
       slots: interview.proposedSlots.map((d) => d.toISOString()),
       calendarLink: interview.calendarLinkUsed,
+      candidateCountry: candidate.country,
+      durationMinutes: interview.durationMinutes,
     })
 
     const template = recruiter.schedulingEmailTemplate

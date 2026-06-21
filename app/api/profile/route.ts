@@ -8,6 +8,7 @@ const SELECT = {
   name: true,
   email: true,
   calendarLink: true,
+  timezone: true,
   role: true,
   schedulingEmailTemplate: true,
   rejectionEmailTemplate: true,
@@ -30,6 +31,7 @@ export async function GET() {
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   calendarLink: z.string().url().nullable().optional().or(z.literal('')),
+  timezone: z.string().nullable().optional(),
   schedulingEmailTemplate: z.string().nullable().optional(),
   rejectionEmailTemplate: z.string().nullable().optional(),
   advanceEmailTemplate: z.string().nullable().optional(),
@@ -49,6 +51,7 @@ export async function PATCH(req: NextRequest) {
     data: {
       ...(d.name !== undefined ? { name: d.name } : {}),
       ...(d.calendarLink !== undefined ? { calendarLink: d.calendarLink || null } : {}),
+      ...(d.timezone !== undefined ? { timezone: d.timezone || null } : {}),
       ...(d.schedulingEmailTemplate !== undefined ? { schedulingEmailTemplate: d.schedulingEmailTemplate || null } : {}),
       ...(d.rejectionEmailTemplate !== undefined ? { rejectionEmailTemplate: d.rejectionEmailTemplate || null } : {}),
       ...(d.advanceEmailTemplate !== undefined ? { advanceEmailTemplate: d.advanceEmailTemplate || null } : {}),

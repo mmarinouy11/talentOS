@@ -19,6 +19,7 @@ const createSchema = z.object({
   schedulingMode: z.enum(['MANUAL_SLOTS', 'CALENDAR_LINK']).optional().nullable(),
   proposedSlots: z.array(z.string().datetime()).optional(),
   calendarLinkUsed: z.string().optional().nullable(),
+  durationMinutes: z.number().int().min(1).optional().nullable(),
 })
 
 export async function GET(
@@ -73,6 +74,7 @@ export async function POST(
       schedulingMode: parsed.data.schedulingMode ?? null,
       proposedSlots: parsed.data.proposedSlots?.map((s) => new Date(s)) ?? [],
       calendarLinkUsed: parsed.data.calendarLinkUsed ?? null,
+      durationMinutes: parsed.data.durationMinutes ?? null,
     },
     include: { decidedBy: { select: { name: true, email: true } } },
   })

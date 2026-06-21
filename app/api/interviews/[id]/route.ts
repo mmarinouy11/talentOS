@@ -11,6 +11,7 @@ const patchSchema = z.object({
   calendarLinkUsed: z.string().nullable().optional(),
   roundLabel: z.string().min(1).optional(),
   roundNumber: z.number().int().min(1).optional(),
+  durationMinutes: z.number().int().min(1).nullable().optional(),
   isInternal: z.boolean().optional(),
   feedbackText: z.string().nullable().optional(),
   feedbackSummary: z.string().nullable().optional(),
