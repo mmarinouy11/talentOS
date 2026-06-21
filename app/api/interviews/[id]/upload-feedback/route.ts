@@ -30,6 +30,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -60,6 +61,7 @@ export async function POST(
   try {
     rawText = await extractPdfText(buffer)
   } catch (err) {
+    console.error('[upload-feedback] PDF extraction error:', err)
     return NextResponse.json({ error: `PDF text extraction failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 422 })
   }
 
@@ -71,6 +73,7 @@ export async function POST(
     const result = await uploadFileToDrive(buffer, fileName, 'application/pdf', folderId)
     fileId = result.fileId
   } catch (err) {
+    console.error('[upload-feedback] Drive upload error:', err)
     return NextResponse.json({ error: `Drive upload failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
   }
 
@@ -83,6 +86,7 @@ export async function POST(
       FEEDBACK_SYSTEM_PROMPT
     )
   } catch (err) {
+    console.error('[upload-feedback] Claude parsing error:', err)
     return NextResponse.json({ error: `AI parsing failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
   }
 
@@ -107,4 +111,8 @@ export async function POST(
   })
 
   return NextResponse.json(updated)
+  } catch (err) {
+    console.error('[upload-feedback] Unhandled error:', err)
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 })
+  }
 }
