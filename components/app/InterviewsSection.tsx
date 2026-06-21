@@ -30,9 +30,11 @@ interface Interview {
   calendarLinkUsed: string | null
   scheduledAt: string | null
   feedbackText: string | null
+  feedbackPdfUrl: string | null
   feedbackSummary: string | null
   feedbackStrengths: string[]
   feedbackConcerns: string[]
+  aiRecommendedDecision: InterviewDecision | null
   decision: InterviewDecision | null
   decisionNotes: string | null
   decidedAt: string | null
@@ -172,6 +174,149 @@ function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: stri
       <button type="button" onClick={() => onChange([...slots, ''])} className="text-sm text-blue-600 hover:underline">
         + Add another slot
       </button>
+    </div>
+  )
+}
+
+// ─── FeedbackPdfUpload ─────────────────────────────────────────────────────
+
+function FeedbackPdfUpload({
+  interviewId,
+  existingPdfUrl,
+  onParsed,
+}: {
+  interviewId: string
+  existingPdfUrl: string | null
+  onParsed: (interview: Interview) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+
+  async function upload(file: File) {
+    if (file.type !== 'application/pdf') { setError('Only PDF files are accepted'); return }
+    if (file.size > 10 * 1024 * 1024) { setError('File exceeds 10MB limit'); return }
+    setUploading(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/interviews/${interviewId}/upload-feedback`, { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Upload failed'); return }
+      onParsed(data as Interview)
+    } catch {
+      setError('Network error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) upload(file)
+  }
+
+  function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) upload(file)
+    e.target.value = ''
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Feedback PDF</Label>
+        {existingPdfUrl && (
+          <a
+            href={`https://drive.google.com/file/d/${existingPdfUrl}/view`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-blue-600 hover:underline"
+          >
+            View current PDF ↗
+          </a>
+        )}
+      </div>
+
+      <label
+        className={`relative flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 cursor-pointer transition-colors ${dragOver ? 'border-[#8DF000] bg-lime-50' : 'border-gray-200 hover:border-gray-300 bg-gray-50'} ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+      >
+        <input type="file" accept="application/pdf" className="sr-only" onChange={onFileInput} disabled={uploading} />
+        {uploading ? (
+          <p className="text-sm text-gray-500">Parsing feedback PDF…</p>
+        ) : (
+          <>
+            <p className="text-sm text-gray-600 font-medium">{existingPdfUrl ? 'Drop to replace feedback PDF' : 'Drop feedback PDF here or click to upload'}</p>
+            <p className="text-xs text-gray-400">PDF only · max 10 MB</p>
+          </>
+        )}
+      </label>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+// ─── FeedbackParseResult ────────────────────────────────────────────────────
+
+function FeedbackParseResult({
+  summary,
+  strengths,
+  concerns,
+  aiRecommendedDecision,
+}: {
+  summary: string
+  strengths: string[]
+  concerns: string[]
+  aiRecommendedDecision: InterviewDecision | null
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 text-sm">
+      <div>
+        <p className="text-xs font-medium text-gray-500 mb-1">AI Summary</p>
+        <p className="text-gray-700">{summary}</p>
+      </div>
+      {strengths.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Strengths</p>
+          <ul className="space-y-0.5">
+            {strengths.map((s, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-green-700">
+                <span className="mt-0.5 shrink-0">✓</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {concerns.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Concerns</p>
+          <ul className="space-y-0.5">
+            {concerns.map((c, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-orange-700">
+                <span className="mt-0.5 shrink-0">⚠</span>
+                <span>{c}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400 italic">No concerns noted</p>
+      )}
+      {aiRecommendedDecision && (
+        <div className="pt-1 border-t border-gray-200">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${aiRecommendedDecision === 'ADVANCE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            🤖 AI suggests: {aiRecommendedDecision === 'ADVANCE' ? 'Advance' : 'Reject'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
@@ -747,7 +892,7 @@ function EditInterviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
+      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold text-gray-900 mb-0.5">Edit Interview</h2>
         <p className="text-sm text-gray-500 mb-4">{currentInterview.roundLabel} · {STAGE_LABELS[currentInterview.stage]}</p>
 
@@ -782,9 +927,29 @@ function EditInterviewModal({
             <Input id="scheduledAt" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} disabled={isCancelled} className="mt-0.5" />
           </div>
 
+          {!isCancelled && (
+            <FeedbackPdfUpload
+              interviewId={currentInterview.id}
+              existingPdfUrl={currentInterview.feedbackPdfUrl}
+              onParsed={(updated) => {
+                setCurrentInterview(updated)
+                setFeedbackText(updated.feedbackText ?? '')
+              }}
+            />
+          )}
+
+          {currentInterview.feedbackSummary && (
+            <FeedbackParseResult
+              summary={currentInterview.feedbackSummary}
+              strengths={currentInterview.feedbackStrengths}
+              concerns={currentInterview.feedbackConcerns}
+              aiRecommendedDecision={currentInterview.aiRecommendedDecision}
+            />
+          )}
+
           <div>
             <Label htmlFor="feedbackText">Feedback Notes</Label>
-            <p className="text-xs text-gray-400 mb-1">Adding feedback will mark this interview as Completed.</p>
+            <p className="text-xs text-gray-400 mb-1">Adding feedback will mark this interview as Completed. Upload a PDF above to auto-fill.</p>
             <textarea
               id="feedbackText"
               value={feedbackText}
@@ -799,6 +964,11 @@ function EditInterviewModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="decision">Decision</Label>
+              {currentInterview.aiRecommendedDecision && !decision && (
+                <p className="text-xs text-gray-400 mb-0.5">
+                  🤖 AI suggests: {currentInterview.aiRecommendedDecision === 'ADVANCE' ? 'Advance' : 'Reject'}
+                </p>
+              )}
               <select id="decision" value={decision} onChange={(e) => setDecision(e.target.value as InterviewDecision | '')} disabled={isCancelled} className={`${selectClass()} disabled:bg-gray-50 disabled:text-gray-400`}>
                 <option value="">— No decision yet —</option>
                 <option value="ADVANCE">Advance</option>

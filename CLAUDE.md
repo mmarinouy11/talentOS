@@ -64,6 +64,8 @@ Import from `lib/anthropic.ts`:
 - Email preview: Creating a SCREENING/TECHNICAL/MANAGER/CLIENT interview shows an editable scheduling email preview before sending; "Skip for now" leaves PENDING; "Send Email" → status becomes AWAITING_SCHEDULE
 - "Send Scheduling Email" button visible on PENDING/AWAITING_SCHEDULE Screening interviews in Edit modal
 - Decision flows: saving REJECT → rejection email preview modal; saving ADVANCE → NextRoundModal (select stage → schedule slots → email preview); HOLD → no email
+- Feedback PDF: `POST /api/interviews/[id]/upload-feedback` — PDF only, max 10MB; extracts text via `lib/pdf-extract.ts`, uploads to Drive (prefix `feedback_`), parses with Claude Haiku → feedbackSummary/Strengths/Concerns/aiRecommendedDecision; auto-sets status COMPLETED
+- Interview model: `feedbackPdfUrl` (Drive file ID), `aiRecommendedDecision` (InterviewDecision?) — AI-suggested decision shown as hint near Decision dropdown, never auto-fills recruiter's choice
 - Status auto-derivation: scheduledAt→SCHEDULED, feedbackText→COMPLETED, action:'cancel'→CANCELLED; no direct status field in edit form
 - Settings: SENDER_EMAIL key in SystemSettings; editable via `/settings` (LABELS entry added)
 - Debug page: `/settings/email-test` (ADMIN-only client page) + `POST /api/settings/email-test`

@@ -293,6 +293,7 @@ model Interview {
   feedbackSummary     String?           @db.Text
   feedbackStrengths   String[]
   feedbackConcerns    String[]
+  aiRecommendedDecision InterviewDecision?
   decision            InterviewDecision?
   decisionNotes       String?           @db.Text
   decidedAt           DateTime?
