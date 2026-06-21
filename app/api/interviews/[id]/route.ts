@@ -2,6 +2,35 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { callClaudeJSON } from '@/lib/anthropic'
+
+const MANUAL_FEEDBACK_SYSTEM_PROMPT = `You are parsing interview feedback for a recruiting platform. The input may be either:
+(a) Detailed notes or a transcript from the interview, OR
+(b) A short, already-condensed assessment written by the interviewer/recruiter (e.g. "Strong technical skills, weak communication, would advance")
+
+If input is type (b) — short and already conclusion-level — treat it AS the summary itself. Do not pad it out, do not claim information is missing just because it's brief. Extract whatever specific strengths/concerns ARE stated, even if there are only one or two.
+
+If input is type (a) — longer and more conversational — synthesize a proper summary from it as usual.
+
+Extract structured information and return ONLY valid JSON, no markdown:
+{
+  "summary": "2-3 sentences; if input was already short/conclusive, mirror the original phrasing rather than inventing detail",
+  "strengths": ["whatever positive points are stated, can be as few as 1"],
+  "concerns": ["whatever concerns are stated, empty array if none"],
+  "recommendedDecision": "ADVANCE | REJECT | UNCLEAR"
+}
+Rules:
+- Never claim "insufficient information" if there is ANY substantive content, even a single sentence
+- Only return minimal/empty fields if the input is truly empty or has zero substantive content
+- May be in English or Spanish
+- No markdown, no explanation, only the JSON object`
+
+interface FeedbackParse {
+  summary: string
+  strengths: string[]
+  concerns: string[]
+  recommendedDecision: 'ADVANCE' | 'REJECT' | 'UNCLEAR'
+}
 
 const patchSchema = z.object({
   action: z.literal('cancel').optional(),
@@ -79,6 +108,39 @@ export async function PATCH(
         }
       : {}
 
+  // Determine if feedbackText actually changed and has content — if so, parse with Claude
+  const newFeedbackText = rest.feedbackText
+  const feedbackChanged =
+    newFeedbackText !== undefined &&
+    newFeedbackText !== null &&
+    newFeedbackText.trim().length > 0 &&
+    newFeedbackText.trim() !== (existing.feedbackText ?? '').trim()
+
+  let aiFields: Record<string, unknown> = {}
+  if (feedbackChanged) {
+    try {
+      const feedbackParse = await callClaudeJSON<FeedbackParse>(
+        `Parse this interview feedback:\n\n${newFeedbackText}`,
+        'FAST',
+        MANUAL_FEEDBACK_SYSTEM_PROMPT
+      )
+      const aiRecommendedDecision =
+        feedbackParse.recommendedDecision === 'ADVANCE' || feedbackParse.recommendedDecision === 'REJECT'
+          ? feedbackParse.recommendedDecision
+          : null
+      aiFields = {
+        feedbackSummary: feedbackParse.summary,
+        feedbackStrengths: feedbackParse.strengths,
+        feedbackConcerns: feedbackParse.concerns,
+        aiRecommendedDecision,
+        feedbackParseMethod: 'text',
+      }
+    } catch (err) {
+      console.error('[interview PATCH] Claude feedback parse failed:', err)
+      // Non-fatal — save the raw text without structured parse
+    }
+  }
+
   const interview = await db.interview.update({
     where: { id },
     data: {
@@ -87,9 +149,11 @@ export async function PATCH(
       scheduledAt: rest.scheduledAt !== undefined ? (rest.scheduledAt ? new Date(rest.scheduledAt) : null) : undefined,
       proposedSlots: proposedSlots !== undefined ? proposedSlots.map((s) => new Date(s)) : undefined,
       ...decidedFields,
+      ...aiFields,
     },
     include: { decidedBy: { select: { name: true, email: true } } },
   })
 
   return NextResponse.json(interview)
 }
+
