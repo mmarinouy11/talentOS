@@ -295,6 +295,7 @@ model Interview {
   feedbackStrengths   String[]
   feedbackConcerns    String[]
   aiRecommendedDecision InterviewDecision?
+  feedbackParseMethod String?
   durationMinutes     Int?
   decision            InterviewDecision?
   decisionNotes       String?           @db.Text

@@ -36,6 +36,7 @@ interface Interview {
   feedbackStrengths: string[]
   feedbackConcerns: string[]
   aiRecommendedDecision: InterviewDecision | null
+  feedbackParseMethod: string | null
   durationMinutes: number | null
   decision: InterviewDecision | null
   decisionNotes: string | null
@@ -284,11 +285,13 @@ function FeedbackParseResult({
   strengths,
   concerns,
   aiRecommendedDecision,
+  feedbackParseMethod,
 }: {
   summary: string
   strengths: string[]
   concerns: string[]
   aiRecommendedDecision: InterviewDecision | null
+  feedbackParseMethod: string | null
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 text-sm">
@@ -330,6 +333,11 @@ function FeedbackParseResult({
             🤖 AI suggests: {aiRecommendedDecision === 'ADVANCE' ? 'Advance' : 'Reject'}
           </span>
         </div>
+      )}
+      {feedbackParseMethod && (
+        <p className="text-xs text-gray-400 pt-1">
+          {feedbackParseMethod === 'vision' ? 'Parsed from document images' : 'Parsed from document text'}
+        </p>
       )}
     </div>
   )
@@ -992,6 +1000,7 @@ function EditInterviewModal({
               strengths={currentInterview.feedbackStrengths}
               concerns={currentInterview.feedbackConcerns}
               aiRecommendedDecision={currentInterview.aiRecommendedDecision}
+              feedbackParseMethod={currentInterview.feedbackParseMethod}
             />
           )}
 
