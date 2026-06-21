@@ -1026,11 +1026,6 @@ function EditInterviewModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="decision">Decision</Label>
-              {currentInterview.aiRecommendedDecision && !decision && (
-                <p className="text-xs text-gray-400 mb-0.5">
-                  🤖 AI suggests: {currentInterview.aiRecommendedDecision === 'ADVANCE' ? 'Advance' : 'Reject'}
-                </p>
-              )}
               <select id="decision" value={decision} onChange={(e) => setDecision(e.target.value as InterviewDecision | '')} disabled={isCancelled} className={`${selectClass()} disabled:bg-gray-50 disabled:text-gray-400`}>
                 <option value="">— No decision yet —</option>
                 <option value="ADVANCE">Advance</option>
