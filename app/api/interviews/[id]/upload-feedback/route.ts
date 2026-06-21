@@ -45,19 +45,32 @@ interface FeedbackParse {
 }
 
 async function renderPdfPages(buffer: Buffer): Promise<Buffer[]> {
-  const { pdf: pdfToImg } = await import('pdf-to-img')
-  const doc = await pdfToImg(buffer, { scale: 1.5 })
-  const pages: Buffer[] = []
-  for await (const page of doc) {
-    pages.push(page)
-    if (pages.length >= MAX_VISION_PAGES) {
-      if (doc.length > MAX_VISION_PAGES) {
-        console.warn(`[upload-feedback] PDF has ${doc.length} pages — only first ${MAX_VISION_PAGES} sent to vision model`)
-      }
-      break
-    }
+  const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const { createCanvas } = await import('@napi-rs/canvas')
+  const { pathToFileURL } = await import('url')
+  const { resolve } = await import('path')
+
+  // Point to the bundled worker file so pdfjs can spawn it without a network fetch
+  const workerPath = resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
+  GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href
+
+  const data = new Uint8Array(buffer)
+  const pdf = await getDocument({ data, useWorkerFetch: false, isEvalSupported: false }).promise
+
+  const numPages = Math.min(pdf.numPages, MAX_VISION_PAGES)
+  if (pdf.numPages > MAX_VISION_PAGES) {
+    console.warn(`[upload-feedback] PDF has ${pdf.numPages} pages — only first ${MAX_VISION_PAGES} sent to vision model`)
   }
-  await doc.destroy()
+
+  const pages: Buffer[] = []
+  for (let i = 1; i <= numPages; i++) {
+    const page = await pdf.getPage(i)
+    const viewport = page.getViewport({ scale: 1.5 })
+    const canvas = createCanvas(viewport.width, viewport.height)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await page.render({ canvasContext: canvas.getContext('2d') as any, viewport, canvas: canvas as any }).promise
+    pages.push(canvas.toBuffer('image/png'))
+  }
   return pages
 }
 
