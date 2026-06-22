@@ -19,6 +19,9 @@ const positionSchema = z.object({
   sales_contact_email: z.string().email().optional().nullable(),
   clientRate: z.number().optional().nullable(),
   internalCostBudget: z.number().optional().nullable(),
+  talentId: z.string().optional().nullable(),
+  reportingEmails: z.array(z.string().email()).optional(),
+  reportingDays: z.array(z.string()).optional(),
 })
 
 export async function GET(request: Request) {

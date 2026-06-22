@@ -88,6 +88,12 @@ Import from `lib/anthropic.ts`:
 - On-demand route: `POST /api/positions/[id]/generate-linkedin-queries` — generates without re-parsing JD
 - UI: subsection in `JDIntelligence` component — monospace query boxes with per-query Copy button (clipboard + "Copied!" flash), Generate/Regenerate button
 
+## Role-Based Access
+
+- Settings pages (`/settings`, `/settings/*`) redirect non-ADMIN users to `/positions`
+- `GET /api/settings` and `PATCH /api/settings/[key]` return 403 for non-ADMIN
+- Sidebar only shows Settings link for ADMIN role (handled in `app/(dashboard)/layout.tsx`)
+
 ## Backlog
 
 - Automatic interview scheduling confirmation: currently moving an Interview to

@@ -141,6 +141,21 @@ export default async function PositionDetailPage({
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</p>
             <p className="text-sm text-gray-900 mt-1">{fmt(position.createdAt)}</p>
           </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">TalentID</p>
+            <p className="text-sm text-gray-900 mt-1">{position.talentId ?? '—'}</p>
+          </div>
+          {(position.reportingEmails.length > 0 || position.reportingDays.length > 0) && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Reporting</p>
+              <p className="text-sm text-gray-900 mt-1">
+                {position.reportingDays.length > 0
+                  ? position.reportingDays.map((d) => d.charAt(0) + d.slice(1).toLowerCase()).join(', ')
+                  : 'No days set'}
+                {position.reportingEmails.length > 0 && ` · ${position.reportingEmails.length} recipient${position.reportingEmails.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

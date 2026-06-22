@@ -187,6 +187,9 @@ model Position {
   jdLanguages          String[]
   jdSummary            String?    @db.Text
   linkedinSearchQueries String[]
+  talentId                String?
+  reportingEmails         String[]
+  reportingDays           String[]
   insightsSummary         String?   @db.Text
   insightsCommonStrengths String[]
   insightsCommonConcerns  String[]

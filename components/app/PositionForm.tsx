@@ -38,6 +38,9 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   URGENT: 'text-red-600',
 }
 
+const REPORTING_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'] as const
+const REPORTING_DAY_LABELS: Record<string, string> = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' }
+
 interface PositionFormProps {
   users: UserOption[]
   defaultValues?: {
@@ -56,6 +59,9 @@ interface PositionFormProps {
     sales_contact_email?: string | null
     clientRate?: number | null
     internalCostBudget?: number | null
+    talentId?: string | null
+    reportingEmails?: string[]
+    reportingDays?: string[]
   }
   mode: 'create' | 'edit'
 }
@@ -73,6 +79,12 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
     defaultValues.internalCostBudget != null ? String(defaultValues.internalCostBudget) : ''
   )
   const [dgmThreshold, setDgmThreshold] = useState<number>(0.4)
+  const [reportingEmails, setReportingEmails] = useState<string[]>(defaultValues.reportingEmails ?? [])
+  const [reportingEmailInput, setReportingEmailInput] = useState('')
+  const [reportingEmailError, setReportingEmailError] = useState('')
+  const [reportingDays, setReportingDays] = useState<string[]>(
+    defaultValues.reportingDays ?? ['MON', 'TUE', 'WED', 'THU', 'FRI']
+  )
 
   useEffect(() => {
     fetch('/api/settings')
@@ -91,6 +103,28 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
   const dgmAtRisk = dgm != null && dgm < dgmThreshold
 
   const recruiters = users.filter((u) => u.role === 'RECRUITER' || u.role === 'ADMIN')
+
+  function addReportingEmail() {
+    const email = reportingEmailInput.trim()
+    if (!email) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setReportingEmailError('Invalid email address')
+      return
+    }
+    if (reportingEmails.includes(email)) {
+      setReportingEmailError('Already added')
+      return
+    }
+    setReportingEmails((prev) => [...prev, email])
+    setReportingEmailInput('')
+    setReportingEmailError('')
+  }
+
+  function toggleReportingDay(day: string) {
+    setReportingDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    )
+  }
 
   function addLocation(loc: string) {
     if (!loc) return
@@ -133,6 +167,9 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
       sales_contact_email: (fd.get('sales_contact_email') as string) || null,
       clientRate: clientRate !== '' && !isNaN(crNum) ? crNum : null,
       internalCostBudget: internalCostBudget !== '' && !isNaN(icbNum) ? icbNum : null,
+      talentId: (fd.get('talentId') as string) || null,
+      reportingEmails,
+      reportingDays,
     }
 
     if (mode === 'edit') {
@@ -197,6 +234,17 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             required
             defaultValue={defaultValues.client}
             placeholder="e.g. Acme Corp"
+          />
+        </div>
+
+        {/* TalentID */}
+        <div>
+          <Label htmlFor="talentId">TalentID</Label>
+          <Input
+            id="talentId"
+            name="talentId"
+            defaultValue={defaultValues.talentId ?? ''}
+            placeholder="Optional internal ID"
           />
         </div>
 
@@ -404,6 +452,60 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             )}
           </div>
         )}
+      </div>
+
+      {/* Reporting */}
+      <div className="border-t border-gray-100 pt-6">
+        <h2 className="text-sm font-medium text-gray-900 mb-3">Reporting</h2>
+        <div className="space-y-4">
+          <div>
+            <Label>Reporting Emails</Label>
+            <p className="text-xs text-gray-400 mb-1">Recipients for automated position reports.</p>
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                value={reportingEmailInput}
+                onChange={(e) => { setReportingEmailInput(e.target.value); setReportingEmailError('') }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addReportingEmail() } }}
+                placeholder="email@example.com"
+                className="flex-1"
+              />
+              <Button type="button" variant="outline" onClick={addReportingEmail}>Add</Button>
+            </div>
+            {reportingEmailError && <p className="text-xs text-red-600 mt-1">{reportingEmailError}</p>}
+            {reportingEmails.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {reportingEmails.map((email) => (
+                  <span key={email} className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 text-xs font-medium">
+                    {email}
+                    <button type="button" onClick={() => setReportingEmails((prev) => prev.filter((e) => e !== email))} className="text-blue-400 hover:text-blue-700 ml-0.5">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <Label>Reporting Frequency</Label>
+            <p className="text-xs text-gray-400 mb-2">Which days to send reports.</p>
+            <div className="flex gap-2">
+              {REPORTING_DAYS.map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleReportingDay(day)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                    reportingDays.includes(day)
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                  }`}
+                >
+                  {REPORTING_DAY_LABELS[day]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-3 pt-2">

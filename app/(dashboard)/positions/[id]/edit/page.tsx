@@ -57,6 +57,9 @@ export default async function EditPositionPage({
             sales_contact_email: position.sales_contact_email,
             clientRate: position.clientRate,
             internalCostBudget: position.internalCostBudget,
+            talentId: position.talentId,
+            reportingEmails: position.reportingEmails,
+            reportingDays: position.reportingDays,
           }}
         />
       </div>
