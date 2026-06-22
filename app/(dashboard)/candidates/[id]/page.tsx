@@ -57,7 +57,7 @@ export default async function CandidateDetailPage({
   }))
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -80,10 +80,10 @@ export default async function CandidateDetailPage({
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-4">
         {/* Left: Candidate info */}
-        <div className="col-span-1 space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="col-span-1 space-y-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
             <h2 className="text-sm font-medium text-gray-900">Profile</h2>
             <div className="space-y-3 text-sm">
               {candidate.phone && (
@@ -162,7 +162,7 @@ export default async function CandidateDetailPage({
           />
 
           {candidate.summary && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
               <h2 className="text-sm font-medium text-gray-900 mb-2">Summary</h2>
               <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{candidate.summary}</p>
             </div>
@@ -171,7 +171,7 @@ export default async function CandidateDetailPage({
 
         {/* Right: Positions */}
         <div className="col-span-2">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
             <CandidateDetailClient
               candidateId={id}
               candidatePositions={serializedPositions}

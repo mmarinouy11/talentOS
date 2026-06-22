@@ -39,7 +39,7 @@ export default async function CandidateInPositionPage({
   const hoursBaseline = await getMonthlyHoursBaseline()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
         <nav className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
@@ -59,10 +59,10 @@ export default async function CandidateInPositionPage({
         <p className="text-sm text-gray-500 mt-0.5">{position.title} · {position.client}</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-4">
         {/* Left: candidate profile */}
-        <div className="col-span-1 space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+        <div className="col-span-1 space-y-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
             <h2 className="text-sm font-medium text-gray-900">Profile</h2>
             <div className="text-sm space-y-3">
               <div>
@@ -109,7 +109,7 @@ export default async function CandidateInPositionPage({
           </div>
 
           {candidate.summary && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
               <h2 className="text-sm font-medium text-gray-900 mb-2">Summary</h2>
               <p className="text-sm text-gray-700 leading-relaxed">{candidate.summary}</p>
             </div>
@@ -129,7 +129,7 @@ export default async function CandidateInPositionPage({
         </div>
 
         {/* Right: Fit Score + Stage History */}
-        <div className="col-span-2 space-y-4">
+        <div className="col-span-2 space-y-3">
           <FitScoreCard
             candidatePositionId={cp.id}
             fitScore={cp.fitScore}
@@ -152,7 +152,7 @@ export default async function CandidateInPositionPage({
             const outOfRange = minMonthly != null && budgetMonthly != null && minMonthly > budgetMonthly
             const withinBudget = minMonthly != null && budgetMonthly != null && minMonthly <= budgetMonthly
             return (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <h2 className="text-sm font-medium text-gray-900 mb-3">Budget Fit</h2>
                 <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                   <div>
@@ -206,7 +206,7 @@ export default async function CandidateInPositionPage({
           />
 
           {cp.stageHistory.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
               <h2 className="text-sm font-medium text-gray-900 mb-3">Stage History</h2>
               <div className="space-y-2">
                 {cp.stageHistory.map((h) => (

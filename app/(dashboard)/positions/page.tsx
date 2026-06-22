@@ -13,7 +13,17 @@ export default async function PositionsPage() {
 
   const positions = await db.position.findMany({
     where: { deletedAt: null },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      client: true,
+      status: true,
+      priority: true,
+      target_date_asap: true,
+      target_date: true,
+      createdAt: true,
+      dgm: true,
+      dgmAtRisk: true,
       recruiter: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true } },
     },

@@ -29,13 +29,6 @@ export default async function CandidatesPage() {
       candidatePositions: {
         select: { stage: true },
       },
-      _count: {
-        select: {
-          candidatePositions: {
-            where: { stage: { notIn: ['HIRED', 'REJECTED'] } },
-          },
-        },
-      },
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -60,7 +53,7 @@ export default async function CandidatesPage() {
     country: c.country,
     seniority: c.seniority,
     skills: c.skills,
-    _count: c._count,
+    _count: { candidatePositions: c.candidatePositions.filter((cp) => cp.stage !== 'HIRED' && cp.stage !== 'REJECTED').length },
     sourcedByType: c.sourcedByType,
     sourcedByOther: c.sourcedByOther,
     sourcedByUser: c.sourcedByUser,

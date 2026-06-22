@@ -77,7 +77,7 @@ export default async function PositionDetailPage({
   ).length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -98,24 +98,28 @@ export default async function PositionDetailPage({
         </Link>
       </div>
 
-      {/* Info grid */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="grid grid-cols-3 gap-6">
+      {/* Info + Financials combined card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="grid grid-cols-4 gap-x-4 gap-y-3">
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Client</p>
-            <p className="text-sm text-gray-900 mt-1">{position.client}</p>
+            <p className="text-sm text-gray-900 mt-0.5">{position.client}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recruiter</p>
-            <p className="text-sm text-gray-900 mt-1">{position.recruiter.name ?? position.recruiter.email}</p>
+            <p className="text-sm text-gray-900 mt-0.5">{position.recruiter.name ?? position.recruiter.email}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Target Date</p>
-            <p className="text-sm text-gray-900 mt-1">{fmtTarget(position)}</p>
+            <p className="text-sm text-gray-900 mt-0.5">{fmtTarget(position)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</p>
+            <p className="text-sm text-gray-900 mt-0.5">{fmt(position.createdAt)}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Location</p>
-            <div className="flex flex-wrap gap-1 mt-1">
+            <div className="flex flex-wrap gap-1 mt-0.5">
               {position.location.length > 0
                 ? position.location.map((loc) => (
                     <span key={loc} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
@@ -128,27 +132,23 @@ export default async function PositionDetailPage({
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hiring Manager</p>
-            <p className="text-sm text-gray-900 mt-1">{position.hiring_manager_name ?? '—'}</p>
+            <p className="text-sm text-gray-900 mt-0.5">{position.hiring_manager_name ?? '—'}</p>
             {position.hiring_manager_email && (
               <p className="text-xs text-gray-500">{position.hiring_manager_email}</p>
             )}
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sales Contact</p>
-            <p className="text-sm text-gray-900 mt-1">{position.sales_contact_email ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</p>
-            <p className="text-sm text-gray-900 mt-1">{fmt(position.createdAt)}</p>
+            <p className="text-sm text-gray-900 mt-0.5">{position.sales_contact_email ?? '—'}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">TalentID</p>
-            <p className="text-sm text-gray-900 mt-1">{position.talentId ?? '—'}</p>
+            <p className="text-sm text-gray-900 mt-0.5">{position.talentId ?? '—'}</p>
           </div>
           {(position.reportingEmails.length > 0 || position.reportingDays.length > 0) && (
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Reporting</p>
-              <p className="text-sm text-gray-900 mt-1">
+              <p className="text-sm text-gray-900 mt-0.5">
                 {position.reportingDays.length > 0
                   ? position.reportingDays.map((d) => d.charAt(0) + d.slice(1).toLowerCase()).join(', ')
                   : 'No days set'}
@@ -157,36 +157,35 @@ export default async function PositionDetailPage({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Financials */}
-      {(position.clientRate || position.internalCostBudget) && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-sm font-medium text-gray-900 mb-4">Financials</h2>
-          {position.dgmAtRisk && (
-            <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-              <span className="text-red-600">⚠️</span>
-              <p className="text-sm text-red-700 font-medium">This position&apos;s margin is below the minimum threshold</p>
+        {(position.clientRate || position.internalCostBudget) && (
+          <>
+            <div className="border-t border-gray-100 my-3" />
+            {position.dgmAtRisk && (
+              <div className="mb-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <span className="text-red-600 text-sm">⚠️</span>
+                <p className="text-sm text-red-700 font-medium">Margin below minimum threshold</p>
+              </div>
+            )}
+            <div className="grid grid-cols-4 gap-x-4 gap-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Client Rate</p>
+                <p className="text-sm text-gray-900 mt-0.5">{position.clientRate ? `$${position.clientRate.toLocaleString()}/hr` : '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Internal Budget</p>
+                <p className="text-sm text-gray-900 mt-0.5">{position.internalCostBudget ? `$${position.internalCostBudget.toLocaleString()}/hr` : '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">DGM</p>
+                <p className={`text-sm font-medium mt-0.5 ${position.dgmAtRisk ? 'text-red-600' : 'text-green-600'}`}>
+                  {position.dgm != null ? `${(position.dgm * 100).toFixed(1)}%` : '—'}
+                </p>
+              </div>
             </div>
-          )}
-          <div className="grid grid-cols-3 gap-6">
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Client Rate</p>
-              <p className="text-sm text-gray-900 mt-1">{position.clientRate ? `$${position.clientRate.toLocaleString()}/hr` : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Internal Budget</p>
-              <p className="text-sm text-gray-900 mt-1">{position.internalCostBudget ? `$${position.internalCostBudget.toLocaleString()}/hr` : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">DGM</p>
-              <p className={`text-sm font-medium mt-1 ${position.dgmAtRisk ? 'text-red-600' : 'text-green-600'}`}>
-                {position.dgm != null ? `${(position.dgm * 100).toFixed(1)}%` : '—'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       {/* JD Intelligence */}
       <JDIntelligence
@@ -200,14 +199,14 @@ export default async function PositionDetailPage({
       />
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-5 py-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-4 py-3">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Aging</p>
-          <p className="text-3xl font-semibold mt-1 text-gray-900">{days}d</p>
+          <p className="text-3xl font-semibold mt-0.5 text-gray-900">{days}d</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-5 py-4">
+        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-4 py-3">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Candidates</p>
-          <p className="text-3xl font-semibold mt-1 text-gray-900">{position.candidatePositions.length}</p>
+          <p className="text-3xl font-semibold mt-0.5 text-gray-900">{position.candidatePositions.length}</p>
         </div>
       </div>
 
@@ -234,7 +233,7 @@ export default async function PositionDetailPage({
       />
 
       {/* Position Velocity */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Position Velocity</h2>
 
         {/* Lead time for this position */}
@@ -279,7 +278,7 @@ export default async function PositionDetailPage({
       />
 
       {/* Job Description */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h2 className="text-sm font-medium text-gray-900 mb-3">Job Description</h2>
         <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
           {position.description}
