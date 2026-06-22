@@ -186,6 +186,7 @@ model Position {
   jdSeniority          Seniority?
   jdLanguages          String[]
   jdSummary            String?    @db.Text
+  linkedinSearchQueries String[]
   insightsSummary         String?   @db.Text
   insightsCommonStrengths String[]
   insightsCommonConcerns  String[]

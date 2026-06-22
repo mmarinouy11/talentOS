@@ -169,6 +169,7 @@ export default async function PositionDetailPage({
         jdSkills={position.jdSkills}
         jdSeniority={position.jdSeniority}
         jdLanguages={position.jdLanguages}
+        linkedinSearchQueries={position.linkedinSearchQueries}
       />
 
       {/* Metrics */}

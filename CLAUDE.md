@@ -81,6 +81,13 @@ Import from `lib/anthropic.ts`:
 - Components: `PositionInsights` (on position detail page) and `GlobalInsights` (on /reports page) — client components with Generate/Regenerate button, display summary/strengths/concerns/bottleneck/recommendation
 - Both are on-demand (button-triggered), not automatic
 
+## LinkedIn Search Queries
+
+- Position model field: `linkedinSearchQueries String[]`
+- Generated automatically after JD parsing (`parseJD` in `lib/jd-parser.ts`) — calls Claude FAST with extracted skills/seniority/location
+- On-demand route: `POST /api/positions/[id]/generate-linkedin-queries` — generates without re-parsing JD
+- UI: subsection in `JDIntelligence` component — monospace query boxes with per-query Copy button (clipboard + "Copied!" flash), Generate/Regenerate button
+
 ## Backlog
 
 - Automatic interview scheduling confirmation: currently moving an Interview to
