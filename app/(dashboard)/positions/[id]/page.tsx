@@ -12,6 +12,7 @@ import { PositionCandidatesPanel } from '@/components/app/PositionCandidatesPane
 import { FunnelChart } from '@/components/app/FunnelChart'
 import { VelocityTable } from '@/components/app/VelocityTable'
 import { PositionInsights } from '@/components/app/PositionInsights'
+import { STAGE_SEQUENCE } from '@/lib/pipeline'
 
 function fmt(date: Date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -59,6 +60,17 @@ export default async function PositionDetailPage({
     getTimeInStage(id),
     getLeadTime(id),
   ])
+  // Sort: later stages first, then by fitScore desc (nulls last)
+  const sortedCandidatePositions = [...position.candidatePositions].sort((a, b) => {
+    const aIdx = STAGE_SEQUENCE.indexOf(a.stage as typeof STAGE_SEQUENCE[number])
+    const bIdx = STAGE_SEQUENCE.indexOf(b.stage as typeof STAGE_SEQUENCE[number])
+    if (bIdx !== aIdx) return bIdx - aIdx
+    if (a.fitScore == null && b.fitScore == null) return 0
+    if (a.fitScore == null) return 1
+    if (b.fitScore == null) return -1
+    return b.fitScore - a.fitScore
+  })
+
   const days = aging(position.createdAt)
   const activeCandidates = position.candidatePositions.filter(
     (cp) => !['HIRED', 'REJECTED'].includes(cp.stage)
@@ -187,7 +199,7 @@ export default async function PositionDetailPage({
       {/* Candidates */}
       <PositionCandidatesPanel
         positionId={id}
-        candidatePositions={position.candidatePositions.map((cp) => ({
+        candidatePositions={sortedCandidatePositions.map((cp) => ({
           id: cp.id,
           stage: cp.stage,
           fitScore: cp.fitScore,

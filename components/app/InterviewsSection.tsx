@@ -163,18 +163,38 @@ function buildRejectionEmailContent(
 
 // ─── SlotList ──────────────────────────────────────────────────────────────
 
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const h = Math.floor(i / 4)
+  const m = (i % 4) * 15
+  const hh = String(h).padStart(2, '0')
+  const mm = String(m).padStart(2, '0')
+  const label = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${mm} ${h < 12 ? 'AM' : 'PM'}`
+  return { value: `${hh}:${mm}`, label }
+})
+
+function SlotEntry({ value, onChange, onRemove, showRemove }: { value: string; onChange: (v: string) => void; onRemove: () => void; showRemove: boolean }) {
+  const [date, time] = value ? value.split('T') : ['', '00:00']
+  function set(d: string, t: string) { onChange(d && t ? `${d}T${t}` : '') }
+  return (
+    <div className="flex items-center gap-2">
+      <Input type="date" value={date} onChange={(e) => set(e.target.value, time)} className="flex-1" required />
+      <select value={time} onChange={(e) => set(date, e.target.value)} className="border border-gray-200 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+        {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      {showRemove && (
+        <button type="button" onClick={onRemove} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+      )}
+    </div>
+  )
+}
+
 function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: string[]) => void }) {
   function update(i: number, val: string) { const n = [...slots]; n[i] = val; onChange(n) }
   function remove(i: number) { onChange(slots.filter((_, idx) => idx !== i)) }
   return (
     <div className="space-y-2">
       {slots.map((slot, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <Input type="datetime-local" step={900} value={slot} onChange={(e) => update(i, e.target.value)} className="flex-1" required />
-          {slots.length > 1 && (
-            <button type="button" onClick={() => remove(i)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
-          )}
-        </div>
+        <SlotEntry key={i} value={slot} onChange={(v) => update(i, v)} onRemove={() => remove(i)} showRemove={slots.length > 1} />
       ))}
       <button type="button" onClick={() => onChange([...slots, ''])} className="text-sm text-blue-600 hover:underline">
         + Add another slot
@@ -578,7 +598,7 @@ function NextRoundModal({
 
           <div>
             <Label htmlFor="nr-duration">Duration (minutes)</Label>
-            <Input id="nr-duration" type="number" min={5} max={480} step={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
+            <Input id="nr-duration" type="number" min={15} max={480} step={15} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -775,7 +795,7 @@ function AddInterviewModal({
 
           <div>
             <Label htmlFor="add-duration">Duration (minutes)</Label>
-            <Input id="add-duration" type="number" min={5} max={480} step={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
+            <Input id="add-duration" type="number" min={15} max={480} step={15} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
           </div>
 
           {showEmailPreview && (
@@ -977,11 +997,28 @@ function EditInterviewModal({
             </div>
           ) : null}
 
-          <div>
-            <Label htmlFor="scheduledAt">Confirmed Date</Label>
-            <p className="text-xs text-gray-400 mb-1">Setting a date will mark this interview as Scheduled.</p>
-            <Input id="scheduledAt" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} disabled={isCancelled} className="mt-0.5" />
-          </div>
+          {currentInterview.status === 'COMPLETED' ? (
+            <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-sm text-gray-600 space-y-0.5">
+              {currentInterview.scheduledAt && (
+                <p><span className="font-medium text-gray-700">Date: </span>{new Date(currentInterview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+              )}
+              {currentInterview.durationMinutes && (
+                <p><span className="font-medium text-gray-700">Duration: </span>{currentInterview.durationMinutes} min</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div>
+                <Label htmlFor="scheduledAt">Confirmed Date</Label>
+                <p className="text-xs text-gray-400 mb-1">Setting a date will mark this interview as Scheduled.</p>
+                <Input id="scheduledAt" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} disabled={isCancelled} className="mt-0.5" />
+              </div>
+              <div>
+                <Label htmlFor="edit-duration">Duration (minutes)</Label>
+                <Input id="edit-duration" type="number" min={15} max={480} step={15} value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} disabled={isCancelled} className="mt-1 w-32" />
+              </div>
+            </>
+          )}
 
           {!isCancelled && (
             <FeedbackPdfUpload
@@ -1016,11 +1053,6 @@ function EditInterviewModal({
               className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
               placeholder="Interviewer notes…"
             />
-          </div>
-
-          <div>
-            <Label htmlFor="edit-duration">Duration (minutes)</Label>
-            <Input id="edit-duration" type="number" min={5} max={480} step={5} value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} disabled={isCancelled} className="mt-1 w-32" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

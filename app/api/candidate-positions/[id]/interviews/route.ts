@@ -2,6 +2,8 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { STAGE_SEQUENCE } from '@/lib/pipeline'
+import type { Stage } from '@prisma/client'
 
 const STAGE_LABELS: Record<string, string> = {
   APPLIED: 'Applied',
@@ -78,6 +80,31 @@ export async function POST(
     },
     include: { decidedBy: { select: { name: true, email: true } } },
   })
+
+  // Advance CandidatePosition.stage if the interview stage is further along
+  const interviewStage = parsed.data.stage
+  const cpStage = cp.stage as string
+  const interviewIdx = STAGE_SEQUENCE.indexOf(interviewStage as typeof STAGE_SEQUENCE[number])
+  const cpIdx = STAGE_SEQUENCE.indexOf(cpStage as typeof STAGE_SEQUENCE[number])
+
+  if (interviewIdx > cpIdx) {
+    const userId = (session.user as { id?: string }).id
+    await db.candidatePosition.update({
+      where: { id },
+      data: { stage: interviewStage as Stage, stageEnteredAt: new Date() },
+    })
+    if (userId) {
+      await db.stageHistory.create({
+        data: {
+          candidatePositionId: id,
+          fromStage: cpStage as Stage,
+          toStage: interviewStage as Stage,
+          movedById: userId,
+          notes: `Auto-advanced when ${roundLabel} interview was created`,
+        },
+      })
+    }
+  }
 
   return NextResponse.json(interview, { status: 201 })
 }
