@@ -86,10 +86,38 @@ export async function DELETE(
 
   const { id } = await params
 
-  const existing = await db.candidate.findFirst({ where: { id, deletedAt: null } })
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const existing = await db.candidate.findUnique({ where: { id } })
+  if (!existing) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
 
-  await db.candidate.update({ where: { id }, data: { deletedAt: new Date() } })
+  try {
+    await db.$transaction([
+      db.emailLog.deleteMany({
+        where: { interview: { candidatePosition: { candidateId: id } } },
+      }),
+      db.emailLog.deleteMany({
+        where: { candidatePosition: { candidateId: id } },
+      }),
+      db.emailLog.deleteMany({
+        where: { candidateId: id },
+      }),
+      db.interview.deleteMany({
+        where: { candidatePosition: { candidateId: id } },
+      }),
+      db.stageHistory.deleteMany({
+        where: { candidatePosition: { candidateId: id } },
+      }),
+      db.candidatePosition.deleteMany({
+        where: { candidateId: id },
+      }),
+      db.candidate.delete({ where: { id } }),
+    ])
 
-  return NextResponse.json({ ok: true })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[delete-candidate] error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Delete failed' },
+      { status: 500 }
+    )
+  }
 }
