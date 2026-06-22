@@ -100,3 +100,8 @@ Import from `lib/anthropic.ts`:
   SCHEDULED requires the recruiter to manually enter a confirmed date after
   coordinating with the candidate. Explore automating via Google Calendar webhook
   or a candidate-facing confirmation page tied to a unique link per Interview.
+
+- Reporting cron multi-instance: `lib/reporting-cron.ts` uses node-cron which
+  runs in-process. If Railway ever scales to multiple instances, each will fire
+  independently and send duplicate emails. Fix by moving to a database-locked job
+  (e.g. pg_advisory_lock), a queue (BullMQ/Redis), or an external scheduler.
