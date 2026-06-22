@@ -1,3 +1,5 @@
+const COMPANY_NAME = 'Tenarai'
+
 export const DEFAULT_SCHEDULING_TEMPLATE = `<p>Hi {{candidateName}},</p>
 <p>Thank you for your interest in the <strong>{{positionTitle}}</strong> role at <strong>{{clientName}}</strong>. We'd love to schedule a screening call with you.</p>
 <p>{{schedulingLink}}</p>
@@ -30,7 +32,7 @@ export function renderTemplate(template: string, tokens: Record<string, string>)
 export function buildSchedulingTokens({
   candidateName,
   positionTitle,
-  clientName,
+  clientName: _clientName,
   recruiterName,
   roundLabel,
   slots,
@@ -60,13 +62,14 @@ export function buildSchedulingTokens({
     schedulingLink = `<p>Please let us know which of the following times works best for you:</p><ul>${formatted.map((f) => `<li>${f}</li>`).join('')}</ul>`
     if (duration) schedulingLink += `<p>Each slot is a ${duration} call.</p>`
   }
-  return { candidateName, positionTitle, clientName, recruiterName, roundLabel, schedulingLink, slotsList: schedulingLink, nextRoundLabel: '', duration }
+  // clientName in candidate-facing emails is always the company brand, not the end client
+  return { candidateName, positionTitle, clientName: COMPANY_NAME, recruiterName, roundLabel, schedulingLink, slotsList: schedulingLink, nextRoundLabel: '', duration }
 }
 
 export function schedulingRequestEmail({
   candidateName,
   positionTitle,
-  client,
+  client: _client,
   roundLabel,
   recruiterName,
   customTemplate,
@@ -78,10 +81,10 @@ export function schedulingRequestEmail({
   recruiterName: string
   customTemplate?: string | null
 }): { subject: string; html: string } {
-  const subject = `Interview Scheduling – ${positionTitle} at ${client}`
+  const subject = `${candidateName} - Interview Scheduling: ${positionTitle}`
   const template = customTemplate ?? DEFAULT_SCHEDULING_TEMPLATE
   const html = renderTemplate(template, {
-    candidateName, positionTitle, clientName: client, recruiterName, roundLabel, schedulingLink: '', slotsList: '', nextRoundLabel: '',
+    candidateName, positionTitle, clientName: COMPANY_NAME, recruiterName, roundLabel, schedulingLink: '', slotsList: '', nextRoundLabel: '',
   })
   return { subject, html }
 }
@@ -89,7 +92,7 @@ export function schedulingRequestEmail({
 export function rejectionEmail({
   candidateName,
   positionTitle,
-  client,
+  client: _client,
   recruiterName,
   customTemplate,
 }: {
@@ -99,10 +102,10 @@ export function rejectionEmail({
   recruiterName: string
   customTemplate?: string | null
 }): { subject: string; html: string } {
-  const subject = `Update on your application – ${positionTitle} at ${client}`
+  const subject = `${candidateName} - Update on your application: ${positionTitle}`
   const template = customTemplate ?? DEFAULT_REJECTION_TEMPLATE
   const html = renderTemplate(template, {
-    candidateName, positionTitle, clientName: client, recruiterName, roundLabel: '', schedulingLink: '', slotsList: '', nextRoundLabel: '',
+    candidateName, positionTitle, clientName: COMPANY_NAME, recruiterName, roundLabel: '', schedulingLink: '', slotsList: '', nextRoundLabel: '',
   })
   return { subject, html }
 }
@@ -110,7 +113,7 @@ export function rejectionEmail({
 export function advanceNotificationEmail({
   candidateName,
   positionTitle,
-  client,
+  client: _client,
   nextRoundLabel,
   recruiterName,
   customTemplate,
@@ -122,10 +125,10 @@ export function advanceNotificationEmail({
   recruiterName: string
   customTemplate?: string | null
 }): { subject: string; html: string } {
-  const subject = `Great news – Moving forward for ${positionTitle} at ${client}`
+  const subject = `${candidateName} - Moving forward: ${positionTitle}`
   const template = customTemplate ?? DEFAULT_ADVANCE_TEMPLATE
   const html = renderTemplate(template, {
-    candidateName, positionTitle, clientName: client, recruiterName, roundLabel: '', schedulingLink: '', slotsList: '', nextRoundLabel,
+    candidateName, positionTitle, clientName: COMPANY_NAME, recruiterName, roundLabel: '', schedulingLink: '', slotsList: '', nextRoundLabel,
   })
   return { subject, html }
 }
