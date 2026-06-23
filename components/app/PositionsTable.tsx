@@ -24,10 +24,8 @@ export interface PositionRow {
   _count: { candidatePositions: number }
 }
 
-function dgmColor(dgm: number, atRisk: boolean): string {
-  if (atRisk) return 'text-red-600'
-  if (dgm >= 0.5) return 'text-green-600'
-  return 'text-orange-600'
+function dgmColor(atRisk: boolean): string {
+  return atRisk ? 'text-red-600' : 'text-green-600'
 }
 
 function aging(createdAt: string) {
@@ -131,7 +129,7 @@ export function PositionsTable({ positions }: { positions: PositionRow[] }) {
                     </td>
                     <td className="px-4 py-3 text-right">
                       {p.dgm != null ? (
-                        <span className={`font-medium ${dgmColor(p.dgm, p.dgmAtRisk)}`}>
+                        <span className={`font-medium ${dgmColor(p.dgmAtRisk)}`}>
                           {(p.dgm * 100).toFixed(0)}%
                         </span>
                       ) : (
