@@ -99,14 +99,15 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
     return (
       c.firstName.toLowerCase().includes(q) ||
       c.lastName.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q)
+      c.email.toLowerCase().includes(q) ||
+      c.skills.some((s) => s.toLowerCase().includes(q))
     )
   })
 
   return (
     <div className="space-y-4">
       <Input
-        placeholder="Search by name or email…"
+        placeholder="Search by name, email, or skill…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-xs"
