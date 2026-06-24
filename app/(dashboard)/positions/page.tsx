@@ -5,11 +5,13 @@ import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { PositionCard } from '@/components/app/PositionCard'
 import { PositionsTable } from '@/components/app/PositionsTable'
-import type { PositionStatus } from '@prisma/client'
+import type { PositionStatus, Role } from '@prisma/client'
 
 export default async function PositionsPage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
+
+  const isAdmin = (session.user as { role?: Role }).role === 'ADMIN'
 
   const positions = await db.position.findMany({
     where: { deletedAt: null },
@@ -67,7 +69,7 @@ export default async function PositionsPage() {
         <PositionCard label="Filled" count={counts.FILLED} color="text-blue-600" />
       </div>
 
-      <PositionsTable positions={serialized} />
+      <PositionsTable positions={serialized} isAdmin={isAdmin} />
     </div>
   )
 }

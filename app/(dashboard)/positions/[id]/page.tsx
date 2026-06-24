@@ -13,6 +13,8 @@ import { FunnelChart } from '@/components/app/FunnelChart'
 import { VelocityTable } from '@/components/app/VelocityTable'
 import { PositionInsights } from '@/components/app/PositionInsights'
 import { STAGE_SEQUENCE } from '@/lib/pipeline'
+import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
+import type { Role } from '@prisma/client'
 
 function fmt(date: Date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -35,6 +37,8 @@ export default async function PositionDetailPage({
 }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
+
+  const isAdmin = (session.user as { role?: Role }).role === 'ADMIN'
 
   const { id } = await params
 
@@ -93,9 +97,14 @@ export default async function PositionDetailPage({
           </div>
           <p className="text-sm text-gray-500 mt-1">{position.client}</p>
         </div>
-        <Link href={`/positions/${id}/edit`}>
-          <Button variant="outline">Edit</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <PositionDeleteButton positionId={id} positionTitle={position.title} />
+          )}
+          <Link href={`/positions/${id}/edit`}>
+            <Button variant="outline">Edit</Button>
+          </Link>
+        </div>
       </div>
 
       {/* Info + Financials combined card */}

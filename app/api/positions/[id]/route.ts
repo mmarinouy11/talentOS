@@ -100,13 +100,16 @@ export async function DELETE(
 ) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if ((session.user as { role?: string }).role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const { id } = await params
 
   const existing = await db.position.findFirst({ where: { id, deletedAt: null } })
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!existing) return NextResponse.json({ error: 'Position not found' }, { status: 404 })
 
   await db.position.update({ where: { id }, data: { deletedAt: new Date() } })
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ success: true })
 }
