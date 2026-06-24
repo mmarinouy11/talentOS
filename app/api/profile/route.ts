@@ -13,6 +13,7 @@ const SELECT = {
   schedulingEmailTemplate: true,
   rejectionEmailTemplate: true,
   advanceEmailTemplate: true,
+  gmailConnectedEmail: true,
 } as const
 
 export async function GET() {

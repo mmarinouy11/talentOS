@@ -73,6 +73,7 @@ export async function POST(
     }
   }
 
+  const recruiterId = recruiter.id
   try {
     await sendEmail({
       to: candidate.email,
@@ -83,6 +84,7 @@ export async function POST(
       candidatePositionId: cp.id,
       interviewId: interview.id,
       sentById: (session.user as { id?: string }).id,
+      userId: recruiterId,
     })
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Send failed' }, { status: 500 })

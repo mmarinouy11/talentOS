@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +22,7 @@ interface UserProfile {
   schedulingEmailTemplate: string | null
   rejectionEmailTemplate: string | null
   advanceEmailTemplate: string | null
+  gmailConnectedEmail: string | null
 }
 
 const TEMPLATE_TOKENS: Record<string, string[]> = {
@@ -77,6 +79,11 @@ export default function ProfilePage() {
   const [timezone, setTimezone] = useState('America/Montevideo')
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [gmailToast, setGmailToast] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   useEffect(() => {
     fetch('/api/profile')
@@ -90,6 +97,36 @@ export default function ProfilePage() {
         setRejectionTemplate(data.rejectionEmailTemplate ?? DEFAULT_REJECTION_TEMPLATE)
         setAdvanceTemplate(data.advanceEmailTemplate ?? DEFAULT_ADVANCE_TEMPLATE)
       })
+  }, [])
+
+  useEffect(() => {
+    const gmail = searchParams.get('gmail')
+    if (gmail === 'connected') {
+      setGmailToast({ ok: true, msg: 'Gmail connected successfully.' })
+      // Refresh profile to get gmailConnectedEmail
+      fetch('/api/profile').then((r) => r.json()).then((data: UserProfile) => setProfile(data))
+      router.replace('/profile')
+    } else if (gmail === 'error') {
+      setGmailToast({ ok: false, msg: 'Failed to connect Gmail. Please try again.' })
+      router.replace('/profile')
+    }
+  }, [searchParams, router])
+
+  const handleDisconnectGmail = useCallback(async () => {
+    setDisconnecting(true)
+    try {
+      const res = await fetch('/api/auth/gmail/disconnect', { method: 'POST' })
+      if (res.ok) {
+        setProfile((prev) => prev ? { ...prev, gmailConnectedEmail: null } : prev)
+        setGmailToast({ ok: true, msg: 'Gmail disconnected.' })
+      } else {
+        setGmailToast({ ok: false, msg: 'Failed to disconnect Gmail.' })
+      }
+    } catch {
+      setGmailToast({ ok: false, msg: 'Network error.' })
+    } finally {
+      setDisconnecting(false)
+    }
   }, [])
 
   async function save(e: React.FormEvent) {
@@ -177,6 +214,39 @@ export default function ProfilePage() {
               Used for Screening interviews. Paste your Google Calendar appointment scheduling link or Calendly link here.
             </p>
           </div>
+        </div>
+
+        {/* Email Sending */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div>
+            <h2 className="text-sm font-medium text-gray-900">Email Sending</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Connect your Gmail account to send candidate emails from your own address.
+            </p>
+          </div>
+
+          {gmailToast && (
+            <p className={`text-sm ${gmailToast.ok ? 'text-green-600' : 'text-red-600'}`}>{gmailToast.msg}</p>
+          )}
+
+          {profile?.gmailConnectedEmail ? (
+            <div className="flex items-center gap-3">
+              <span className="text-green-600">&#10003;</span>
+              <span className="text-sm text-gray-700">Connected as <strong>{profile.gmailConnectedEmail}</strong></span>
+              <button
+                type="button"
+                onClick={handleDisconnectGmail}
+                disabled={disconnecting}
+                className="ml-2 text-xs text-red-500 hover:text-red-700 underline disabled:opacity-40"
+              >
+                {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+          ) : (
+            <a href="/api/auth/gmail/connect">
+              <Button type="button" variant="outline" size="sm">Connect Gmail</Button>
+            </a>
+          )}
         </div>
 
         {/* Email Templates */}
