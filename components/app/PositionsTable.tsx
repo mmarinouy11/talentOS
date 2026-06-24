@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import type { PositionStatus, Priority } from '@prisma/client'
 import { PositionStatusBadge } from './PositionStatusBadge'
@@ -8,6 +8,34 @@ import { PriorityBadge } from './PriorityBadge'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+
+type SortDir = 'asc' | 'desc'
+
+function SortableHeader({
+  label,
+  active,
+  direction,
+  onClick,
+  className = 'text-left',
+}: {
+  label: string
+  active: boolean
+  direction: SortDir
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <th
+      onClick={onClick}
+      className={`${className} px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className="text-[10px] text-gray-400">{active ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+      </span>
+    </th>
+  )
+}
 
 function TrashIcon() {
   return (
@@ -32,71 +60,100 @@ export interface PositionRow {
   _count: { candidatePositions: number }
 }
 
-function dgmColor(atRisk: boolean): string {
-  return atRisk ? 'text-red-600' : 'text-green-600'
+// Flat sort row — derived fields hoisted so useSortableData can compare them
+interface SortRow extends PositionRow {
+  _recruiterLabel: string
+  _agingMs: number
+  _candidates: number
+  _targetMs: number
+  _priorityOrder: number
+  _statusOrder: number
 }
 
-function aging(createdAt: string) {
-  return Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
+const PRIORITY_ORDER: Record<Priority, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, URGENT: 3 }
+const STATUS_ORDER: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 1, CLOSED: 2, FILLED: 3 }
+
+function dgmColor(atRisk: boolean): string {
+  return atRisk ? 'text-red-600' : 'text-green-600'
 }
 
 function fmtTarget(row: PositionRow) {
   if (row.target_date_asap) return 'ASAP'
   if (!row.target_date) return '—'
-  return new Date(row.target_date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  return new Date(row.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+
+type SortKey = keyof SortRow
 
 export function PositionsTable({ positions, isAdmin = false }: { positions: PositionRow[]; isAdmin?: boolean }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<PositionStatus | ''>('')
   const [rows, setRows] = useState(positions)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey | undefined>(undefined)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
-  async function handleDelete(p: PositionRow) {
-    if (!confirm(`Delete position '${p.title}'? This will hide it from all views. This action can be reversed by an administrator if needed.`)) return
-    setDeleting(p.id)
-    try {
-      const res = await fetch(`/api/positions/${p.id}`, { method: 'DELETE' })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        alert(body.error ?? 'Delete failed')
-        return
-      }
-      setRows((prev) => prev.filter((r) => r.id !== p.id))
-    } catch {
-      alert('Delete failed — please try again')
-    } finally {
-      setDeleting(null)
-    }
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
   }
 
-  const filtered = rows.filter((p) => {
+  const now = Date.now()
+
+  const sortRows: SortRow[] = useMemo(() => rows.map((p) => ({
+    ...p,
+    _recruiterLabel: p.recruiter?.name ?? p.recruiter?.email ?? '',
+    _agingMs: now - new Date(p.createdAt).getTime(),
+    _candidates: p._count.candidatePositions,
+    _targetMs: p.target_date_asap ? -1 : p.target_date ? new Date(p.target_date).getTime() : Infinity,
+    _priorityOrder: PRIORITY_ORDER[p.priority],
+    _statusOrder: STATUS_ORDER[p.status],
+  })), [rows, now])
+
+  const filtered = useMemo(() => sortRows.filter((p) => {
     const matchesSearch =
       !search ||
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.client.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = !statusFilter || p.status === statusFilter
     return matchesSearch && matchesStatus
-  })
+  }), [sortRows, search, statusFilter])
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey]
+      if (av == null) return 1
+      if (bv == null) return -1
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1
+      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [filtered, sortKey, sortDir])
+
+  async function handleDelete(p: PositionRow) {
+    if (!confirm(`Delete position '${p.title}'? This will hide it from all views. This action can be reversed by an administrator if needed.`)) return
+    setDeleting(p.id)
+    try {
+      const res = await fetch(`/api/positions/${p.id}`, { method: 'DELETE' })
+      if (!res.ok) { const body = await res.json().catch(() => ({})); alert(body.error ?? 'Delete failed'); return }
+      setRows((prev) => prev.filter((r) => r.id !== p.id))
+    } catch { alert('Delete failed — please try again') }
+    finally { setDeleting(null) }
+  }
+
+  function sh(label: string, key: SortKey, className?: string) {
+    return <SortableHeader label={label} active={sortKey === key} direction={sortDir} onClick={() => toggleSort(key)} className={className} />
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
-        <Input
-          placeholder="Search by title or client…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as PositionStatus | '')}
-          className="w-40"
-        >
+        <Input placeholder="Search by title or client…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PositionStatus | '')} className="w-40">
           <option value="">All statuses</option>
           <option value="OPEN">Open</option>
           <option value="ON_HOLD">On Hold</option>
@@ -105,83 +162,52 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
           <p className="text-gray-400 text-sm">
-            {rows.length === 0
-              ? 'No positions yet. Create your first one.'
-              : 'No positions match your filters.'}
+            {rows.length === 0 ? 'No positions yet. Create your first one.' : 'No positions match your filters.'}
           </p>
-          {rows.length === 0 && (
-            <Link href="/positions/new">
-              <Button className="mt-4" size="sm">New Position</Button>
-            </Link>
-          )}
+          {rows.length === 0 && <Link href="/positions/new"><Button className="mt-4" size="sm">New Position</Button></Link>}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Title</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Client</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Priority</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">DGM</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Recruiter</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Target</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Aging</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Candidates</th>
+                {sh('Title', 'title')}
+                {sh('Client', 'client')}
+                {sh('Status', '_statusOrder')}
+                {sh('Priority', '_priorityOrder')}
+                {sh('DGM', 'dgm', 'text-right')}
+                {sh('Recruiter', '_recruiterLabel')}
+                {sh('Target', '_targetMs')}
+                {sh('Aging', '_agingMs', 'text-right')}
+                {sh('Candidates', '_candidates', 'text-right')}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((p) => {
-                const days = aging(p.createdAt)
+              {sorted.map((p) => {
+                const days = Math.floor(p._agingMs / (1000 * 60 * 60 * 24))
                 return (
-                  <tr
-                    key={p.id}
-                    className="hover:bg-[#F5F0EB] transition-colors cursor-pointer"
-                    onClick={() => { window.location.href = `/positions/${p.id}` }}
-                  >
+                  <tr key={p.id} className="hover:bg-[#F5F0EB] transition-colors cursor-pointer" onClick={() => { window.location.href = `/positions/${p.id}` }}>
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {p.dgmAtRisk && <span className="text-red-600 mr-1" title="Margin at risk">⚠</span>}
                       {p.title}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{p.client}</td>
-                    <td className="px-4 py-3">
-                      <PositionStatusBadge status={p.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriorityBadge priority={p.priority} />
-                    </td>
+                    <td className="px-4 py-3"><PositionStatusBadge status={p.status} /></td>
+                    <td className="px-4 py-3"><PriorityBadge priority={p.priority} /></td>
                     <td className="px-4 py-3 text-right">
-                      {p.dgm != null ? (
-                        <span className={`font-medium ${dgmColor(p.dgmAtRisk)}`}>
-                          {(p.dgm * 100).toFixed(0)}%
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
+                      {p.dgm != null ? <span className={`font-medium ${dgmColor(p.dgmAtRisk)}`}>{(p.dgm * 100).toFixed(0)}%</span> : <span className="text-gray-400">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {p.recruiter?.name ?? p.recruiter?.email ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-sm">
-                      {fmtTarget(p)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-600">
-                      {days}d
-                    </td>
-                    <td className="px-4 py-3 text-right text-gray-600">
-                      {p._count.candidatePositions}
-                    </td>
+                    <td className="px-4 py-3 text-gray-600">{p.recruiter?.name ?? p.recruiter?.email ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 text-sm">{fmtTarget(p)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-600">{days}d</td>
+                    <td className="px-4 py-3 text-right text-gray-600">{p._count.candidatePositions}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <Link
-                          href={`/positions/${p.id}/edit`}
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <Link href={`/positions/${p.id}/edit`} onClick={(e) => e.stopPropagation()}>
                           <Button variant="outline" size="sm">Edit</Button>
                         </Link>
                         {isAdmin && (

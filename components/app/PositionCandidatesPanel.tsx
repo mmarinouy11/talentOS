@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddCandidateToPositionModal } from './AddCandidateToPositionModal'
 import type { Stage } from '@prisma/client'
+import { STAGE_SEQUENCE } from '@/lib/pipeline'
 
 const STAGE_LABELS: Record<Stage, string> = {
   APPLIED: 'Applied',
@@ -15,6 +16,41 @@ const STAGE_LABELS: Record<Stage, string> = {
   OFFER: 'Offer',
   HIRED: 'Hired',
   REJECTED: 'Rejected',
+}
+
+// REJECTED is not in STAGE_SEQUENCE — put it last
+function stageOrder(stage: Stage): number {
+  const idx = STAGE_SEQUENCE.indexOf(stage as typeof STAGE_SEQUENCE[number])
+  return idx === -1 ? STAGE_SEQUENCE.length : idx
+}
+
+type SortDir = 'asc' | 'desc'
+type SortKey = 'name' | 'email' | 'seniority' | 'stage' | 'fitScore'
+
+function SortableHeader({
+  label,
+  active,
+  direction,
+  onClick,
+  className = 'text-left',
+}: {
+  label: string
+  active: boolean
+  direction: SortDir
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <th
+      onClick={onClick}
+      className={`${className} px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className="text-[10px] text-gray-400">{active ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+      </span>
+    </th>
+  )
 }
 
 function scoreColor(score: number): string {
@@ -56,15 +92,20 @@ interface Props {
 export function PositionCandidatesPanel({ positionId, candidatePositions: initial, activeCandidates }: Props) {
   const [rows, setRows] = useState<CandidatePosition[]>(initial)
   const [showModal, setShowModal] = useState(false)
-  // live fit scores: cpId → number | null (null = still scoring)
   const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
-  // set of cpIds currently being polled
   const [scoringIds, setScoringIds] = useState<Set<string>>(new Set())
 
-  // Poll a candidatePositionId until fitScore arrives
+  // Default: stage desc (later stages first), then fitScore desc — matches server-side sort
+  const [sortKey, setSortKey] = useState<SortKey>('stage')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
   const startPolling = useCallback((cpId: string) => {
     setScoringIds((prev) => new Set([...prev, cpId]))
-
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/candidate-positions/${cpId}`)
@@ -73,18 +114,10 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         if (data.fitScore != null) {
           clearInterval(interval)
           setLiveScores((prev) => ({ ...prev, [cpId]: data.fitScore }))
-          setScoringIds((prev) => {
-            const next = new Set(prev)
-            next.delete(cpId)
-            return next
-          })
+          setScoringIds((prev) => { const next = new Set(prev); next.delete(cpId); return next })
         }
-      } catch {
-        clearInterval(interval)
-      }
+      } catch { clearInterval(interval) }
     }, 3000)
-
-    // Safety: stop polling after 2 minutes regardless
     setTimeout(() => clearInterval(interval), 120_000)
   }, [])
 
@@ -101,28 +134,66 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
 
   const existingCandidateIds = new Set(rows.map((cp) => cp.candidate.id))
 
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      let av: number | string | null = null
+      let bv: number | string | null = null
+
+      if (sortKey === 'name') {
+        av = `${a.candidate.firstName} ${a.candidate.lastName}`
+        bv = `${b.candidate.firstName} ${b.candidate.lastName}`
+      } else if (sortKey === 'email') {
+        av = a.candidate.email
+        bv = b.candidate.email
+      } else if (sortKey === 'seniority') {
+        av = a.candidate.seniority ?? ''
+        bv = b.candidate.seniority ?? ''
+      } else if (sortKey === 'stage') {
+        av = stageOrder(a.stage)
+        bv = stageOrder(b.stage)
+        // Tie-break by fitScore desc
+        if (av === bv) {
+          const aFit = liveScores[a.id] ?? a.fitScore ?? -1
+          const bFit = liveScores[b.id] ?? b.fitScore ?? -1
+          return bFit - aFit
+        }
+      } else if (sortKey === 'fitScore') {
+        av = liveScores[a.id] ?? a.fitScore ?? -1
+        bv = liveScores[b.id] ?? b.fitScore ?? -1
+      }
+
+      if (av == null) return 1
+      if (bv == null) return -1
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1
+      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [rows, sortKey, sortDir, liveScores])
+
   function fitCell(cp: CandidatePosition) {
-    // live score arrived
     if (liveScores[cp.id] != null) {
       const score = liveScores[cp.id]!
       return <span className={`font-medium ${scoreColor(score)}`}>{Math.round(score)}</span>
     }
-    // currently scoring
     if (scoringIds.has(cp.id)) return <Spinner />
-    // already had a score from server
     if (cp.fitScore != null) {
       return <span className={`font-medium ${scoreColor(cp.fitScore)}`}>{Math.round(cp.fitScore)}</span>
     }
     return <span className="text-gray-400">—</span>
   }
 
+  function sh(label: string, key: SortKey, className?: string) {
+    return <SortableHeader label={label} active={sortKey === key} direction={sortDir} onClick={() => toggleSort(key)} className={className} />
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="border-b border-gray-100 px-6 py-3 flex items-center justify-between">
         <div>
-          <span className="text-sm font-medium text-gray-900">
-            Candidates ({rows.length})
-          </span>
+          <span className="text-sm font-medium text-gray-900">Candidates ({rows.length})</span>
           <span className="ml-4 text-sm text-gray-500">{activeCandidates} active</span>
         </div>
         <Button size="sm" onClick={() => setShowModal(true)}>Add Candidate</Button>
@@ -134,27 +205,19 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Seniority</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Stage</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Fit</th>
+              {sh('Name', 'name')}
+              {sh('Email', 'email')}
+              {sh('Seniority', 'seniority')}
+              {sh('Stage', 'stage')}
+              {sh('Fit', 'fitScore', 'text-right')}
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {rows.map((cp) => (
-              <tr
-                key={cp.id}
-                className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => { window.location.href = `/positions/${positionId}/candidates/${cp.id}` }}
-              >
+            {sorted.map((cp) => (
+              <tr key={cp.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { window.location.href = `/positions/${positionId}/candidates/${cp.id}` }}>
                 <td className="px-4 py-3 font-medium text-gray-900">
-                  <Link
-                    href={`/positions/${positionId}/candidates/${cp.id}`}
-                    className="hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <Link href={`/positions/${positionId}/candidates/${cp.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
                     {cp.candidate.firstName} {cp.candidate.lastName}
                   </Link>
                   {cp.compensationOutOfRange && (
@@ -171,10 +234,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
                 <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
                 <td className="px-4 py-3 text-right">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemove(cp.id, `${cp.candidate.firstName} ${cp.candidate.lastName}`)
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleRemove(cp.id, `${cp.candidate.firstName} ${cp.candidate.lastName}`) }}
                     className="text-gray-400 hover:text-red-600 transition-colors"
                     title="Remove from position"
                   >
