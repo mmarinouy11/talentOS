@@ -94,6 +94,7 @@ model User {
   name         String?
   passwordHash String?
   role         Role     @default(RECRUITER)
+  active       Boolean  @default(true)
   image        String?
   calendarLink               String?
   timezone                   String?  @default("America/Montevideo")

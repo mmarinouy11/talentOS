@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import Image from 'next/image'
 import type { Role } from '@prisma/client'
 import { SidebarNav } from '@/components/app/SidebarNav'
+import { SidebarLogout } from '@/components/app/SidebarLogout'
 
 const navItems = [
   { href: '/positions', label: 'Positions' },
@@ -55,6 +56,7 @@ export default async function DashboardLayout({
           <p className="text-xs text-[#6E6A65] mt-0.5">
             {user.role?.replace(/_/g, ' ')}
           </p>
+          <SidebarLogout />
         </div>
       </aside>
 
