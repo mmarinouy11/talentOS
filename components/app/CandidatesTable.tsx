@@ -7,6 +7,7 @@ import { SeniorityBadge } from './SeniorityBadge'
 import { SkillTags } from './SkillTags'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 type SortDir = 'asc' | 'desc'
 
@@ -26,11 +27,16 @@ function SortableHeader({
   return (
     <th
       onClick={onClick}
-      className={`${className} px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900`}
+      className={`${className} px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:bg-gray-100 hover:text-gray-900 transition-colors`}
     >
       <span className="inline-flex items-center gap-1">
         {label}
-        <span className="text-[10px] text-gray-400">{active ? (direction === 'asc' ? '↑' : '↓') : ''}</span>
+        {active
+          ? direction === 'asc'
+            ? <ChevronUp size={14} className="text-gray-700" />
+            : <ChevronDown size={14} className="text-gray-700" />
+          : <ChevronsUpDown size={14} className="text-gray-300" />
+        }
       </span>
     </th>
   )
