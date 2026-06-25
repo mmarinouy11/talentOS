@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
 import Image from 'next/image'
 import type { Role } from '@prisma/client'
 import { SidebarNav } from '@/components/app/SidebarNav'
 import { SidebarLogout } from '@/components/app/SidebarLogout'
+import { GmailReminderBanner } from '@/components/app/GmailReminderBanner'
 
 const navItems = [
   { href: '/positions', label: 'Positions' },
@@ -24,7 +26,12 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const user = session.user as { name?: string | null; email?: string | null; role?: Role }
+  const user = session.user as { id?: string; name?: string | null; email?: string | null; role?: Role }
+
+  const dbUser = user.id
+    ? await db.user.findUnique({ where: { id: user.id }, select: { gmailConnectedEmail: true } })
+    : null
+  const gmailConnected = !!dbUser?.gmailConnectedEmail
 
   const items = [...navItems]
   if (user.role === 'ADMIN') {
@@ -60,7 +67,10 @@ export default async function DashboardLayout({
         </div>
       </aside>
 
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 flex flex-col">
+        {!gmailConnected && <GmailReminderBanner />}
+        <div className="p-8 flex-1">{children}</div>
+      </main>
     </div>
   )
 }
