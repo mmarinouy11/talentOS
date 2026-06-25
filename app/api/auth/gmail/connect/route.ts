@@ -36,7 +36,10 @@ export async function GET() {
   const url = client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: ['https://www.googleapis.com/auth/gmail.send'],
+    scope: [
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/userinfo.email',
+    ],
   })
 
   console.log('[gmail/connect] generated OAuth URL:', url)
