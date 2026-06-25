@@ -59,7 +59,7 @@ export async function POST(
       nextRoundLabel: '',
     }
     if (recruiter.rejectionEmailTemplate) {
-      subject = `${`${candidate.firstName} ${candidate.lastName}`} - Update on your application: ${position.title}`
+      subject = `Update on your application - ${position.title} - ${candidate.firstName} ${candidate.lastName}`
       html = renderTemplate(recruiter.rejectionEmailTemplate, tokens)
     } else {
       const result = rejectionEmail({

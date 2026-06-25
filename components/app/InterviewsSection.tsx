@@ -65,6 +65,14 @@ const STAGE_LABELS: Record<PipelineStage, string> = {
   REJECTED: 'Rejected',
 }
 
+const INTERVIEW_TYPE_LABELS: Partial<Record<PipelineStage, string>> = {
+  SCREENING: 'Screening Interview',
+  TECHNICAL_INTERVIEW: 'Technical Interview',
+  MANAGER_INTERVIEW: 'Manager Interview',
+  CLIENT_INTERVIEW: 'Client Interview',
+  OFFER: 'Offer Discussion',
+}
+
 const INTERVIEW_STAGES: PipelineStage[] = [
   'SCREENING',
   'TECHNICAL_INTERVIEW',
@@ -79,6 +87,7 @@ const EMAIL_PREVIEW_STAGES: PipelineStage[] = [
   'TECHNICAL_INTERVIEW',
   'MANAGER_INTERVIEW',
   'CLIENT_INTERVIEW',
+  'OFFER',
 ]
 
 const STATUS_COLORS: Record<InterviewStatus, string> = {
@@ -134,7 +143,8 @@ function buildSchedulingEmailContent(
     ? (userProfile?.schedulingEmailTemplate ?? DEFAULT_SCHEDULING_TEMPLATE)
     : DEFAULT_NEXT_ROUND_TEMPLATE
 
-  const subject = `${candidateName} - Interview Scheduling: ${positionTitle}`
+  const interviewTypeLabel = INTERVIEW_TYPE_LABELS[interview.stage as PipelineStage] ?? 'Interview'
+  const subject = `${interviewTypeLabel} - ${positionTitle} - ${candidateName}`
   const html = renderTemplate(template, tokens)
   return { subject, html }
 }
@@ -158,7 +168,7 @@ function buildRejectionEmailContent(
     nextRoundLabel: '',
   }
   const template = userProfile?.rejectionEmailTemplate ?? DEFAULT_REJECTION_TEMPLATE
-  const subject = `${candidateName} - Update on your application: ${positionTitle}`
+  const subject = `Update on your application - ${positionTitle} - ${candidateName}`
   const html = renderTemplate(template, tokens)
   return { subject, html }
 }
@@ -174,29 +184,33 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
   return { value: `${hh}:${mm}`, label }
 })
 
-function SlotEntry({ value, onChange, onRemove, showRemove }: { value: string; onChange: (v: string) => void; onRemove: () => void; showRemove: boolean }) {
+function SlotEntry({ value, onChange, onRemove, showRemove, timezone }: { value: string; onChange: (v: string) => void; onRemove: () => void; showRemove: boolean; timezone: string }) {
   const [date, time] = value ? value.split('T') : ['', '00:00']
   function set(d: string, t: string) { onChange(d && t ? `${d}T${t}` : '') }
+  const isPast = value ? new Date(zonedToUtcIso(value, timezone)) < new Date() : false
   return (
-    <div className="flex items-center gap-2">
-      <Input type="date" value={date} onChange={(e) => set(e.target.value, time)} className="flex-1" required />
-      <select value={time} onChange={(e) => set(date, e.target.value)} className="border border-gray-200 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
-        {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {showRemove && (
-        <button type="button" onClick={onRemove} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
-      )}
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <Input type="date" value={date} onChange={(e) => set(e.target.value, time)} className={`flex-1 ${isPast ? 'border-red-400' : ''}`} required />
+        <select value={time} onChange={(e) => set(date, e.target.value)} className={`border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white ${isPast ? 'border-red-400' : 'border-gray-200'}`}>
+          {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        {showRemove && (
+          <button type="button" onClick={onRemove} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+        )}
+      </div>
+      {isPast && <p className="text-xs text-red-600">This time slot is in the past — please choose a future date and time.</p>}
     </div>
   )
 }
 
-function SlotList({ slots, onChange }: { slots: string[]; onChange: (slots: string[]) => void }) {
+function SlotList({ slots, onChange, timezone }: { slots: string[]; onChange: (slots: string[]) => void; timezone: string }) {
   function update(i: number, val: string) { const n = [...slots]; n[i] = val; onChange(n) }
   function remove(i: number) { onChange(slots.filter((_, idx) => idx !== i)) }
   return (
     <div className="space-y-2">
       {slots.map((slot, i) => (
-        <SlotEntry key={i} value={slot} onChange={(v) => update(i, v)} onRemove={() => remove(i)} showRemove={slots.length > 1} />
+        <SlotEntry key={i} value={slot} onChange={(v) => update(i, v)} onRemove={() => remove(i)} showRemove={slots.length > 1} timezone={timezone} />
       ))}
       <button type="button" onClick={() => onChange([...slots, ''])} className="text-sm text-blue-600 hover:underline">
         + Add another slot
@@ -504,8 +518,12 @@ function NextRoundModal({
   async function createInterview() {
     setCreating(true)
     setError(null)
+    const isCalendar = isScreening && schedulingMode === 'CALENDAR_LINK'
+    if (!isCalendar) {
+      const hasPast = slots.filter(Boolean).some((s) => new Date(zonedToUtcIso(s, slotTimezone)) < new Date())
+      if (hasPast) { setError('One or more slots are in the past — please choose future times.'); setCreating(false); return }
+    }
     try {
-      const isCalendar = isScreening && schedulingMode === 'CALENDAR_LINK'
       const res = await fetch(`/api/candidate-positions/${candidatePositionId}/interviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -593,7 +611,7 @@ function NextRoundModal({
               </div>
               <div>
                 <Label>Proposed Time Slots</Label>
-                <div className="mt-1"><SlotList slots={slots} onChange={setSlots} /></div>
+                <div className="mt-1"><SlotList slots={slots} onChange={setSlots} timezone={slotTimezone} /></div>
               </div>
             </div>
           )}
@@ -695,8 +713,12 @@ function AddInterviewModal({
     e.preventDefault()
     setSaving(true)
     setError(null)
+    const isCalendar = isScreening && schedulingMode === 'CALENDAR_LINK'
+    if (!isCalendar) {
+      const hasPast = slots.filter(Boolean).some((s) => new Date(zonedToUtcIso(s, slotTimezone)) < new Date())
+      if (hasPast) { setError('One or more slots are in the past — please choose future times.'); setSaving(false); return }
+    }
     try {
-      const isCalendar = isScreening && schedulingMode === 'CALENDAR_LINK'
       const res = await fetch(`/api/candidate-positions/${candidatePositionId}/interviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -790,7 +812,7 @@ function AddInterviewModal({
                   <Label>Your Timezone (slots are in this timezone)</Label>
                   <div className="mt-1"><TimezoneSelect value={slotTimezone} onChange={setSlotTimezone} /></div>
                 </div>
-                <SlotList slots={slots} onChange={setSlots} />
+                <SlotList slots={slots} onChange={setSlots} timezone={slotTimezone} />
               </div>
             )}
           </div>

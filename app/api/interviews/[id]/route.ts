@@ -96,6 +96,12 @@ export async function PATCH(
 
   const { action, decision, decisionNotes, proposedSlots, ...rest } = parsed.data
 
+  if (proposedSlots?.length) {
+    const now = new Date()
+    const hasPast = proposedSlots.some((s) => new Date(s) < now)
+    if (hasPast) return NextResponse.json({ error: 'One or more proposed slots are in the past.' }, { status: 400 })
+  }
+
   const newStatus = deriveStatus(existing, { action, scheduledAt: rest.scheduledAt, feedbackText: rest.feedbackText })
 
   const decidedFields =

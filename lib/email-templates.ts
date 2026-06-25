@@ -72,6 +72,7 @@ export function schedulingRequestEmail({
   client: _client,
   roundLabel,
   recruiterName,
+  interviewTypeLabel,
   customTemplate,
 }: {
   candidateName: string
@@ -79,9 +80,11 @@ export function schedulingRequestEmail({
   client: string
   roundLabel: string
   recruiterName: string
+  interviewTypeLabel?: string
   customTemplate?: string | null
 }): { subject: string; html: string } {
-  const subject = `${candidateName} - Interview Scheduling: ${positionTitle}`
+  const typeLabel = interviewTypeLabel ?? 'Interview'
+  const subject = `${typeLabel} - ${positionTitle} - ${candidateName}`
   const template = customTemplate ?? DEFAULT_SCHEDULING_TEMPLATE
   const html = renderTemplate(template, {
     candidateName, positionTitle, clientName: COMPANY_NAME, recruiterName, roundLabel, schedulingLink: '', slotsList: '', nextRoundLabel: '',
@@ -102,7 +105,7 @@ export function rejectionEmail({
   recruiterName: string
   customTemplate?: string | null
 }): { subject: string; html: string } {
-  const subject = `${candidateName} - Update on your application: ${positionTitle}`
+  const subject = `Update on your application - ${positionTitle} - ${candidateName}`
   const template = customTemplate ?? DEFAULT_REJECTION_TEMPLATE
   const html = renderTemplate(template, {
     candidateName, positionTitle, clientName: COMPANY_NAME, recruiterName, roundLabel: '', schedulingLink: '', slotsList: '', nextRoundLabel: '',
@@ -125,7 +128,7 @@ export function advanceNotificationEmail({
   recruiterName: string
   customTemplate?: string | null
 }): { subject: string; html: string } {
-  const subject = `${candidateName} - Moving forward: ${positionTitle}`
+  const subject = `Moving forward - ${positionTitle} - ${candidateName}`
   const template = customTemplate ?? DEFAULT_ADVANCE_TEMPLATE
   const html = renderTemplate(template, {
     candidateName, positionTitle, clientName: COMPANY_NAME, recruiterName, roundLabel: '', schedulingLink: '', slotsList: '', nextRoundLabel,

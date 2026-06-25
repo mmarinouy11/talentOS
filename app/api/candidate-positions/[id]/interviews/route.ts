@@ -57,6 +57,12 @@ export async function POST(
   const cp = await db.candidatePosition.findUnique({ where: { id } })
   if (!cp) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  if (parsed.data.schedulingMode !== 'CALENDAR_LINK' && parsed.data.proposedSlots?.length) {
+    const now = new Date()
+    const hasPast = parsed.data.proposedSlots.some((s) => new Date(s) < now)
+    if (hasPast) return NextResponse.json({ error: 'One or more proposed slots are in the past.' }, { status: 400 })
+  }
+
   const [existingForStage, existingTotal] = await Promise.all([
     db.interview.count({ where: { candidatePositionId: id, stage: parsed.data.stage } }),
     db.interview.count({ where: { candidatePositionId: id } }),

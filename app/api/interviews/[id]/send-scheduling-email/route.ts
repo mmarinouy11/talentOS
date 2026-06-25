@@ -5,6 +5,14 @@ import { z } from 'zod'
 import { sendEmail } from '@/lib/email'
 import { schedulingRequestEmail, buildSchedulingTokens, renderTemplate } from '@/lib/email-templates'
 
+const INTERVIEW_TYPE_LABELS: Record<string, string> = {
+  SCREENING: 'Screening Interview',
+  TECHNICAL_INTERVIEW: 'Technical Interview',
+  MANAGER_INTERVIEW: 'Manager Interview',
+  CLIENT_INTERVIEW: 'Client Interview',
+  OFFER: 'Offer Discussion',
+}
+
 const bodySchema = z.object({
   subject: z.string().optional(),
   html: z.string().optional(),
@@ -62,16 +70,19 @@ export async function POST(
     })
 
     const template = recruiter.schedulingEmailTemplate
+    const interviewTypeLabel = INTERVIEW_TYPE_LABELS[interview.stage] ?? 'Interview'
+    const candidateName = `${candidate.firstName} ${candidate.lastName}`
     if (template) {
-      subject = `${`${candidate.firstName} ${candidate.lastName}`} - Interview Scheduling: ${position.title}`
+      subject = `${interviewTypeLabel} - ${position.title} - ${candidateName}`
       html = renderTemplate(template, tokens)
     } else {
       const result = schedulingRequestEmail({
-        candidateName: tokens.candidateName,
+        candidateName,
         positionTitle: position.title,
         client: position.client,
         roundLabel: interview.roundLabel,
         recruiterName,
+        interviewTypeLabel,
       })
       subject = result.subject
       html = result.html
