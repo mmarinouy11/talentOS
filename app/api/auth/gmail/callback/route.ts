@@ -3,11 +3,16 @@ import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 
+function getRedirectUri(): string {
+  const base = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
+  return `${base}/api/auth/gmail/callback`
+}
+
 function getOAuthClient() {
   return new google.auth.OAuth2(
     process.env.GMAIL_OAUTH_CLIENT_ID,
     process.env.GMAIL_OAUTH_CLIENT_SECRET,
-    `${process.env.NEXTAUTH_URL}/api/auth/gmail/callback`,
+    getRedirectUri(),
   )
 }
 
