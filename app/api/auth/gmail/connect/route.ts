@@ -10,11 +10,16 @@ function getRedirectUri(): string {
 }
 
 function getOAuthClient() {
-  return new google.auth.OAuth2(
-    process.env.GMAIL_OAUTH_CLIENT_ID,
-    process.env.GMAIL_OAUTH_CLIENT_SECRET,
-    getRedirectUri(),
+  const clientId = process.env.GMAIL_OAUTH_CLIENT_ID
+  const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET
+  const redirectUri = getRedirectUri()
+  console.log(
+    '[gmail/connect] OAuth2 constructor args —',
+    'client_id length:', clientId?.length ?? 'UNDEFINED',
+    '| client_secret length:', clientSecret?.length ?? 'UNDEFINED',
+    '| redirect_uri:', redirectUri,
   )
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri)
 }
 
 export async function GET() {
@@ -34,6 +39,6 @@ export async function GET() {
     scope: ['https://www.googleapis.com/auth/gmail.send'],
   })
 
-  console.log('[gmail/connect] redirecting to Google OAuth URL:', url)
+  console.log('[gmail/connect] generated OAuth URL:', url)
   return NextResponse.redirect(url)
 }
