@@ -51,7 +51,7 @@ export async function POST(
     const tokens: Record<string, string> = {
       candidateName: `${candidate.firstName} ${candidate.lastName}`,
       positionTitle: position.title,
-      clientName: position.client,
+      clientName: 'Tenarai',
       recruiterName,
       roundLabel: '',
       schedulingLink: '',
@@ -59,7 +59,7 @@ export async function POST(
       nextRoundLabel: '',
     }
     if (recruiter.rejectionEmailTemplate) {
-      subject = `Update on your application – ${position.title} at ${position.client}`
+      subject = `${`${candidate.firstName} ${candidate.lastName}`} - Update on your application: ${position.title}`
       html = renderTemplate(recruiter.rejectionEmailTemplate, tokens)
     } else {
       const result = rejectionEmail({

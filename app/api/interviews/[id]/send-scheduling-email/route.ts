@@ -63,7 +63,7 @@ export async function POST(
 
     const template = recruiter.schedulingEmailTemplate
     if (template) {
-      subject = `Interview Scheduling – ${position.title} at ${position.client}`
+      subject = `${`${candidate.firstName} ${candidate.lastName}`} - Interview Scheduling: ${position.title}`
       html = renderTemplate(template, tokens)
     } else {
       const result = schedulingRequestEmail({

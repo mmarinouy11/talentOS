@@ -114,12 +114,13 @@ function buildSchedulingEmailContent(
   userProfile: UserProfile | null,
   positionTitle: string,
   clientName: string,
+  candidateName: string,
 ) {
   const recruiterName = userProfile?.name ?? userProfile?.email ?? 'Recruiter'
   const isScreening = interview.stage === 'SCREENING'
 
   const tokens = buildSchedulingTokens({
-    candidateName: '', // will be set by caller context
+    candidateName,
     positionTitle,
     clientName,
     recruiterName,
@@ -133,7 +134,7 @@ function buildSchedulingEmailContent(
     ? (userProfile?.schedulingEmailTemplate ?? DEFAULT_SCHEDULING_TEMPLATE)
     : DEFAULT_NEXT_ROUND_TEMPLATE
 
-  const subject = `Interview Scheduling – ${positionTitle} at ${clientName}`
+  const subject = `${candidateName} - Interview Scheduling: ${positionTitle}`
   const html = renderTemplate(template, tokens)
   return { subject, html }
 }
@@ -143,10 +144,11 @@ function buildRejectionEmailContent(
   userProfile: UserProfile | null,
   positionTitle: string,
   clientName: string,
+  candidateName: string,
 ) {
   const recruiterName = userProfile?.name ?? userProfile?.email ?? 'Recruiter'
   const tokens: Record<string, string> = {
-    candidateName: '',
+    candidateName,
     positionTitle,
     clientName,
     recruiterName,
@@ -156,7 +158,7 @@ function buildRejectionEmailContent(
     nextRoundLabel: '',
   }
   const template = userProfile?.rejectionEmailTemplate ?? DEFAULT_REJECTION_TEMPLATE
-  const subject = `Update on your application – ${positionTitle} at ${clientName}`
+  const subject = `${candidateName} - Update on your application: ${positionTitle}`
   const html = renderTemplate(template, tokens)
   return { subject, html }
 }
@@ -532,7 +534,7 @@ function NextRoundModal({
 
   if (phase === 'preview' && createdInterview) {
     const { subject: defaultSubject, html: defaultHtml } = buildSchedulingEmailContent(
-      createdInterview, userProfile, positionTitle, clientName
+      createdInterview, userProfile, positionTitle, clientName, candidateName
     )
     return (
       <GenericEmailPreviewModal
@@ -725,7 +727,7 @@ function AddInterviewModal({
   }
 
   if (pendingInterview) {
-    const { subject, html } = buildSchedulingEmailContent(pendingInterview, userProfile, positionTitle, clientName)
+    const { subject, html } = buildSchedulingEmailContent(pendingInterview, userProfile, positionTitle, clientName, candidateName)
     return (
       <GenericEmailPreviewModal
         title="Email Preview"
@@ -913,7 +915,7 @@ function EditInterviewModal({
 
   // Rejection email preview
   if (postSaveFlow === 'rejection-email') {
-    const { subject, html } = buildRejectionEmailContent(currentInterview, userProfile, positionTitle, clientName)
+    const { subject, html } = buildRejectionEmailContent(currentInterview, userProfile, positionTitle, clientName, candidateName)
     return (
       <GenericEmailPreviewModal
         title="Rejection Email Preview"
@@ -950,7 +952,7 @@ function EditInterviewModal({
   }
 
   if (showSchedulingEmailPreview) {
-    const { subject, html } = buildSchedulingEmailContent(currentInterview, userProfile, positionTitle, clientName)
+    const { subject, html } = buildSchedulingEmailContent(currentInterview, userProfile, positionTitle, clientName, candidateName)
     return (
       <GenericEmailPreviewModal
         title="Email Preview"

@@ -16,22 +16,23 @@ async function getFromAddress(): Promise<string> {
   return setting?.value ?? 'noreply@example.com'
 }
 
+function encodeSubject(subject: string): string {
+  if (/[^\x00-\x7F]/.test(subject)) {
+    return `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`
+  }
+  return subject
+}
+
 function buildRawEmail({ from, to, subject, html }: { from: string; to: string; subject: string; html: string }): string {
-  const boundary = `----=_Part_${Date.now()}`
   const raw = [
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodeSubject(subject)}`,
     'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: quoted-printable',
     '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
-    '',
-    Buffer.from(html).toString('base64'),
-    '',
-    `--${boundary}--`,
+    html,
   ].join('\r\n')
   return Buffer.from(raw).toString('base64url')
 }
