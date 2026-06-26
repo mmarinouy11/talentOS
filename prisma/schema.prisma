@@ -304,6 +304,11 @@ model Interview {
   proposedSlots       DateTime[]
   calendarLinkUsed    String?
   scheduledAt         DateTime?
+  interviewerEmail    String?
+  magicLinkToken      String?           @unique
+  magicLinkExpiresAt  DateTime?
+  magicLinkUsedAt     DateTime?
+  humanScore          Int?
   feedbackText        String?           @db.Text
   feedbackPdfUrl      String?
   feedbackSummary     String?           @db.Text
@@ -319,9 +324,21 @@ model Interview {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
-  candidatePosition CandidatePosition @relation(fields: [candidatePositionId], references: [id])
-  decidedBy         User?             @relation("InterviewDecidedBy", fields: [decidedById], references: [id])
+  candidatePosition CandidatePosition  @relation(fields: [candidatePositionId], references: [id])
+  decidedBy         User?              @relation("InterviewDecidedBy", fields: [decidedById], references: [id])
   emailLogs         EmailLog[]
+  skillRatings      InterviewSkillRating[]
+}
+
+model InterviewSkillRating {
+  id          String    @id @default(cuid())
+  interviewId String
+  skillName   String
+  rating      Int
+  comment     String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
 }
 
 model EmailLog {

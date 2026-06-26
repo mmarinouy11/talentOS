@@ -2,7 +2,10 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { randomBytes } from 'crypto'
 import { parseTextFeedback } from '@/lib/feedback-parser'
+import { sendEmail } from '@/lib/email'
+import { interviewerFeedbackInviteEmail } from '@/lib/email-templates'
 
 const patchSchema = z.object({
   action: z.literal('cancel').optional(),
@@ -14,6 +17,7 @@ const patchSchema = z.object({
   roundNumber: z.number().int().min(1).optional(),
   durationMinutes: z.number().int().min(1).nullable().optional(),
   isInternal: z.boolean().optional(),
+  interviewerEmail: z.string().email().nullable().optional(),
   feedbackText: z.string().nullable().optional(),
   feedbackSummary: z.string().nullable().optional(),
   feedbackStrengths: z.array(z.string()).optional(),
@@ -128,6 +132,61 @@ export async function PATCH(
   // Strip pre-parsed client fields from rest so they don't double-write
   const { feedbackSummary: _fs, feedbackStrengths: _fst, feedbackConcerns: _fc, aiScore: _as, ...restClean } = rest
 
+  // Generate magic link when transitioning to SCHEDULED for technical/manager interviews with interviewer email
+  const magicLinkFields: Record<string, unknown> = {}
+  const interviewerEmailForLink = rest.interviewerEmail ?? existing.interviewerEmail
+  const shouldSendMagicLink =
+    newStatus === 'SCHEDULED' &&
+    existing.status !== 'SCHEDULED' &&
+    !existing.magicLinkToken &&
+    interviewerEmailForLink &&
+    (existing.stage === 'TECHNICAL_INTERVIEW' || existing.stage === 'MANAGER_INTERVIEW')
+
+  if (shouldSendMagicLink) {
+    const token = randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+    magicLinkFields.magicLinkToken = token
+    magicLinkFields.magicLinkExpiresAt = expiresAt
+
+    // Send invite email async (don't block response)
+    const cp = await db.candidatePosition.findUnique({
+      where: { id: existing.candidatePositionId },
+      include: {
+        candidate: { select: { firstName: true, lastName: true } },
+        position: { select: { title: true } },
+      },
+    })
+    if (cp) {
+      const recruiter = await db.user.findUnique({
+        where: { id: (session.user as { id?: string }).id ?? '' },
+        select: { id: true, name: true },
+      })
+      const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
+      const feedbackUrl = `${baseUrl}/feedback/${token}`
+      const candidateName = `${cp.candidate.firstName} ${cp.candidate.lastName}`
+      const INTERVIEW_TYPE_LABELS: Record<string, string> = {
+        TECHNICAL_INTERVIEW: 'Technical Interview',
+        MANAGER_INTERVIEW: 'Manager Interview',
+      }
+      const interviewTypeLabel = INTERVIEW_TYPE_LABELS[existing.stage] ?? existing.stage
+      const { subject, html } = interviewerFeedbackInviteEmail({
+        candidateName,
+        positionTitle: cp.position.title,
+        interviewTypeLabel,
+        feedbackUrl,
+        recruiterName: recruiter?.name ?? 'The Recruiting Team',
+      })
+      sendEmail({
+        to: interviewerEmailForLink!,
+        subject,
+        html,
+        template: 'interviewer_invite',
+        userId: (session.user as { id?: string }).id,
+        interviewId: id,
+      }).catch((err) => console.error('[interview PATCH] Failed to send magic link email:', err))
+    }
+  }
+
   const interview = await db.interview.update({
     where: { id },
     data: {
@@ -137,6 +196,7 @@ export async function PATCH(
       proposedSlots: proposedSlots !== undefined ? proposedSlots.map((s) => new Date(s)) : undefined,
       ...decidedFields,
       ...aiFields,
+      ...magicLinkFields,
     },
     include: { decidedBy: { select: { name: true, email: true } } },
   })

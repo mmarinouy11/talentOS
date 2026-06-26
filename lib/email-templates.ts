@@ -113,6 +113,29 @@ export function rejectionEmail({
   return { subject, html }
 }
 
+export function interviewerFeedbackInviteEmail({
+  candidateName,
+  positionTitle,
+  interviewTypeLabel,
+  feedbackUrl,
+  recruiterName,
+}: {
+  candidateName: string
+  positionTitle: string
+  interviewTypeLabel: string
+  feedbackUrl: string
+  recruiterName: string
+}): { subject: string; html: string } {
+  const subject = `Feedback needed: ${candidateName} - ${interviewTypeLabel} - ${positionTitle}`
+  const html = `<p>Hi,</p>
+<p>Thank you for interviewing <strong>${candidateName}</strong> for the <strong>${positionTitle}</strong> position (${interviewTypeLabel}).</p>
+<p>Please share your feedback using the link below. It only takes a few minutes and will help us make the best decision:</p>
+<p><a href="${feedbackUrl}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Submit Feedback</a></p>
+<p>This link is valid for 14 days and can only be used once.</p>
+<p>Best,<br/>${recruiterName} · ${COMPANY_NAME}</p>`
+  return { subject, html }
+}
+
 export function advanceNotificationEmail({
   candidateName,
   positionTitle,

@@ -30,6 +30,8 @@ interface Interview {
   proposedSlots: string[]
   calendarLinkUsed: string | null
   scheduledAt: string | null
+  interviewerEmail: string | null
+  humanScore: number | null
   feedbackText: string | null
   feedbackPdfUrl: string | null
   feedbackSummary: string | null
@@ -699,9 +701,11 @@ function AddInterviewModal({
   const [slots, setSlots] = useState<string[]>([''])
   const [slotTimezone, setSlotTimezone] = useState(userProfile?.timezone ?? 'America/Montevideo')
   const [duration, setDuration] = useState<number>(stage === 'SCREENING' || stage === 'MANAGER_INTERVIEW' ? 30 : 60)
+  const [interviewerEmail, setInterviewerEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingInterview, setPendingInterview] = useState<Interview | null>(null)
+  const needsInterviewerEmail = stage === 'TECHNICAL_INTERVIEW' || stage === 'MANAGER_INTERVIEW'
 
   const isScreening = stage === 'SCREENING'
   const hasCalendarLink = !!userProfile?.calendarLink
@@ -734,6 +738,7 @@ function AddInterviewModal({
           proposedSlots: isCalendar ? [] : slots.filter(Boolean).map((s) => zonedToUtcIso(s, slotTimezone)),
           calendarLinkUsed: isCalendar ? userProfile?.calendarLink : null,
           durationMinutes: duration || null,
+          interviewerEmail: interviewerEmail.trim() || null,
         }),
       })
       if (!res.ok) {
@@ -823,6 +828,21 @@ function AddInterviewModal({
             )}
           </div>
 
+          {needsInterviewerEmail && (
+            <div>
+              <Label htmlFor="interviewerEmail">Interviewer Email</Label>
+              <p className="text-xs text-gray-400 mb-1">When the interview is scheduled, they&apos;ll receive a link to submit structured feedback.</p>
+              <Input
+                id="interviewerEmail"
+                type="email"
+                value={interviewerEmail}
+                onChange={(e) => setInterviewerEmail(e.target.value)}
+                placeholder="interviewer@company.com"
+                className="mt-0.5"
+              />
+            </div>
+          )}
+
           <div>
             <Label htmlFor="add-duration">Duration (minutes)</Label>
             <Input id="add-duration" type="number" min={15} max={480} step={15} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
@@ -878,8 +898,10 @@ function EditInterviewModal({
   )
   const [feedbackText, setFeedbackText] = useState(interview.feedbackText ?? '')
   const [durationMinutes, setDurationMinutes] = useState<number>(interview.durationMinutes ?? (interview.stage === 'SCREENING' || interview.stage === 'MANAGER_INTERVIEW' ? 30 : 60))
+  const [interviewerEmail, setInterviewerEmail] = useState(interview.interviewerEmail ?? '')
   const [decision, setDecision] = useState<InterviewDecision | ''>(interview.decision ?? '')
   const [decisionNotes, setDecisionNotes] = useState(interview.decisionNotes ?? '')
+  const needsInterviewerEmail = interview.stage === 'TECHNICAL_INTERVIEW' || interview.stage === 'MANAGER_INTERVIEW'
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -932,6 +954,7 @@ function EditInterviewModal({
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       feedbackText: feedbackText || null,
       durationMinutes: durationMinutes || null,
+      interviewerEmail: interviewerEmail.trim() || null,
       decision: decision || null,
       decisionNotes: decisionNotes || null,
       ...(alreadyParsed ? {
@@ -1082,6 +1105,35 @@ function EditInterviewModal({
             </>
           )}
 
+          {needsInterviewerEmail && (
+            <div>
+              <Label htmlFor="edit-interviewerEmail">Interviewer Email</Label>
+              <p className="text-xs text-gray-400 mb-1">When scheduled, they&apos;ll receive a feedback link automatically.</p>
+              <Input
+                id="edit-interviewerEmail"
+                type="email"
+                value={interviewerEmail}
+                onChange={(e) => setInterviewerEmail(e.target.value)}
+                placeholder="interviewer@company.com"
+                disabled={isCancelled}
+                className="mt-0.5"
+              />
+            </div>
+          )}
+
+          {currentInterview.humanScore != null && (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-1">
+              <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">Interviewer Feedback</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-blue-900">Score: {currentInterview.humanScore}/5</span>
+                <span className="text-yellow-500">{'★'.repeat(currentInterview.humanScore)}{'☆'.repeat(5 - currentInterview.humanScore)}</span>
+              </div>
+              {currentInterview.feedbackParseMethod === 'interviewer_form' && currentInterview.feedbackSummary && (
+                <p className="text-sm text-blue-800">{currentInterview.feedbackSummary}</p>
+              )}
+            </div>
+          )}
+
           {!isCancelled && (
             <FeedbackPdfUpload
               interviewId={currentInterview.id}
@@ -1093,7 +1145,7 @@ function EditInterviewModal({
             />
           )}
 
-          {(currentInterview.feedbackSummary || previewResult) && (
+          {(currentInterview.feedbackSummary || previewResult) && currentInterview.feedbackParseMethod !== 'interviewer_form' && (
             <FeedbackParseResult
               summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
               strengths={previewResult?.strengths ?? currentInterview.feedbackStrengths}

@@ -22,6 +22,7 @@ const createSchema = z.object({
   proposedSlots: z.array(z.string().datetime()).optional(),
   calendarLinkUsed: z.string().optional().nullable(),
   durationMinutes: z.number().int().min(1).optional().nullable(),
+  interviewerEmail: z.string().email().optional().nullable(),
 })
 
 export async function GET(
@@ -83,6 +84,7 @@ export async function POST(
       proposedSlots: parsed.data.proposedSlots?.map((s) => new Date(s)) ?? [],
       calendarLinkUsed: parsed.data.calendarLinkUsed ?? null,
       durationMinutes: parsed.data.durationMinutes ?? null,
+      interviewerEmail: parsed.data.interviewerEmail ?? null,
     },
     include: { decidedBy: { select: { name: true, email: true } } },
   })
