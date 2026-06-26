@@ -28,6 +28,7 @@ interface Fields {
   desiredCompensation: string
   minimumCompensation: string
   notes: string
+  recruiterId: string
   sourcedByType: 'RECRUITER' | 'VENDOR' | 'OTHER' | ''
   sourcedByUserId: string
   sourcedByVendorId: string
@@ -36,6 +37,7 @@ interface Fields {
 
 interface CandidateFormProps {
   mode: 'create' | 'edit'
+  currentUserId?: string
   defaultValues?: {
     id?: string
     firstName?: string
@@ -53,6 +55,7 @@ interface CandidateFormProps {
     notes?: string | null
     cvDriveId?: string | null
     cvOriginalName?: string | null
+    recruiterId?: string | null
     sourcedByType?: 'RECRUITER' | 'VENDOR' | 'OTHER' | null
     sourcedByUserId?: string | null
     sourcedByVendorId?: string | null
@@ -63,7 +66,7 @@ interface CandidateFormProps {
 interface UserOption { id: string; name: string | null; email: string }
 interface VendorOption { id: string; name: string }
 
-export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) {
+export function CandidateForm({ mode, currentUserId, defaultValues = {} }: CandidateFormProps) {
   const router = useRouter()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -90,6 +93,7 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
     desiredCompensation: defaultValues.desiredCompensation?.toString() ?? '',
     minimumCompensation: defaultValues.minimumCompensation?.toString() ?? '',
     notes: defaultValues.notes ?? '',
+    recruiterId: defaultValues.recruiterId ?? currentUserId ?? '',
     sourcedByType: defaultValues.sourcedByType ?? '',
     sourcedByUserId: defaultValues.sourcedByUserId ?? '',
     sourcedByVendorId: defaultValues.sourcedByVendorId ?? '',
@@ -148,6 +152,7 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
       notes: fields.notes || null,
       cvDriveId: cvDriveId || undefined,
       cvOriginalName: cvOriginalName || undefined,
+      recruiterId: fields.recruiterId || null,
       sourcedByType: fields.sourcedByType || null,
       sourcedByUserId: fields.sourcedByType === 'RECRUITER' ? fields.sourcedByUserId || null : null,
       sourcedByVendorId: fields.sourcedByType === 'VENDOR' ? fields.sourcedByVendorId || null : null,
@@ -328,6 +333,26 @@ export function CandidateForm({ mode, defaultValues = {} }: CandidateFormProps) 
           {!minimumManuallyEdited && fields.minimumCompensation !== '' && (
             <p className="text-xs text-gray-400 mt-1">Auto-filled from Desired — you can adjust it</p>
           )}
+        </div>
+
+        {/* Recruiter */}
+        <div className="col-span-2 border-t border-gray-100 pt-4 mt-2">
+          <p className="text-sm font-medium text-gray-700 mb-3">Ownership</p>
+        </div>
+
+        <div className="col-span-2">
+          <Label htmlFor="recruiterId">Recruiter (Internal Owner) <span className="text-red-500">*</span></Label>
+          <Select
+            id="recruiterId"
+            value={fields.recruiterId}
+            onChange={(e) => setField('recruiterId', e.target.value)}
+            required
+          >
+            <option value="">— Select recruiter —</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>{u.name ?? u.email}</option>
+            ))}
+          </Select>
         </div>
 
         {/* Sourcing */}

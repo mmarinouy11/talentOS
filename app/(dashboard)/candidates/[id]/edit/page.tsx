@@ -22,6 +22,7 @@ export default async function EditCandidatePage({
       desiredCompensation: true, minimumCompensation: true,
       skills: true, languages: true,
       sourcedByType: true, sourcedByUserId: true, sourcedByVendorId: true, sourcedByOther: true,
+      recruiterId: true,
     },
   })
 
@@ -60,6 +61,7 @@ export default async function EditCandidatePage({
           sourcedByUserId: candidate.sourcedByUserId,
           sourcedByVendorId: candidate.sourcedByVendorId,
           sourcedByOther: candidate.sourcedByOther,
+          recruiterId: candidate.recruiterId,
         }}
       />
     </div>

@@ -32,6 +32,9 @@ export async function GET(
   }
 
   const cp = interview.candidatePosition
+  const skillLimitSetting = await db.systemSettings.findUnique({ where: { key: 'TECHNICAL_FEEDBACK_SKILL_LIMIT' } })
+  const skillLimit = parseInt(skillLimitSetting?.value ?? '6', 10)
+
   return NextResponse.json({
     interviewId: interview.id,
     stage: interview.stage,
@@ -39,5 +42,6 @@ export async function GET(
     positionTitle: cp.position.title,
     client: cp.position.client,
     jdSkills: cp.position.jdSkills,
+    skillLimit,
   })
 }

@@ -44,6 +44,7 @@ interface Interview {
   decisionNotes: string | null
   decidedAt: string | null
   decidedBy: { name: string | null; email: string } | null
+  skillRatings: { skillName: string; rating: number; comment: string | null }[]
   createdAt: string
 }
 
@@ -1174,7 +1175,7 @@ function EditInterviewModal({
           )}
 
           {currentInterview.humanScore != null && (
-            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-1">
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-2">
               <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">Interviewer Feedback</p>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-blue-900">Score: {currentInterview.humanScore}/5</span>
@@ -1182,6 +1183,18 @@ function EditInterviewModal({
               </div>
               {currentInterview.feedbackParseMethod === 'interviewer_form' && currentInterview.feedbackSummary && (
                 <p className="text-sm text-blue-800">{currentInterview.feedbackSummary}</p>
+              )}
+              {currentInterview.skillRatings.length > 0 && (
+                <div className="pt-2 border-t border-blue-200 space-y-1.5">
+                  <p className="text-xs font-medium text-blue-600">Skill Ratings</p>
+                  {currentInterview.skillRatings.map((sr) => (
+                    <div key={sr.skillName} className="flex items-start gap-2 text-sm">
+                      <span className="font-medium text-blue-900 w-32 shrink-0">{sr.skillName}</span>
+                      <span className="text-yellow-500">{'★'.repeat(sr.rating)}{'☆'.repeat(5 - sr.rating)}</span>
+                      {sr.comment && <span className="text-blue-700 text-xs">{sr.comment}</span>}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -1198,13 +1211,25 @@ function EditInterviewModal({
           )}
 
           {(currentInterview.feedbackSummary || previewResult) && currentInterview.feedbackParseMethod !== 'interviewer_form' && (
-            <FeedbackParseResult
-              summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
-              strengths={previewResult?.strengths ?? currentInterview.feedbackStrengths}
-              concerns={previewResult?.concerns ?? currentInterview.feedbackConcerns}
-              aiScore={previewResult?.score ?? currentInterview.aiScore ?? null}
-              feedbackParseMethod={previewResult ? 'text' : currentInterview.feedbackParseMethod}
-            />
+            <>
+              <FeedbackParseResult
+                summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
+                strengths={previewResult?.strengths ?? currentInterview.feedbackStrengths}
+                concerns={previewResult?.concerns ?? currentInterview.feedbackConcerns}
+                aiScore={previewResult?.score ?? currentInterview.aiScore ?? null}
+                feedbackParseMethod={previewResult ? 'text' : currentInterview.feedbackParseMethod}
+              />
+              {currentInterview.feedbackPdfUrl && (
+                <a
+                  href={`https://drive.google.com/file/d/${currentInterview.feedbackPdfUrl}/view`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  View Feedback PDF ↗
+                </a>
+              )}
+            </>
           )}
 
           <div>

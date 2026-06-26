@@ -10,6 +10,7 @@ interface FeedbackData {
   positionTitle: string
   client: string
   jdSkills: string[]
+  skillLimit: number
   used: boolean
   expired: boolean
   invalid: boolean
@@ -56,7 +57,9 @@ export default function FeedbackPage() {
       .then((d) => {
         setData(d)
         if (d.jdSkills?.length) {
-          setSkillRatings(d.jdSkills.map((s: string) => ({ skillName: s, rating: 0, comment: '' })))
+          const limit = typeof d.skillLimit === 'number' && d.skillLimit > 0 ? d.skillLimit : 6
+          const skills = d.jdSkills.slice(0, limit)
+          setSkillRatings(skills.map((s: string) => ({ skillName: s, rating: 0, comment: '' })))
         }
       })
       .catch(() => setData({ invalid: true } as FeedbackData))
@@ -173,6 +176,9 @@ export default function FeedbackPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-2">General Notes</label>
+                {isTechnical && skillRatings.length > 0 && (
+                  <p className="text-xs text-gray-400 mb-1">Cover any additional relevant skills not listed above in your notes.</p>
+                )}
                 <textarea
                   value={generalNotes}
                   onChange={(e) => setGeneralNotes(e.target.value)}

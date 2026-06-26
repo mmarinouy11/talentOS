@@ -23,6 +23,7 @@ const candidateSchema = z.object({
   sourcedByUserId: z.string().optional().nullable(),
   sourcedByVendorId: z.string().optional().nullable(),
   sourcedByOther: z.string().optional().nullable(),
+  recruiterId: z.string().optional().nullable(),
 })
 
 export async function GET(request: Request) {
@@ -99,11 +100,13 @@ export async function POST(request: Request) {
   }
 
   const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
+  const sessionUser = session.user as { id?: string }
   const candidate = await db.candidate.create({
     data: {
       ...rest,
       cvDriveId: rest.cvDriveId ?? null,
       cvOriginalName: rest.cvOriginalName ?? null,
+      recruiterId: rest.recruiterId ?? sessionUser.id ?? null,
     },
   })
 

@@ -43,6 +43,7 @@ export default async function CandidateDetailPage({
       },
       sourcedByUser: { select: { id: true, name: true, email: true } },
       sourcedByVendor: { select: { id: true, name: true } },
+      recruiter: { select: { id: true, name: true, email: true } },
     },
   })
 
@@ -104,6 +105,12 @@ export default async function CandidateDetailPage({
                   <p className="text-gray-900 mt-0.5">{candidate.yearsOfExperience} years</p>
                 </div>
               )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recruiter (Owner)</p>
+                <p className="text-gray-900 mt-0.5">
+                  {candidate.recruiter ? (candidate.recruiter.name ?? candidate.recruiter.email) : <span className="text-gray-400">Not assigned</span>}
+                </p>
+              </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sourced By</p>
                 <div className="mt-0.5">

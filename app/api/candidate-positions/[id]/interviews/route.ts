@@ -36,7 +36,7 @@ export async function GET(
 
   const interviews = await db.interview.findMany({
     where: { candidatePositionId: id },
-    include: { decidedBy: { select: { name: true, email: true } } },
+    include: { decidedBy: { select: { name: true, email: true } }, skillRatings: { orderBy: { createdAt: 'asc' } } },
     orderBy: [{ roundNumber: 'asc' }, { createdAt: 'asc' }],
   })
 

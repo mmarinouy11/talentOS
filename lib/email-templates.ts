@@ -136,6 +136,31 @@ export function interviewerFeedbackInviteEmail({
   return { subject, html }
 }
 
+export function feedbackSubmittedNotificationEmail({
+  recruiterName,
+  candidateName,
+  positionTitle,
+  interviewType,
+  scoreLabel,
+}: {
+  recruiterName: string
+  candidateName: string
+  positionTitle: string
+  interviewType: string
+  scoreLabel: string
+}): { subject: string; html: string } {
+  const subject = `Feedback submitted: ${candidateName} — ${interviewType}`
+  const html = `<p>Hi ${recruiterName},</p>
+<p>New feedback has been submitted for <strong>${candidateName}</strong> (${positionTitle}).</p>
+<table style="border-collapse:collapse;margin-top:8px;">
+  <tr><td style="padding:2px 12px 2px 0;color:#6b7280;font-size:14px;">Interview</td><td style="padding:2px 0;font-size:14px;font-weight:600;">${interviewType}</td></tr>
+  <tr><td style="padding:2px 12px 2px 0;color:#6b7280;font-size:14px;">Score</td><td style="padding:2px 0;font-size:14px;font-weight:600;">${scoreLabel}</td></tr>
+</table>
+<p style="margin-top:16px;">Log in to TalentOS to view the full feedback and make a decision.</p>
+<p>Best,<br/>${COMPANY_NAME}</p>`
+  return { subject, html }
+}
+
 export function advanceNotificationEmail({
   candidateName,
   positionTitle,
