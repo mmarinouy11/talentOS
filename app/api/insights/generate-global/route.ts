@@ -41,7 +41,7 @@ export async function POST(_req: NextRequest) {
       feedbackStrengths: true,
       feedbackConcerns: true,
       decision: true,
-      aiRecommendedDecision: true,
+      aiScore: true,
       candidatePosition: {
         select: {
           candidate: { select: { firstName: true, lastName: true } },
@@ -65,7 +65,7 @@ ${interviews.map((iv, i) => `--- Interview ${i + 1}: ${iv.candidatePosition.cand
 Summary: ${iv.feedbackSummary}
 Strengths: ${iv.feedbackStrengths.join(', ') || 'none listed'}
 Concerns: ${iv.feedbackConcerns.join(', ') || 'none listed'}
-Decision: ${iv.decision ?? iv.aiRecommendedDecision ?? 'not set'}`).join('\n\n')}
+Decision: ${iv.decision ?? 'not set'}${iv.aiScore != null ? ` (AI score: ${iv.aiScore}/5)` : ''}`).join('\n\n')}
 
 Identify systemic cross-position patterns.`
 

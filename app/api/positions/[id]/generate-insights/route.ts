@@ -52,7 +52,7 @@ export async function POST(
           feedbackStrengths: true,
           feedbackConcerns: true,
           decision: true,
-          aiRecommendedDecision: true,
+          aiScore: true,
         },
       },
     },
@@ -77,7 +77,7 @@ ${interviewsWithFeedback.map((iv, i) => `--- Interview ${i + 1}: ${iv.candidateN
 Summary: ${iv.feedbackSummary}
 Strengths: ${iv.feedbackStrengths.join(', ') || 'none listed'}
 Concerns: ${iv.feedbackConcerns.join(', ') || 'none listed'}
-Decision: ${iv.decision ?? iv.aiRecommendedDecision ?? 'not set'}`).join('\n\n')}
+Decision: ${iv.decision ?? 'not set'}${iv.aiScore != null ? ` (AI score: ${iv.aiScore}/5)` : ''}`).join('\n\n')}
 
 Identify patterns across these candidates.`
 
