@@ -309,7 +309,7 @@ model Interview {
   feedbackSummary     String?           @db.Text
   feedbackStrengths   String[]
   feedbackConcerns    String[]
-  aiRecommendedDecision InterviewDecision?
+  aiScore             Int?
   feedbackParseMethod String?
   durationMinutes     Int?
   decision            InterviewDecision?

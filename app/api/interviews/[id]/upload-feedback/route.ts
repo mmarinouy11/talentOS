@@ -9,25 +9,12 @@ import { join } from 'path'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
+import { parseTextFeedback } from '@/lib/feedback-parser'
 
 const execFileAsync = promisify(execFile)
 
 const MIN_TEXT_LENGTH = 200
 const MAX_VISION_PAGES = 12
-
-const TEXT_FEEDBACK_SYSTEM_PROMPT = `You are parsing interview feedback notes for a recruiting platform. The text comes from a PDF feedback form filled out by an interviewer (technical, managerial, or client-facing).
-
-Extract structured information and return ONLY valid JSON, no markdown:
-{
-  "summary": "2-3 sentence overall assessment of the candidate's performance",
-  "strengths": ["3-5 specific positive points mentioned"],
-  "concerns": ["2-4 specific concerns, gaps, or red flags — empty array if none found"],
-  "recommendedDecision": "ADVANCE | REJECT | UNCLEAR"
-}
-Rules:
-- May be in English or Spanish — handle both
-- Base everything strictly on what's written
-- No markdown, no explanation, only the JSON object`
 
 const VISION_FEEDBACK_SYSTEM_PROMPT = `You are analyzing interview feedback report pages (provided as images) for a recruiting platform. Pages may include score visualizations, skill ratings, sentiment charts, and written interviewer comments. Read all visual content across all images as a single combined report.
 
@@ -36,11 +23,17 @@ Extract structured information and return ONLY valid JSON, no markdown:
   "summary": "2-3 sentence overall assessment",
   "strengths": ["3-5 specific positive points"],
   "concerns": ["2-4 specific concerns, empty array if none"],
-  "recommendedDecision": "ADVANCE | REJECT | UNCLEAR"
+  "score": number from 1 to 5 — assessment of how strong a fit this candidate is:
+    1 = Poor fit, clear concerns outweigh strengths
+    2 = Below average, more concerns than strengths
+    3 = Average/mixed, balanced strengths and concerns
+    4 = Strong fit, clear strengths with minor concerns
+    5 = Excellent fit, overwhelmingly positive feedback
 }
 Rules:
 - Read scores, star ratings, percentage bars, and badges visually
 - Prioritize the interviewer's written remarks if present
+- score must be an integer 1-5
 - May be in English or Spanish
 - No markdown, no explanation, only the JSON object`
 
@@ -48,7 +41,7 @@ interface FeedbackParse {
   summary: string
   strengths: string[]
   concerns: string[]
-  recommendedDecision: 'ADVANCE' | 'REJECT' | 'UNCLEAR'
+  score: number
 }
 
 async function renderPdfPages(buffer: Buffer): Promise<Buffer[]> {
@@ -172,22 +165,13 @@ export async function POST(
       }
     } else {
       try {
-        parsed = await callClaudeJSON<FeedbackParse>(
-          `Parse this interview feedback:\n\n${rawText}`,
-          'FAST',
-          TEXT_FEEDBACK_SYSTEM_PROMPT
-        )
+        parsed = await parseTextFeedback(rawText)
         parseMethod = 'text'
       } catch (err) {
         console.error('[upload-feedback] Claude text parsing error:', err)
         return NextResponse.json({ error: `AI parsing failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
       }
     }
-
-    const aiRecommendedDecision =
-      parsed.recommendedDecision === 'ADVANCE' || parsed.recommendedDecision === 'REJECT'
-        ? parsed.recommendedDecision
-        : null
 
     const updated = await db.interview.update({
       where: { id },
@@ -197,7 +181,7 @@ export async function POST(
         feedbackSummary: parsed.summary,
         feedbackStrengths: parsed.strengths,
         feedbackConcerns: parsed.concerns,
-        aiRecommendedDecision,
+        aiScore: typeof parsed.score === 'number' ? Math.min(5, Math.max(1, Math.round(parsed.score))) : null,
         feedbackParseMethod: parseMethod,
         status: 'COMPLETED',
       },

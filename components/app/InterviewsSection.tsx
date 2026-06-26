@@ -35,7 +35,7 @@ interface Interview {
   feedbackSummary: string | null
   feedbackStrengths: string[]
   feedbackConcerns: string[]
-  aiRecommendedDecision: InterviewDecision | null
+  aiScore: number | null
   feedbackParseMethod: string | null
   durationMinutes: number | null
   decision: InterviewDecision | null
@@ -316,18 +316,24 @@ function FeedbackPdfUpload({
 
 // ─── FeedbackParseResult ────────────────────────────────────────────────────
 
+function aiScoreColor(score: number): string {
+  if (score >= 4) return 'text-green-700'
+  if (score === 3) return 'text-yellow-700'
+  return 'text-red-700'
+}
+
 function FeedbackParseResult({
   summary,
   strengths,
   concerns,
-  aiRecommendedDecision,
+  aiScore,
   feedbackParseMethod,
 }: {
   summary: string
   strengths: string[]
   concerns: string[]
-  aiRecommendedDecision: InterviewDecision | null
-  feedbackParseMethod: string | null
+  aiScore: number | null
+  feedbackParseMethod?: string | null
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 text-sm">
@@ -363,11 +369,11 @@ function FeedbackParseResult({
       ) : (
         <p className="text-xs text-gray-400 italic">No concerns noted</p>
       )}
-      {aiRecommendedDecision && (
-        <div className="pt-1 border-t border-gray-200">
-          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${aiRecommendedDecision === 'ADVANCE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            🤖 AI suggests: {aiRecommendedDecision === 'ADVANCE' ? 'Advance' : 'Reject'}
-          </span>
+      {aiScore != null && (
+        <div className="pt-1 border-t border-gray-200 flex items-center gap-2">
+          <span className="text-xs text-gray-500">🤖 AI Score:</span>
+          <span className={`font-semibold text-sm ${aiScoreColor(aiScore)}`}>{aiScore}/5</span>
+          <span className="text-gray-300">{'★'.repeat(aiScore)}{'☆'.repeat(5 - aiScore)}</span>
         </div>
       )}
       {feedbackParseMethod && (
@@ -878,6 +884,9 @@ function EditInterviewModal({
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [postSaveFlow, setPostSaveFlow] = useState<'rejection-email' | 'next-round' | null>(null)
+  const [parsing, setParsing] = useState(false)
+  const [previewResult, setPreviewResult] = useState<{ summary: string; strengths: string[]; concerns: string[]; score: number } | null>(null)
+  const [parsedText, setParsedText] = useState<string | null>(null)
 
   async function patch(body: Record<string, unknown>): Promise<Interview | null> {
     const res = await fetch(`/api/interviews/${currentInterview.id}`, {
@@ -893,16 +902,45 @@ function EditInterviewModal({
     return res.json()
   }
 
+  async function parseManual() {
+    if (!feedbackText.trim()) return
+    setParsing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/interviews/parse-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: feedbackText }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Parse failed'); return }
+      setPreviewResult(data)
+      setParsedText(feedbackText)
+    } catch {
+      setError('Parse failed — please try again')
+    } finally {
+      setParsing(false)
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     setError(null)
+    const alreadyParsed = previewResult && parsedText === feedbackText && feedbackText.trim().length > 0
     const updated = await patch({
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       feedbackText: feedbackText || null,
       durationMinutes: durationMinutes || null,
       decision: decision || null,
       decisionNotes: decisionNotes || null,
+      ...(alreadyParsed ? {
+        _parsedFromClient: true,
+        feedbackSummary: previewResult.summary,
+        feedbackStrengths: previewResult.strengths,
+        feedbackConcerns: previewResult.concerns,
+        aiScore: previewResult.score,
+      } : {}),
     })
     setSaving(false)
     if (!updated) return
@@ -1055,23 +1093,35 @@ function EditInterviewModal({
             />
           )}
 
-          {currentInterview.feedbackSummary && (
+          {(currentInterview.feedbackSummary || previewResult) && (
             <FeedbackParseResult
-              summary={currentInterview.feedbackSummary}
-              strengths={currentInterview.feedbackStrengths}
-              concerns={currentInterview.feedbackConcerns}
-              aiRecommendedDecision={currentInterview.aiRecommendedDecision}
-              feedbackParseMethod={currentInterview.feedbackParseMethod}
+              summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
+              strengths={previewResult?.strengths ?? currentInterview.feedbackStrengths}
+              concerns={previewResult?.concerns ?? currentInterview.feedbackConcerns}
+              aiScore={previewResult?.score ?? currentInterview.aiScore ?? null}
+              feedbackParseMethod={previewResult ? 'text' : currentInterview.feedbackParseMethod}
             />
           )}
 
           <div>
-            <Label htmlFor="feedbackText">Feedback Notes</Label>
+            <div className="flex items-center justify-between mb-0.5">
+              <Label htmlFor="feedbackText">Feedback Notes</Label>
+              {feedbackText.trim() && !isCancelled && (
+                <button
+                  type="button"
+                  onClick={parseManual}
+                  disabled={parsing}
+                  className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-0.5 transition-colors disabled:opacity-50"
+                >
+                  {parsing ? 'Parsing…' : '🤖 Parse'}
+                </button>
+              )}
+            </div>
             <p className="text-xs text-gray-400 mb-1">Adding feedback will mark this interview as Completed. Upload a PDF above to auto-fill.</p>
             <textarea
               id="feedbackText"
               value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
+              onChange={(e) => { setFeedbackText(e.target.value); if (previewResult) setPreviewResult(null) }}
               rows={4}
               disabled={isCancelled}
               className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
