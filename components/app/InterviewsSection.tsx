@@ -221,6 +221,38 @@ function SlotList({ slots, onChange, timezone }: { slots: string[]; onChange: (s
   )
 }
 
+// ─── ConfirmedDatePicker ───────────────────────────────────────────────────
+
+function ConfirmedDatePicker({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  const parts = value ? value.split('T') : ['', '09:00']
+  const date = parts[0]
+  const time = (parts[1] ?? '09:00').slice(0, 5)
+  function set(d: string, t: string) { onChange(d && t ? `${d}T${t}` : '') }
+  const isPast = value ? new Date(value) < new Date() : false
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <Input
+          type="date"
+          value={date}
+          onChange={(e) => set(e.target.value, time)}
+          disabled={disabled}
+          className={`flex-1 ${isPast ? 'border-red-400' : ''}`}
+        />
+        <select
+          value={time}
+          onChange={(e) => set(date, e.target.value)}
+          disabled={disabled}
+          className={`border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white ${isPast ? 'border-red-400' : 'border-gray-200'} ${disabled ? 'bg-gray-50 text-gray-400' : ''}`}
+        >
+          {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+      {isPast && <p className="text-xs text-red-600">Confirmed date cannot be in the past.</p>}
+    </div>
+  )
+}
+
 function TimezoneSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} className={selectClass()}>
@@ -701,11 +733,9 @@ function AddInterviewModal({
   const [slots, setSlots] = useState<string[]>([''])
   const [slotTimezone, setSlotTimezone] = useState(userProfile?.timezone ?? 'America/Montevideo')
   const [duration, setDuration] = useState<number>(stage === 'SCREENING' || stage === 'MANAGER_INTERVIEW' ? 30 : 60)
-  const [interviewerEmail, setInterviewerEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingInterview, setPendingInterview] = useState<Interview | null>(null)
-  const needsInterviewerEmail = stage === 'TECHNICAL_INTERVIEW' || stage === 'MANAGER_INTERVIEW'
 
   const isScreening = stage === 'SCREENING'
   const hasCalendarLink = !!userProfile?.calendarLink
@@ -738,7 +768,6 @@ function AddInterviewModal({
           proposedSlots: isCalendar ? [] : slots.filter(Boolean).map((s) => zonedToUtcIso(s, slotTimezone)),
           calendarLinkUsed: isCalendar ? userProfile?.calendarLink : null,
           durationMinutes: duration || null,
-          interviewerEmail: interviewerEmail.trim() || null,
         }),
       })
       if (!res.ok) {
@@ -828,21 +857,6 @@ function AddInterviewModal({
             )}
           </div>
 
-          {needsInterviewerEmail && (
-            <div>
-              <Label htmlFor="interviewerEmail">Interviewer Email</Label>
-              <p className="text-xs text-gray-400 mb-1">When the interview is scheduled, they&apos;ll receive a link to submit structured feedback.</p>
-              <Input
-                id="interviewerEmail"
-                type="email"
-                value={interviewerEmail}
-                onChange={(e) => setInterviewerEmail(e.target.value)}
-                placeholder="interviewer@company.com"
-                className="mt-0.5"
-              />
-            </div>
-          )}
-
           <div>
             <Label htmlFor="add-duration">Duration (minutes)</Label>
             <Input id="add-duration" type="number" min={15} max={480} step={15} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-32" />
@@ -893,15 +907,20 @@ function EditInterviewModal({
   onInterviewCreated: (interview: Interview) => void
 }) {
   const [currentInterview, setCurrentInterview] = useState(interview)
-  const [scheduledAt, setScheduledAt] = useState(
-    interview.scheduledAt ? new Date(interview.scheduledAt).toISOString().slice(0, 16) : ''
-  )
+  const [scheduledAt, setScheduledAt] = useState(() => {
+    if (!interview.scheduledAt) return ''
+    const d = new Date(interview.scheduledAt)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  })
   const [feedbackText, setFeedbackText] = useState(interview.feedbackText ?? '')
   const [durationMinutes, setDurationMinutes] = useState<number>(interview.durationMinutes ?? (interview.stage === 'SCREENING' || interview.stage === 'MANAGER_INTERVIEW' ? 30 : 60))
+  const [panelType, setPanelType] = useState<'INTERNAL' | 'EXTERNAL'>(interview.isInternal ? 'INTERNAL' : 'EXTERNAL')
   const [interviewerEmail, setInterviewerEmail] = useState(interview.interviewerEmail ?? '')
+  const [confirmationError, setConfirmationError] = useState<{ interviewerEmail?: string } | null>(null)
   const [decision, setDecision] = useState<InterviewDecision | ''>(interview.decision ?? '')
   const [decisionNotes, setDecisionNotes] = useState(interview.decisionNotes ?? '')
-  const needsInterviewerEmail = interview.stage === 'TECHNICAL_INTERVIEW' || interview.stage === 'MANAGER_INTERVIEW'
+  const needsConfirmationFields = interview.stage === 'TECHNICAL_INTERVIEW' || interview.stage === 'MANAGER_INTERVIEW'
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -949,12 +968,25 @@ function EditInterviewModal({
     e.preventDefault()
     setSaving(true)
     setError(null)
+    setConfirmationError(null)
+
+    // Validate Panel Type / Interviewer Email when setting a confirmed date for tech/manager rounds
+    if (scheduledAt && needsConfirmationFields && panelType === 'INTERNAL') {
+      const emailVal = interviewerEmail.trim()
+      if (!emailVal || !emailVal.includes('@')) {
+        setConfirmationError({ interviewerEmail: 'A valid interviewer email is required for internal panels.' })
+        setSaving(false)
+        return
+      }
+    }
+
     const alreadyParsed = previewResult && parsedText === feedbackText && feedbackText.trim().length > 0
     const updated = await patch({
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       feedbackText: feedbackText || null,
       durationMinutes: durationMinutes || null,
-      interviewerEmail: interviewerEmail.trim() || null,
+      isInternal: panelType === 'INTERNAL',
+      interviewerEmail: needsConfirmationFields && panelType === 'INTERNAL' ? interviewerEmail.trim() || null : null,
       decision: decision || null,
       decisionNotes: decisionNotes || null,
       ...(alreadyParsed ? {
@@ -1092,32 +1124,52 @@ function EditInterviewModal({
               )}
             </div>
           ) : (
-            <>
+            <div className="space-y-3 border border-gray-100 rounded-xl p-4">
               <div>
-                <Label htmlFor="scheduledAt">Confirmed Date</Label>
+                <Label>Confirmed Date</Label>
                 <p className="text-xs text-gray-400 mb-1">Setting a date will mark this interview as Scheduled.</p>
-                <Input id="scheduledAt" type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} disabled={isCancelled} className="mt-0.5" />
+                <ConfirmedDatePicker value={scheduledAt} onChange={setScheduledAt} disabled={isCancelled} />
               </div>
               <div>
                 <Label htmlFor="edit-duration">Duration (minutes)</Label>
                 <Input id="edit-duration" type="number" min={15} max={480} step={15} value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} disabled={isCancelled} className="mt-1 w-32" />
               </div>
-            </>
-          )}
 
-          {needsInterviewerEmail && (
-            <div>
-              <Label htmlFor="edit-interviewerEmail">Interviewer Email</Label>
-              <p className="text-xs text-gray-400 mb-1">When scheduled, they&apos;ll receive a feedback link automatically.</p>
-              <Input
-                id="edit-interviewerEmail"
-                type="email"
-                value={interviewerEmail}
-                onChange={(e) => setInterviewerEmail(e.target.value)}
-                placeholder="interviewer@company.com"
-                disabled={isCancelled}
-                className="mt-0.5"
-              />
+              {needsConfirmationFields && (
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <div>
+                    <Label>Panel Type <span className="text-red-500">*</span></Label>
+                    <div className="flex gap-4 mt-1.5">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="panelType" value="INTERNAL" checked={panelType === 'INTERNAL'} onChange={() => setPanelType('INTERNAL')} className="accent-[#8DF000]" disabled={isCancelled} />
+                        <span className="text-sm text-gray-700">Internal Panel</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="panelType" value="EXTERNAL" checked={panelType === 'EXTERNAL'} onChange={() => { setPanelType('EXTERNAL'); setInterviewerEmail(''); setConfirmationError(null) }} className="accent-[#8DF000]" disabled={isCancelled} />
+                        <span className="text-sm text-gray-700">External Panel</span>
+                      </label>
+                    </div>
+                  </div>
+                  {panelType === 'INTERNAL' && (
+                    <div>
+                      <Label htmlFor="edit-interviewerEmail">Interviewer Email <span className="text-red-500">*</span></Label>
+                      <p className="text-xs text-gray-400 mb-1">They&apos;ll receive a magic link to submit structured feedback when the date is confirmed.</p>
+                      <Input
+                        id="edit-interviewerEmail"
+                        type="email"
+                        value={interviewerEmail}
+                        onChange={(e) => { setInterviewerEmail(e.target.value); if (confirmationError) setConfirmationError(null) }}
+                        placeholder="interviewer@company.com"
+                        disabled={isCancelled}
+                        className={`mt-0.5 ${confirmationError?.interviewerEmail ? 'border-red-400' : ''}`}
+                      />
+                      {confirmationError?.interviewerEmail && (
+                        <p className="text-xs text-red-600 mt-1">{confirmationError.interviewerEmail}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

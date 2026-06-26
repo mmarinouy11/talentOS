@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { SettingsForm } from '@/components/app/SettingsForm'
 import { SettingsNav } from '@/components/app/SettingsNav'
+import { EmailHeaderImageSection } from '@/components/app/EmailHeaderImageSection'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -11,7 +12,12 @@ export default async function SettingsPage() {
   const user = session.user as { role?: string }
   if (user.role !== 'ADMIN') redirect('/positions')
 
-  const settings = await db.systemSettings.findMany({ orderBy: { key: 'asc' } })
+  const [settings, headerSetting] = await Promise.all([
+    db.systemSettings.findMany({ orderBy: { key: 'asc' } }),
+    db.systemSettings.findUnique({ where: { key: 'EMAIL_HEADER_IMAGE_URL' } }),
+  ])
+  const headerImageUrl = headerSetting?.value ?? ''
+
   return (
     <div className="space-y-6">
       <div>
@@ -27,6 +33,7 @@ export default async function SettingsPage() {
           description: s.description,
         }))}
       />
+      <EmailHeaderImageSection currentUrl={headerImageUrl} />
     </div>
   )
 }

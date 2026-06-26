@@ -132,14 +132,16 @@ export async function PATCH(
   // Strip pre-parsed client fields from rest so they don't double-write
   const { feedbackSummary: _fs, feedbackStrengths: _fst, feedbackConcerns: _fc, aiScore: _as, ...restClean } = rest
 
-  // Generate magic link when transitioning to SCHEDULED for technical/manager interviews with interviewer email
+  // Generate magic link when transitioning to SCHEDULED for internal technical/manager interviews
   const magicLinkFields: Record<string, unknown> = {}
+  const newIsInternal = rest.isInternal !== undefined ? rest.isInternal : existing.isInternal
   const interviewerEmailForLink = rest.interviewerEmail ?? existing.interviewerEmail
   const shouldSendMagicLink =
     newStatus === 'SCHEDULED' &&
     existing.status !== 'SCHEDULED' &&
     !existing.magicLinkToken &&
     interviewerEmailForLink &&
+    newIsInternal !== false &&
     (existing.stage === 'TECHNICAL_INTERVIEW' || existing.stage === 'MANAGER_INTERVIEW')
 
   if (shouldSendMagicLink) {

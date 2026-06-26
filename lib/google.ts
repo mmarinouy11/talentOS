@@ -34,3 +34,12 @@ export async function uploadFileToDrive(
     fileName: response.data.name!,
   }
 }
+
+export async function makeFilePublic(fileId: string): Promise<void> {
+  const drive = getDriveClient()
+  await drive.permissions.create({
+    fileId,
+    requestBody: { role: 'reader', type: 'anyone' },
+    supportsAllDrives: true,
+  })
+}

@@ -78,12 +78,13 @@ function SettingRow({ setting }: { setting: Setting }) {
 }
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {
-  if (settings.length === 0) {
+  const filtered = settings.filter((s) => s.key !== 'EMAIL_HEADER_IMAGE_URL')
+  if (filtered.length === 0) {
     return <p className="text-sm text-gray-400">No settings configured.</p>
   }
   return (
     <div className="space-y-4 max-w-2xl">
-      {settings.map((s) => (
+      {filtered.map((s) => (
         <SettingRow key={s.id} setting={s} />
       ))}
     </div>

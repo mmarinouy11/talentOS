@@ -24,15 +24,16 @@ function encodeSubject(subject: string): string {
 }
 
 function buildRawEmail({ from, to, subject, html }: { from: string; to: string; subject: string; html: string }): string {
+  const encodedBody = Buffer.from(html, 'utf-8').toString('base64')
   const raw = [
     `From: ${from}`,
     `To: ${to}`,
     `Subject: ${encodeSubject(subject)}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
-    'Content-Transfer-Encoding: quoted-printable',
+    'Content-Transfer-Encoding: base64',
     '',
-    html,
+    encodedBody,
   ].join('\r\n')
   return Buffer.from(raw).toString('base64url')
 }
@@ -105,6 +106,13 @@ export async function sendEmail({
   let errorMsg: string | undefined
   let from: string
 
+  // Prepend header image if configured
+  const headerSetting = await db.systemSettings.findUnique({ where: { key: 'EMAIL_HEADER_IMAGE_URL' } })
+  const headerImageUrl = headerSetting?.value || null
+  const finalHtml = headerImageUrl
+    ? `<img src="${headerImageUrl}" alt="" style="max-width:600px;width:100%;display:block;margin-bottom:16px;" />${html}`
+    : html
+
   const useGmail = !!userId && !!(await db.user.findUnique({
     where: { id: userId },
     select: { gmailRefreshToken: true },
@@ -112,10 +120,10 @@ export async function sendEmail({
 
   try {
     if (useGmail && userId) {
-      from = await sendEmailViaGmail(userId, { to, subject, html })
+      from = await sendEmailViaGmail(userId, { to, subject, html: finalHtml })
     } else {
       from = await getFromAddress()
-      await getResend().emails.send({ from, to, subject, html })
+      await getResend().emails.send({ from, to, subject, html: finalHtml })
     }
   } catch (err) {
     status = 'failed'
