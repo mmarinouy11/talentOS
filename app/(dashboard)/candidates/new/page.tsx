@@ -6,6 +6,7 @@ import { CandidateForm } from '@/components/app/CandidateForm'
 export default async function NewCandidatePage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
+  const currentUserId = (session.user as { id?: string }).id
 
   return (
     <div className="space-y-6">
@@ -17,7 +18,7 @@ export default async function NewCandidatePage() {
         </nav>
         <h1 className="text-2xl font-semibold text-gray-900">New Candidate</h1>
       </div>
-      <CandidateForm mode="create" />
+      <CandidateForm mode="create" currentUserId={currentUserId} />
     </div>
   )
 }

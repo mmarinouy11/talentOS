@@ -1,6 +1,8 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { sendEmail } from '@/lib/email'
+import { feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
 
 const submitSchema = z.object({
   overallScore: z.number().int().min(1).max(5),
@@ -59,6 +61,47 @@ export async function POST(
       },
     })
   })
+
+  // Send notification to candidate's recruiter
+  try {
+    const INTERVIEW_TYPE_LABELS: Record<string, string> = {
+      TECHNICAL_INTERVIEW: 'Technical Interview',
+      MANAGER_INTERVIEW: 'Manager Interview',
+    }
+    const cp = await db.candidatePosition.findUnique({
+      where: { id: interview.candidatePositionId },
+      include: {
+        candidate: { select: { firstName: true, lastName: true, recruiterId: true } },
+        position: { select: { title: true } },
+      },
+    })
+    if (cp?.candidate.recruiterId) {
+      const recruiter = await db.user.findUnique({
+        where: { id: cp.candidate.recruiterId },
+        select: { email: true, name: true },
+      })
+      if (recruiter) {
+        const scoreLabel = `${overallScore}/5 ${'★'.repeat(overallScore)}${'☆'.repeat(5 - overallScore)}`
+        const { subject, html } = feedbackSubmittedNotificationEmail({
+          recruiterName: recruiter.name ?? recruiter.email,
+          candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
+          positionTitle: cp.position.title,
+          interviewType: INTERVIEW_TYPE_LABELS[interview.stage] ?? interview.stage,
+          scoreLabel,
+        })
+        sendEmail({
+          to: recruiter.email,
+          subject,
+          html,
+          template: 'feedback_notification',
+          interviewId: interview.id,
+          candidatePositionId: interview.candidatePositionId,
+        }).catch((err) => console.error('[feedback submit] Failed to send notification:', err))
+      }
+    }
+  } catch (err) {
+    console.error('[feedback submit] Notification error:', err)
+  }
 
   return NextResponse.json({ ok: true })
 }

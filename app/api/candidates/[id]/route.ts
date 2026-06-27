@@ -23,6 +23,7 @@ const patchSchema = z.object({
   sourcedByUserId: z.string().optional().nullable(),
   sourcedByVendorId: z.string().optional().nullable(),
   sourcedByOther: z.string().optional().nullable(),
+  recruiterId: z.string().optional().nullable(),
 })
 
 export async function GET(
@@ -72,7 +73,7 @@ export async function PATCH(
   // Drop fields not in Candidate model
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
-  const candidate = await db.candidate.update({ where: { id }, data: rest })
+  const candidate = await db.candidate.update({ where: { id }, data: { ...rest } })
 
   return NextResponse.json(candidate)
 }

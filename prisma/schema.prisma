@@ -115,6 +115,7 @@ model User {
   candidatePositions    CandidatePosition[] @relation("RecruiterCandidatePositions")
   stageHistoryMoves     StageHistory[]
   sourcedCandidates     Candidate[]         @relation("CandidateSourcedByUser")
+  candidatesManaged     Candidate[]         @relation("CandidateRecruiter")
   decidedInterviews     Interview[]         @relation("InterviewDecidedBy")
   emailLogs             EmailLog[]
 }
@@ -236,6 +237,7 @@ model Candidate {
   sourcedByUserId       String?
   sourcedByVendorId     String?
   sourcedByOther        String?
+  recruiterId           String?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
   deletedAt             DateTime?
@@ -243,6 +245,7 @@ model Candidate {
   candidatePositions CandidatePosition[]
   sourcedByUser      User?               @relation("CandidateSourcedByUser", fields: [sourcedByUserId], references: [id])
   sourcedByVendor    Vendor?             @relation(fields: [sourcedByVendorId], references: [id])
+  recruiter          User?               @relation("CandidateRecruiter", fields: [recruiterId], references: [id])
   emailLogs          EmailLog[]
 }
 
