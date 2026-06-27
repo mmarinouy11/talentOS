@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { parseTextFeedback } from '@/lib/feedback-parser'
-import { sendEmail, sendEmailViaGmail } from '@/lib/email'
+import { sendEmail, sendEmailViaSystemGmail } from '@/lib/email'
 import { interviewerFeedbackInviteEmail, feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
 
 const patchSchema = z.object({
@@ -226,13 +226,13 @@ export async function PATCH(
       if (cp?.candidate.recruiterId) {
         const recruiter = await db.user.findUnique({
           where: { id: cp.candidate.recruiterId },
-          select: { id: true, email: true, name: true, gmailRefreshToken: true },
+          select: { id: true, email: true, name: true },
         })
-        if (recruiter?.gmailRefreshToken) {
+        if (recruiter) {
           const aiScore = (aiFields as Record<string, unknown>).aiScore as number | null
           const scoreLabel = aiScore ? `${aiScore}/5` : 'N/A'
           const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
-          const link = `${baseUrl}/positions/${cp.position.id}/candidates/${existing.candidatePositionId}`
+          const link = `${baseUrl}/positions/${cp.position.id}/candidates/${existing.candidatePositionId}?openInterview=${id}`
           const { subject, html } = feedbackSubmittedNotificationEmail({
             recruiterName: recruiter.name ?? recruiter.email,
             candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
@@ -241,10 +241,8 @@ export async function PATCH(
             scoreLabel,
             link,
           })
-          sendEmailViaGmail(recruiter.id, { to: recruiter.email, subject, html })
+          sendEmailViaSystemGmail({ to: recruiter.email, subject, html })
             .catch((err) => console.error('[interview PATCH] Failed to send feedback notification:', err))
-        } else {
-          console.log(`[feedback-notification] Skipped - recruiter ${recruiter?.id} has no Gmail connected`)
         }
       }
     } catch (err) {

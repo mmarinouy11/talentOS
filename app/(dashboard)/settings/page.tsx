@@ -4,17 +4,25 @@ import { redirect } from 'next/navigation'
 import { SettingsForm } from '@/components/app/SettingsForm'
 import { SettingsNav } from '@/components/app/SettingsNav'
 import { EmailHeaderImageSection } from '@/components/app/EmailHeaderImageSection'
+import { SystemGmailSection } from '@/components/app/SystemGmailSection'
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ systemGmail?: string }>
+}) {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
   const user = session.user as { role?: string }
   if (user.role !== 'ADMIN') redirect('/positions')
 
-  const [settings, headerSetting] = await Promise.all([
+  const { systemGmail } = await searchParams
+
+  const [settings, headerSetting, systemEmailAccount] = await Promise.all([
     db.systemSettings.findMany({ orderBy: { key: 'asc' } }),
     db.systemSettings.findUnique({ where: { key: 'EMAIL_HEADER_IMAGE_URL' } }),
+    db.systemEmailAccount.findUnique({ where: { purpose: 'system_notifications' } }),
   ])
   const headerImageUrl = headerSetting?.value ?? ''
 
@@ -34,6 +42,10 @@ export default async function SettingsPage() {
         }))}
       />
       <EmailHeaderImageSection currentUrl={headerImageUrl} />
+      <SystemGmailSection
+        connectedEmail={systemEmailAccount?.connectedEmail ?? null}
+        toast={systemGmail ?? null}
+      />
     </div>
   )
 }

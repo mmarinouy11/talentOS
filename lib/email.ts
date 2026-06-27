@@ -81,6 +81,60 @@ export async function sendEmailViaGmail(
   return from
 }
 
+async function getHeaderHtml(html: string): Promise<string> {
+  const headerSetting = await db.systemSettings.findUnique({ where: { key: 'EMAIL_HEADER_IMAGE_URL' } })
+  const headerImageUrl = headerSetting?.value || null
+  return headerImageUrl
+    ? `<img src="${headerImageUrl}" alt="" style="max-width:600px;width:100%;display:block;margin-bottom:16px;" />${html}`
+    : html
+}
+
+export async function sendEmailViaSystemGmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string
+  subject: string
+  html: string
+}): Promise<void> {
+  const account = await db.systemEmailAccount.findUnique({ where: { purpose: 'system_notifications' } })
+  if (!account?.refreshToken) {
+    console.log('[system-gmail] No system Gmail connected, skipping notification')
+    return
+  }
+
+  const finalHtml = await getHeaderHtml(html)
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_OAUTH_CLIENT_ID,
+    process.env.GMAIL_OAUTH_CLIENT_SECRET,
+    `${process.env.NEXTAUTH_URL}/api/auth/system-gmail/callback`,
+  )
+
+  oauth2Client.setCredentials({
+    access_token: account.accessToken,
+    refresh_token: account.refreshToken,
+    expiry_date: account.tokenExpiry?.getTime(),
+  })
+
+  oauth2Client.on('tokens', async (tokens) => {
+    await db.systemEmailAccount.update({
+      where: { purpose: 'system_notifications' },
+      data: {
+        accessToken: tokens.access_token ?? undefined,
+        tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+      },
+    })
+  })
+
+  const from = account.connectedEmail ?? 'me'
+  const raw = buildRawEmail({ from, to, subject, html: finalHtml })
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+  await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+}
+
 export async function sendEmail({
   to,
   subject,
@@ -107,11 +161,7 @@ export async function sendEmail({
   let from: string
 
   // Prepend header image if configured
-  const headerSetting = await db.systemSettings.findUnique({ where: { key: 'EMAIL_HEADER_IMAGE_URL' } })
-  const headerImageUrl = headerSetting?.value || null
-  const finalHtml = headerImageUrl
-    ? `<img src="${headerImageUrl}" alt="" style="max-width:600px;width:100%;display:block;margin-bottom:16px;" />${html}`
-    : html
+  const finalHtml = await getHeaderHtml(html)
 
   const useGmail = !!userId && !!(await db.user.findUnique({
     where: { id: userId },

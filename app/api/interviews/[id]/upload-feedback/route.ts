@@ -10,7 +10,7 @@ import { extractPdfText } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
 import { parseTextFeedback } from '@/lib/feedback-parser'
-import { sendEmailViaGmail } from '@/lib/email'
+import { sendEmailViaSystemGmail } from '@/lib/email'
 import { feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
 
 const execFileAsync = promisify(execFile)
@@ -208,13 +208,13 @@ export async function POST(
       if (cp?.candidate.recruiterId) {
         const recruiter = await db.user.findUnique({
           where: { id: cp.candidate.recruiterId },
-          select: { id: true, email: true, name: true, gmailRefreshToken: true },
+          select: { id: true, email: true, name: true },
         })
-        if (recruiter?.gmailRefreshToken) {
+        if (recruiter) {
           const aiScoreNum = typeof parsed.score === 'number' ? Math.min(5, Math.max(1, Math.round(parsed.score))) : null
           const scoreLabel = aiScoreNum ? `${aiScoreNum}/5` : 'N/A'
           const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
-          const link = `${baseUrl}/positions/${cp.position.id}/candidates/${interview.candidatePositionId}`
+          const link = `${baseUrl}/positions/${cp.position.id}/candidates/${interview.candidatePositionId}?openInterview=${id}`
           const { subject, html } = feedbackSubmittedNotificationEmail({
             recruiterName: recruiter.name ?? recruiter.email,
             candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
@@ -223,10 +223,8 @@ export async function POST(
             scoreLabel,
             link,
           })
-          sendEmailViaGmail(recruiter.id, { to: recruiter.email, subject, html })
+          sendEmailViaSystemGmail({ to: recruiter.email, subject, html })
             .catch((err) => console.error('[upload-feedback] Failed to send notification:', err))
-        } else {
-          console.log(`[feedback-notification] Skipped - recruiter ${recruiter?.id} has no Gmail connected`)
         }
       }
     } catch (notifErr) {

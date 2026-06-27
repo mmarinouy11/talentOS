@@ -381,3 +381,13 @@ model SystemSettings {
   description String?
   updatedAt   DateTime @updatedAt
 }
+
+model SystemEmailAccount {
+  id             String    @id @default(cuid())
+  purpose        String    @unique
+  connectedEmail String?
+  accessToken    String?   @db.Text
+  refreshToken   String?   @db.Text
+  tokenExpiry    DateTime?
+  updatedAt      DateTime  @updatedAt
+}

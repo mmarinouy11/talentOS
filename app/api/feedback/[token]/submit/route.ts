@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { sendEmailViaGmail } from '@/lib/email'
+import { sendEmailViaSystemGmail } from '@/lib/email'
 import { feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
 
 const submitSchema = z.object({
@@ -78,12 +78,12 @@ export async function POST(
     if (cp?.candidate.recruiterId) {
       const recruiter = await db.user.findUnique({
         where: { id: cp.candidate.recruiterId },
-        select: { id: true, email: true, name: true, gmailRefreshToken: true },
+        select: { id: true, email: true, name: true },
       })
-      if (recruiter?.gmailRefreshToken) {
+      if (recruiter) {
         const scoreLabel = `${overallScore}/5 ${'★'.repeat(overallScore)}${'☆'.repeat(5 - overallScore)}`
         const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
-        const link = `${baseUrl}/positions/${cp.position.id}/candidates/${interview.candidatePositionId}`
+        const link = `${baseUrl}/positions/${cp.position.id}/candidates/${interview.candidatePositionId}?openInterview=${interview.id}`
         const { subject, html } = feedbackSubmittedNotificationEmail({
           recruiterName: recruiter.name ?? recruiter.email,
           candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
@@ -92,10 +92,8 @@ export async function POST(
           scoreLabel,
           link,
         })
-        sendEmailViaGmail(recruiter.id, { to: recruiter.email, subject, html })
+        sendEmailViaSystemGmail({ to: recruiter.email, subject, html })
           .catch((err) => console.error('[feedback submit] Failed to send notification:', err))
-      } else {
-        console.log(`[feedback-notification] Skipped - recruiter ${recruiter?.id} has no Gmail connected`)
       }
     }
   } catch (err) {
