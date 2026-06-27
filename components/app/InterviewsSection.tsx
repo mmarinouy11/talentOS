@@ -1275,21 +1275,23 @@ function EditInterviewModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="decision">Decision</Label>
-              <select id="decision" value={decision} onChange={(e) => setDecision(e.target.value as InterviewDecision | '')} disabled={isCancelled} className={`${selectClass()} disabled:bg-gray-50 disabled:text-gray-400`}>
-                <option value="">— No decision yet —</option>
-                <option value="ADVANCE">Advance</option>
-                <option value="HOLD">Hold</option>
-                <option value="REJECT">Reject</option>
-              </select>
+          {currentInterview.status !== 'PENDING' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="decision">Decision</Label>
+                <select id="decision" value={decision} onChange={(e) => setDecision(e.target.value as InterviewDecision | '')} disabled={isCancelled} className={`${selectClass()} disabled:bg-gray-50 disabled:text-gray-400`}>
+                  <option value="">— No decision yet —</option>
+                  <option value="ADVANCE">Advance</option>
+                  <option value="HOLD">Hold</option>
+                  <option value="REJECT">Reject</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="decisionNotes">Decision Notes</Label>
+                <Input id="decisionNotes" value={decisionNotes} onChange={(e) => setDecisionNotes(e.target.value)} placeholder="Optional notes" disabled={isCancelled} className="mt-1" />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="decisionNotes">Decision Notes</Label>
-              <Input id="decisionNotes" value={decisionNotes} onChange={(e) => setDecisionNotes(e.target.value)} placeholder="Optional notes" disabled={isCancelled} className="mt-1" />
-            </div>
-          </div>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -1320,12 +1322,14 @@ export function InterviewsSection({
   candidateEmail,
   positionTitle,
   clientName,
+  initialOpenInterviewId,
 }: {
   candidatePositionId: string
   candidateName: string
   candidateEmail: string
   positionTitle: string
   clientName: string
+  initialOpenInterviewId?: string
 }) {
   const [interviews, setInterviews] = useState<Interview[]>([])
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
@@ -1339,12 +1343,19 @@ export function InterviewsSection({
         fetch(`/api/candidate-positions/${candidatePositionId}/interviews`),
         fetch('/api/profile'),
       ])
-      if (intRes.ok) setInterviews(await intRes.json())
+      if (intRes.ok) {
+        const data: Interview[] = await intRes.json()
+        setInterviews(data)
+        if (initialOpenInterviewId) {
+          const match = data.find((i) => i.id === initialOpenInterviewId)
+          if (match) setEditing(match)
+        }
+      }
       if (profileRes.ok) setUserProfile(await profileRes.json())
     } finally {
       setLoading(false)
     }
-  }, [candidatePositionId])
+  }, [candidatePositionId, initialOpenInterviewId])
 
   useEffect(() => { load() }, [load])
 

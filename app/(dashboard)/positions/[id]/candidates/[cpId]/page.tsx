@@ -12,13 +12,15 @@ import { InterviewsSection } from '@/components/app/InterviewsSection'
 
 export default async function CandidateInPositionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; cpId: string }>
+  searchParams: Promise<{ openInterview?: string }>
 }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
-  const { id: positionId, cpId } = await params
+  const [{ id: positionId, cpId }, { openInterview }] = await Promise.all([params, searchParams])
 
   const cp = await db.candidatePosition.findFirst({
     where: { id: cpId },
@@ -203,6 +205,7 @@ export default async function CandidateInPositionPage({
             candidateEmail={candidate.email}
             positionTitle={position.title}
             clientName={position.client}
+            initialOpenInterviewId={openInterview}
           />
 
           {cp.stageHistory.length > 0 && (
