@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { parseTextFeedback } from '@/lib/feedback-parser'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, sendEmailViaGmail } from '@/lib/email'
 import { interviewerFeedbackInviteEmail, feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
 
 const patchSchema = z.object({
@@ -220,32 +220,31 @@ export async function PATCH(
         where: { id: existing.candidatePositionId },
         include: {
           candidate: { select: { firstName: true, lastName: true, recruiterId: true } },
-          position: { select: { title: true } },
+          position: { select: { id: true, title: true } },
         },
       })
       if (cp?.candidate.recruiterId) {
         const recruiter = await db.user.findUnique({
           where: { id: cp.candidate.recruiterId },
-          select: { email: true, name: true },
+          select: { id: true, email: true, name: true, gmailRefreshToken: true },
         })
-        if (recruiter) {
+        if (recruiter?.gmailRefreshToken) {
           const aiScore = (aiFields as Record<string, unknown>).aiScore as number | null
           const scoreLabel = aiScore ? `${aiScore}/5` : 'N/A'
+          const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
+          const link = `${baseUrl}/positions/${cp.position.id}/candidates/${existing.candidatePositionId}`
           const { subject, html } = feedbackSubmittedNotificationEmail({
             recruiterName: recruiter.name ?? recruiter.email,
             candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
             positionTitle: cp.position.title,
             interviewType: INTERVIEW_TYPE_LABELS[existing.stage] ?? existing.stage,
             scoreLabel,
+            link,
           })
-          sendEmail({
-            to: recruiter.email,
-            subject,
-            html,
-            template: 'feedback_notification',
-            interviewId: id,
-            candidatePositionId: existing.candidatePositionId,
-          }).catch((err) => console.error('[interview PATCH] Failed to send feedback notification:', err))
+          sendEmailViaGmail(recruiter.id, { to: recruiter.email, subject, html })
+            .catch((err) => console.error('[interview PATCH] Failed to send feedback notification:', err))
+        } else {
+          console.log(`[feedback-notification] Skipped - recruiter ${recruiter?.id} has no Gmail connected`)
         }
       }
     } catch (err) {

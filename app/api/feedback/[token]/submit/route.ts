@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { sendEmail } from '@/lib/email'
+import { sendEmailViaGmail } from '@/lib/email'
 import { feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
 
 const submitSchema = z.object({
@@ -72,31 +72,30 @@ export async function POST(
       where: { id: interview.candidatePositionId },
       include: {
         candidate: { select: { firstName: true, lastName: true, recruiterId: true } },
-        position: { select: { title: true } },
+        position: { select: { id: true, title: true } },
       },
     })
     if (cp?.candidate.recruiterId) {
       const recruiter = await db.user.findUnique({
         where: { id: cp.candidate.recruiterId },
-        select: { email: true, name: true },
+        select: { id: true, email: true, name: true, gmailRefreshToken: true },
       })
-      if (recruiter) {
+      if (recruiter?.gmailRefreshToken) {
         const scoreLabel = `${overallScore}/5 ${'★'.repeat(overallScore)}${'☆'.repeat(5 - overallScore)}`
+        const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
+        const link = `${baseUrl}/positions/${cp.position.id}/candidates/${interview.candidatePositionId}`
         const { subject, html } = feedbackSubmittedNotificationEmail({
           recruiterName: recruiter.name ?? recruiter.email,
           candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
           positionTitle: cp.position.title,
           interviewType: INTERVIEW_TYPE_LABELS[interview.stage] ?? interview.stage,
           scoreLabel,
+          link,
         })
-        sendEmail({
-          to: recruiter.email,
-          subject,
-          html,
-          template: 'feedback_notification',
-          interviewId: interview.id,
-          candidatePositionId: interview.candidatePositionId,
-        }).catch((err) => console.error('[feedback submit] Failed to send notification:', err))
+        sendEmailViaGmail(recruiter.id, { to: recruiter.email, subject, html })
+          .catch((err) => console.error('[feedback submit] Failed to send notification:', err))
+      } else {
+        console.log(`[feedback-notification] Skipped - recruiter ${recruiter?.id} has no Gmail connected`)
       }
     }
   } catch (err) {

@@ -23,7 +23,7 @@ const patchSchema = z.object({
   sourcedByUserId: z.string().optional().nullable(),
   sourcedByVendorId: z.string().optional().nullable(),
   sourcedByOther: z.string().optional().nullable(),
-  recruiterId: z.string().optional().nullable(),
+  recruiterId: z.string().optional(),
 })
 
 export async function GET(

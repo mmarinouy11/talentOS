@@ -142,21 +142,20 @@ export function feedbackSubmittedNotificationEmail({
   positionTitle,
   interviewType,
   scoreLabel,
+  link,
 }: {
   recruiterName: string
   candidateName: string
   positionTitle: string
   interviewType: string
   scoreLabel: string
+  link: string
 }): { subject: string; html: string } {
-  const subject = `Feedback submitted: ${candidateName} — ${interviewType}`
+  const subject = `Feedback received: ${candidateName} - ${interviewType} - ${positionTitle}`
   const html = `<p>Hi ${recruiterName},</p>
-<p>New feedback has been submitted for <strong>${candidateName}</strong> (${positionTitle}).</p>
-<table style="border-collapse:collapse;margin-top:8px;">
-  <tr><td style="padding:2px 12px 2px 0;color:#6b7280;font-size:14px;">Interview</td><td style="padding:2px 0;font-size:14px;font-weight:600;">${interviewType}</td></tr>
-  <tr><td style="padding:2px 12px 2px 0;color:#6b7280;font-size:14px;">Score</td><td style="padding:2px 0;font-size:14px;font-weight:600;">${scoreLabel}</td></tr>
-</table>
-<p style="margin-top:16px;">Log in to TalentOS to view the full feedback and make a decision.</p>
+<p>New feedback has been submitted for <strong>${candidateName}</strong> (${interviewType} - ${positionTitle}).</p>
+<p>${scoreLabel}</p>
+<p><a href="${link}" style="color:#1d4ed8;">View full feedback in TalentOS</a></p>
 <p>Best,<br/>${COMPANY_NAME}</p>`
   return { subject, html }
 }

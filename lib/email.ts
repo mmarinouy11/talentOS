@@ -38,7 +38,7 @@ function buildRawEmail({ from, to, subject, html }: { from: string; to: string; 
   return Buffer.from(raw).toString('base64url')
 }
 
-async function sendEmailViaGmail(
+export async function sendEmailViaGmail(
   userId: string,
   { to, subject, html }: { to: string; subject: string; html: string },
 ): Promise<string> {

@@ -10,7 +10,7 @@ import { extractPdfText } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
 import { parseTextFeedback } from '@/lib/feedback-parser'
-import { sendEmail } from '@/lib/email'
+import { sendEmailViaGmail } from '@/lib/email'
 import { feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
 
 const execFileAsync = promisify(execFile)
@@ -202,32 +202,31 @@ export async function POST(
         where: { id: interview.candidatePositionId },
         include: {
           candidate: { select: { firstName: true, lastName: true, recruiterId: true } },
-          position: { select: { title: true } },
+          position: { select: { id: true, title: true } },
         },
       })
       if (cp?.candidate.recruiterId) {
         const recruiter = await db.user.findUnique({
           where: { id: cp.candidate.recruiterId },
-          select: { email: true, name: true },
+          select: { id: true, email: true, name: true, gmailRefreshToken: true },
         })
-        if (recruiter) {
+        if (recruiter?.gmailRefreshToken) {
           const aiScoreNum = typeof parsed.score === 'number' ? Math.min(5, Math.max(1, Math.round(parsed.score))) : null
           const scoreLabel = aiScoreNum ? `${aiScoreNum}/5` : 'N/A'
+          const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
+          const link = `${baseUrl}/positions/${cp.position.id}/candidates/${interview.candidatePositionId}`
           const { subject, html } = feedbackSubmittedNotificationEmail({
             recruiterName: recruiter.name ?? recruiter.email,
             candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
             positionTitle: cp.position.title,
             interviewType: INTERVIEW_TYPE_LABELS[interview.stage] ?? interview.stage,
             scoreLabel,
+            link,
           })
-          sendEmail({
-            to: recruiter.email,
-            subject,
-            html,
-            template: 'feedback_notification',
-            interviewId: id,
-            candidatePositionId: interview.candidatePositionId,
-          }).catch((err) => console.error('[upload-feedback] Failed to send notification:', err))
+          sendEmailViaGmail(recruiter.id, { to: recruiter.email, subject, html })
+            .catch((err) => console.error('[upload-feedback] Failed to send notification:', err))
+        } else {
+          console.log(`[feedback-notification] Skipped - recruiter ${recruiter?.id} has no Gmail connected`)
         }
       }
     } catch (notifErr) {

@@ -101,12 +101,14 @@ export async function POST(request: Request) {
 
   const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
   const sessionUser = session.user as { id?: string }
+  const recruiterId = rest.recruiterId ?? sessionUser.id
+  if (!recruiterId) return NextResponse.json({ error: 'recruiterId is required' }, { status: 400 })
   const candidate = await db.candidate.create({
     data: {
       ...rest,
       cvDriveId: rest.cvDriveId ?? null,
       cvOriginalName: rest.cvOriginalName ?? null,
-      recruiterId: rest.recruiterId ?? sessionUser.id ?? null,
+      recruiterId,
     },
   })
 

@@ -1107,11 +1107,26 @@ function EditInterviewModal({
               Calendar link: <span className="font-medium">{currentInterview.calendarLinkUsed}</span>
             </div>
           ) : currentInterview.proposedSlots.length > 0 ? (
-            <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600">
-              <span className="font-medium text-gray-700">Proposed slots:</span>{' '}
-              {currentInterview.proposedSlots
-                .map((s) => new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))
-                .join(' · ')}
+            <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600 space-y-1.5">
+              <p className="font-medium text-gray-700 text-xs">Proposed slots — click to set confirmed date:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {currentInterview.proposedSlots.map((s) => {
+                  const d = new Date(s)
+                  const pad = (n: number) => String(n).padStart(2, '0')
+                  const localVal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+                  const label = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setScheduledAt(localVal)}
+                      className="px-2.5 py-1 rounded-full border border-gray-300 bg-white text-xs text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-colors cursor-pointer"
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           ) : null}
 
@@ -1199,7 +1214,7 @@ function EditInterviewModal({
             </div>
           )}
 
-          {!isCancelled && (
+          {!isCancelled && currentInterview.status !== 'PENDING' && (
             <FeedbackPdfUpload
               interviewId={currentInterview.id}
               existingPdfUrl={currentInterview.feedbackPdfUrl}
@@ -1210,7 +1225,7 @@ function EditInterviewModal({
             />
           )}
 
-          {(currentInterview.feedbackSummary || previewResult) && currentInterview.feedbackParseMethod !== 'interviewer_form' && (
+          {currentInterview.status !== 'PENDING' && (currentInterview.feedbackSummary || previewResult) && currentInterview.feedbackParseMethod !== 'interviewer_form' && (
             <>
               <FeedbackParseResult
                 summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
@@ -1232,31 +1247,33 @@ function EditInterviewModal({
             </>
           )}
 
-          <div>
-            <div className="flex items-center justify-between mb-0.5">
-              <Label htmlFor="feedbackText">Feedback Notes</Label>
-              {feedbackText.trim() && !isCancelled && (
-                <button
-                  type="button"
-                  onClick={parseManual}
-                  disabled={parsing}
-                  className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-0.5 transition-colors disabled:opacity-50"
-                >
-                  {parsing ? 'Parsing…' : '🤖 Parse'}
-                </button>
-              )}
+          {currentInterview.status !== 'PENDING' && (
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <Label htmlFor="feedbackText">Feedback Notes</Label>
+                {feedbackText.trim() && !isCancelled && (
+                  <button
+                    type="button"
+                    onClick={parseManual}
+                    disabled={parsing}
+                    className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-0.5 transition-colors disabled:opacity-50"
+                  >
+                    {parsing ? 'Parsing…' : '🤖 Parse'}
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mb-1">Adding feedback will mark this interview as Completed. Upload a PDF above to auto-fill.</p>
+              <textarea
+                id="feedbackText"
+                value={feedbackText}
+                onChange={(e) => { setFeedbackText(e.target.value); if (previewResult) setPreviewResult(null) }}
+                rows={4}
+                disabled={isCancelled}
+                className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
+                placeholder="Interviewer notes…"
+              />
             </div>
-            <p className="text-xs text-gray-400 mb-1">Adding feedback will mark this interview as Completed. Upload a PDF above to auto-fill.</p>
-            <textarea
-              id="feedbackText"
-              value={feedbackText}
-              onChange={(e) => { setFeedbackText(e.target.value); if (previewResult) setPreviewResult(null) }}
-              rows={4}
-              disabled={isCancelled}
-              className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
-              placeholder="Interviewer notes…"
-            />
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
