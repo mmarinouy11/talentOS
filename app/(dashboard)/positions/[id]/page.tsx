@@ -50,6 +50,7 @@ export default async function PositionDetailPage({
         where: { candidate: { deletedAt: null } },
         include: {
           candidate: { select: { id: true, firstName: true, lastName: true, email: true, seniority: true, minimumCompensation: true } },
+          interviews: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
         },
         orderBy: { createdAt: 'desc' },
       },
@@ -226,6 +227,7 @@ export default async function PositionDetailPage({
           id: cp.id,
           stage: cp.stage,
           fitScore: cp.fitScore,
+          latestInterviewStatus: cp.interviews[0]?.status ?? null,
           compensationOutOfRange:
             cp.candidate.minimumCompensation != null && position.internalCostBudget != null
               ? cp.candidate.minimumCompensation > hourlyToMonthly(position.internalCostBudget, hoursBaseline)

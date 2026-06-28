@@ -1,4 +1,5 @@
 const COMPANY_NAME = 'Tenarai'
+const SIGNATURE_NAME = 'Tenarai LATAM'
 
 export const DEFAULT_SCHEDULING_TEMPLATE = `<p>Hi {{candidateName}},</p>
 <p>Thank you for your interest in the <strong>{{positionTitle}}</strong> role at <strong>{{clientName}}</strong>. We'd love to schedule a screening call with you.</p>
@@ -132,7 +133,7 @@ export function interviewerFeedbackInviteEmail({
 <p>Please share your feedback using the link below. It only takes a few minutes and will help us make the best decision:</p>
 <p><a href="${feedbackUrl}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Submit Feedback</a></p>
 <p>This link is valid for 14 days and can only be used once.</p>
-<p>Best,<br/>${recruiterName} · ${COMPANY_NAME}</p>`
+<p>Best,<br/>${recruiterName} · ${SIGNATURE_NAME}</p>`
   return { subject, html }
 }
 
@@ -155,8 +156,8 @@ export function feedbackSubmittedNotificationEmail({
   const html = `<p>Hi ${recruiterName},</p>
 <p>New feedback has been submitted for <strong>${candidateName}</strong> (${interviewType} - ${positionTitle}).</p>
 <p>${scoreLabel}</p>
-<p><a href="${link}" style="color:#1d4ed8;">View full feedback in TalentOS</a></p>
-<p>Best,<br/>${COMPANY_NAME}</p>`
+<p><a href="${link}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">View Full Feedback</a></p>
+<p>Best,<br/>${SIGNATURE_NAME}</p>`
   return { subject, html }
 }
 

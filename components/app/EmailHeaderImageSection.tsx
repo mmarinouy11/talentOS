@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
+function toPreviewUrl(url: string): string {
+  const match = url.match(/[?&]id=([^&]+)/)
+  if (match) return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w600`
+  return url
+}
+
 export function EmailHeaderImageSection({ currentUrl }: { currentUrl: string }) {
   const [url, setUrl] = useState(currentUrl)
   const [uploading, setUploading] = useState(false)
@@ -61,7 +67,7 @@ export function EmailHeaderImageSection({ currentUrl }: { currentUrl: string }) 
       {url ? (
         <div className="space-y-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="Email header preview" className="max-h-24 rounded border border-gray-200 object-contain" />
+          <img src={toPreviewUrl(url)} alt="Email header preview" className="max-h-24 rounded border border-gray-200 object-contain" />
           <div className="flex gap-2">
             <label htmlFor="header-image-upload" className="cursor-pointer">
               <span className={`inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>

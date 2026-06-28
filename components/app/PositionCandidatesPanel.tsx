@@ -75,10 +75,29 @@ function Spinner() {
   )
 }
 
+type InterviewStatus = 'PENDING' | 'AWAITING_SCHEDULE' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
+
+const ROUND_STATUS_COLORS: Record<InterviewStatus, string> = {
+  PENDING: 'bg-amber-100 text-amber-700',
+  AWAITING_SCHEDULE: 'bg-amber-100 text-amber-700',
+  SCHEDULED: 'bg-blue-100 text-blue-700',
+  COMPLETED: 'bg-green-100 text-green-700',
+  CANCELLED: 'bg-red-100 text-red-700',
+}
+
+const ROUND_STATUS_LABELS: Record<InterviewStatus, string> = {
+  PENDING: 'Pending',
+  AWAITING_SCHEDULE: 'Awaiting Schedule',
+  SCHEDULED: 'Scheduled',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+}
+
 interface CandidatePosition {
   id: string
   stage: Stage
   fitScore: number | null
+  latestInterviewStatus?: string | null
   compensationOutOfRange?: boolean
   candidate: {
     id: string
@@ -215,6 +234,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
               {sh('Email', 'email')}
               {sh('Seniority', 'seniority')}
               {sh('Stage', 'stage')}
+              <th className="px-4 py-3 text-left font-medium text-gray-600">Round Status</th>
               {sh('Fit', 'fitScore', 'text-right')}
               <th className="px-4 py-3" />
             </tr>
@@ -236,6 +256,15 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
                   <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                     {STAGE_LABELS[cp.stage]}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {cp.latestInterviewStatus ? (
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROUND_STATUS_COLORS[cp.latestInterviewStatus as InterviewStatus] ?? 'bg-gray-100 text-gray-700'}`}>
+                      {ROUND_STATUS_LABELS[cp.latestInterviewStatus as InterviewStatus] ?? cp.latestInterviewStatus}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
                 <td className="px-4 py-3 text-right">
