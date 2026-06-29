@@ -13,6 +13,7 @@ export const COUNTRY_TIMEZONE_MAP: Record<string, string> = {
   'Ecuador': 'America/Guayaquil',
   'Venezuela': 'America/Caracas',
   'India': 'Asia/Kolkata',
+  'United States': 'America/New_York',
 }
 
 // Curated timezone list for recruiter selection
@@ -28,7 +29,8 @@ export const RECRUITER_TIMEZONES: { value: string; label: string }[] = [
   { value: 'America/Asuncion', label: 'Asunción (PYT)' },
   { value: 'America/Guayaquil', label: 'Guayaquil (ECT)' },
   { value: 'America/Caracas', label: 'Caracas (VET)' },
-  { value: 'America/New_York', label: 'New York (ET)' },
+  { value: 'America/New_York', label: 'New York / Eastern (ET)' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles / Pacific (PT)' },
   { value: 'Europe/Madrid', label: 'Madrid (CET)' },
   { value: 'Asia/Kolkata', label: 'Mumbai / India (IST)' },
   { value: 'UTC', label: 'UTC' },

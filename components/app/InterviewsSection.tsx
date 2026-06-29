@@ -1036,6 +1036,7 @@ function EditInterviewModal({
     currentInterview.stage === 'SCREENING' &&
     (currentInterview.status === 'PENDING' || currentInterview.status === 'AWAITING_SCHEDULE')
   const isCancelled = currentInterview.status === 'CANCELLED'
+  const canShowFeedback = currentInterview.status === 'SCHEDULED' || currentInterview.status === 'COMPLETED'
 
   // Rejection email preview
   if (postSaveFlow === 'rejection-email') {
@@ -1222,7 +1223,7 @@ function EditInterviewModal({
             </div>
           )}
 
-          {!isCancelled && currentInterview.status !== 'PENDING' && (
+          {!isCancelled && canShowFeedback && (
             <FeedbackPdfUpload
               interviewId={currentInterview.id}
               existingPdfUrl={currentInterview.feedbackPdfUrl}
@@ -1233,7 +1234,7 @@ function EditInterviewModal({
             />
           )}
 
-          {currentInterview.status !== 'PENDING' && (currentInterview.feedbackSummary || previewResult) && currentInterview.feedbackParseMethod !== 'interviewer_form' && (
+          {canShowFeedback && (currentInterview.feedbackSummary || previewResult) && currentInterview.feedbackParseMethod !== 'interviewer_form' && (
             <>
               <FeedbackParseResult
                 summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
@@ -1255,7 +1256,7 @@ function EditInterviewModal({
             </>
           )}
 
-          {currentInterview.status !== 'PENDING' && (
+          {canShowFeedback && (
             <div>
               <div className="flex items-center justify-between mb-0.5">
                 <Label htmlFor="feedbackText">Feedback Notes</Label>
@@ -1283,7 +1284,7 @@ function EditInterviewModal({
             </div>
           )}
 
-          {currentInterview.status !== 'PENDING' && (
+          {canShowFeedback && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="decision">Decision</Label>
