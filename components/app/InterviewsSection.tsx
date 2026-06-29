@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -503,7 +504,14 @@ function GenericEmailPreviewModal({
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+        {error && (
+          <p className="text-sm text-red-600 mt-3">
+            {error}
+            {error.toLowerCase().includes('gmail') && (
+              <> — <Link href="/profile" className="underline font-medium hover:text-red-800">Go to Profile to connect</Link></>
+            )}
+          </p>
+        )}
 
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>

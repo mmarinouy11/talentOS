@@ -1,20 +1,5 @@
-import { Resend } from 'resend'
 import { db } from '@/lib/db'
 import { google } from 'googleapis'
-
-let _resend: Resend | null = null
-
-function getResend(): Resend {
-  if (!_resend) {
-    _resend = new Resend(process.env.RESEND_API_KEY)
-  }
-  return _resend
-}
-
-async function getFromAddress(): Promise<string> {
-  const setting = await db.systemSettings.findUnique({ where: { key: 'SENDER_EMAIL' } })
-  return setting?.value ?? 'noreply@example.com'
-}
 
 function encodeSubject(subject: string): string {
   if (/[^\x00-\x7F]/.test(subject)) {
@@ -61,7 +46,6 @@ export async function sendEmailViaGmail(
     expiry_date: user.gmailTokenExpiry?.getTime(),
   })
 
-  // Auto-refresh token if needed and persist the new tokens
   oauth2Client.on('tokens', async (tokens) => {
     await db.user.update({
       where: { id: userId },
@@ -155,47 +139,35 @@ export async function sendEmail({
   interviewId?: string
   sentById?: string
   userId?: string
-}): Promise<void> {
-  let status = 'sent'
-  let errorMsg: string | undefined
-  let from: string
-
-  // Prepend header image if configured
-  const finalHtml = await getHeaderHtml(html)
-
-  const useGmail = !!userId && !!(await db.user.findUnique({
-    where: { id: userId },
-    select: { gmailRefreshToken: true },
-  }))?.gmailRefreshToken
-
-  try {
-    if (useGmail && userId) {
-      from = await sendEmailViaGmail(userId, { to, subject, html: finalHtml })
-    } else {
-      from = await getFromAddress()
-      await getResend().emails.send({ from, to, subject, html: finalHtml })
-    }
-  } catch (err) {
-    status = 'failed'
-    errorMsg = err instanceof Error ? err.message : String(err)
-    from = ''
+}): Promise<{ success: boolean; error?: string }> {
+  if (!userId) {
+    return { success: false, error: 'No sender specified — a Gmail account is required to send emails.' }
   }
 
-  await db.emailLog.create({
-    data: {
-      to,
-      subject,
-      template,
-      status,
-      errorMsg,
-      candidateId,
-      candidatePositionId,
-      interviewId,
-      sentById,
-    },
-  })
+  const user = await db.user.findUnique({ where: { id: userId }, select: { gmailRefreshToken: true } })
+  if (!user?.gmailRefreshToken) {
+    await db.emailLog.create({
+      data: { to, subject, template, status: 'failed', errorMsg: 'Gmail not connected', candidateId, candidatePositionId, interviewId, sentById },
+    })
+    return {
+      success: false,
+      error: 'This recruiter has not connected a Gmail account. Connect Gmail in Profile settings to send emails.',
+    }
+  }
 
-  if (status === 'failed') {
-    throw new Error(errorMsg)
+  const finalHtml = await getHeaderHtml(html)
+
+  try {
+    await sendEmailViaGmail(userId, { to, subject, html: finalHtml })
+    await db.emailLog.create({
+      data: { to, subject, template, status: 'sent', candidateId, candidatePositionId, interviewId, sentById },
+    })
+    return { success: true }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    await db.emailLog.create({
+      data: { to, subject, template, status: 'failed', errorMsg, candidateId, candidatePositionId, interviewId, sentById },
+    })
+    return { success: false, error: errorMsg }
   }
 }

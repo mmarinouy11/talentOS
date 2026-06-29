@@ -178,14 +178,15 @@ export async function PATCH(
         feedbackUrl,
         recruiterName: recruiter?.name ?? 'The Recruiting Team',
       })
-      sendEmail({
+      void sendEmail({
         to: interviewerEmailForLink!,
         subject,
         html,
         template: 'interviewer_invite',
         userId: (session.user as { id?: string }).id,
         interviewId: id,
-      }).catch((err) => console.error('[interview PATCH] Failed to send magic link email:', err))
+      }).then((r) => { if (!r.success) console.error('[interview PATCH] Failed to send magic link email:', r.error) })
+        .catch((err) => console.error('[interview PATCH] Unexpected error sending magic link email:', err))
     }
   }
 

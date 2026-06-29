@@ -58,15 +58,15 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  try {
-    await sendEmail({
-      to: d.to,
-      subject: email.subject,
-      html: email.html,
-      template: `test:${d.template}`,
-    })
-    return NextResponse.json({ ok: true, subject: email.subject })
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Send failed' }, { status: 500 })
+  const result = await sendEmail({
+    to: d.to,
+    subject: email.subject,
+    html: email.html,
+    template: `test:${d.template}`,
+    userId: (session.user as { id?: string }).id,
+  })
+  if (!result.success) {
+    return NextResponse.json({ error: result.error ?? 'Send failed' }, { status: 500 })
   }
+  return NextResponse.json({ ok: true, subject: email.subject })
 }

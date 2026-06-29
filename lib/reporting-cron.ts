@@ -47,12 +47,13 @@ export function startReportingCron() {
       try {
         const html = buildReportEmailHtml(position)
         for (const email of position.reportingEmails) {
-          await sendEmail({
+          const result = await sendEmail({
             to: email,
             subject: `TalentOS Update: ${position.title} (${position.client})`,
             html,
             template: 'position-report',
           })
+          if (!result.success) throw new Error(result.error)
         }
       } catch (err) {
         console.error(`[reporting-cron] Failed for position ${position.id}:`, err)

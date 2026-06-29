@@ -90,20 +90,19 @@ export async function POST(
   }
 
   const recruiterId = recruiter.id
-  try {
-    await sendEmail({
-      to: candidate.email,
-      subject,
-      html,
-      template: 'scheduling_request',
-      candidateId: candidate.id,
-      candidatePositionId: cp.id,
-      interviewId: interview.id,
-      sentById: (session.user as { id?: string }).id,
-      userId: recruiterId,
-    })
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Send failed' }, { status: 500 })
+  const sendResult = await sendEmail({
+    to: candidate.email,
+    subject,
+    html,
+    template: 'scheduling_request',
+    candidateId: candidate.id,
+    candidatePositionId: cp.id,
+    interviewId: interview.id,
+    sentById: (session.user as { id?: string }).id,
+    userId: recruiterId,
+  })
+  if (!sendResult.success) {
+    return NextResponse.json({ error: sendResult.error ?? 'Send failed' }, { status: 500 })
   }
 
   const updated = await db.interview.update({
