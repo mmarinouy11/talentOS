@@ -161,6 +161,20 @@ export function feedbackSubmittedNotificationEmail({
   return { subject, html }
 }
 
+export function userInvitationEmail(params: {
+  userName: string
+  inviteLink: string
+}): { subject: string; html: string } {
+  return {
+    subject: `You've been invited to TalentOS`,
+    html: `<p>Hi ${params.userName},</p>
+<p>You've been invited to join TalentOS. Click below to set your password and get started:</p>
+<p><a href="${params.inviteLink}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">Set Your Password</a></p>
+<p>This link is valid for 14 days.</p>
+<p>Best,<br/>${SIGNATURE_NAME}</p>`,
+  }
+}
+
 export function advanceNotificationEmail({
   candidateName,
   positionTitle,

@@ -11,10 +11,11 @@ export default async function UsersSettingsPage() {
   const user = session.user as { role?: string }
   if (user.role !== 'ADMIN') redirect('/positions')
 
-  const users = await db.user.findMany({
-    select: { id: true, name: true, email: true, role: true, active: true },
+  const rawUsers = await db.user.findMany({
+    select: { id: true, name: true, email: true, role: true, active: true, passwordHash: true },
     orderBy: { name: 'asc' },
   })
+  const users = rawUsers.map(({ passwordHash, ...u }) => ({ ...u, pendingInvitation: passwordHash === null }))
 
   return (
     <div className="space-y-6">

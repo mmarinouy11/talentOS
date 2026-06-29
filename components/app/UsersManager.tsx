@@ -13,6 +13,7 @@ interface UserRow {
   email: string
   role: Role
   active: boolean
+  pendingInvitation?: boolean
 }
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -38,7 +39,6 @@ function UserForm({ user, onClose, onSaved }: UserFormProps) {
   const [email, setEmail] = useState(user?.email ?? '')
   const [role, setRole] = useState<Role>(user?.role ?? 'RECRUITER')
   const [active, setActive] = useState(user?.active ?? true)
-  const [password, setPassword] = useState('')
   const [showReset, setShowReset] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
@@ -66,10 +66,10 @@ function UserForm({ user, onClose, onSaved }: UserFormProps) {
         const res = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, role, password }),
+          body: JSON.stringify({ name, email, role }),
         })
         const data = await res.json()
-        if (!res.ok) { setError(data.error ?? 'Create failed'); return }
+        if (!res.ok) { setError(typeof data.error === 'string' ? data.error : 'Create failed'); return }
         onSaved(data)
       }
       onClose()
@@ -131,18 +131,9 @@ function UserForm({ user, onClose, onSaved }: UserFormProps) {
           </div>
 
           {!isEdit && (
-            <div>
-              <Label htmlFor="u-password">Password</Label>
-              <Input
-                id="u-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="mt-1"
-              />
-            </div>
+            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              An invitation email will be sent to this address so they can set their own password.
+            </p>
           )}
 
           {isEdit && (
@@ -204,6 +195,8 @@ export function UsersManager({ initialUsers }: { initialUsers: UserRow[] }) {
   const [users, setUsers] = useState(initialUsers)
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<UserRow | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [resendMsg, setResendMsg] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
 
   function handleSaved(updated: UserRow) {
     setUsers((prev) => {
@@ -217,6 +210,18 @@ export function UsersManager({ initialUsers }: { initialUsers: UserRow[] }) {
         (a.name ?? a.email).localeCompare(b.name ?? b.email)
       )
     })
+  }
+
+  async function handleResendInvitation(u: UserRow) {
+    setResendingId(u.id)
+    setResendMsg(null)
+    try {
+      const res = await fetch(`/api/users/${u.id}/resend-invitation`, { method: 'POST' })
+      const data = await res.json()
+      setResendMsg({ id: u.id, msg: res.ok ? 'Invitation resent!' : (data.error ?? 'Failed'), ok: res.ok })
+    } finally {
+      setResendingId(null)
+    }
   }
 
   return (
@@ -243,14 +248,33 @@ export function UsersManager({ initialUsers }: { initialUsers: UserRow[] }) {
                 <td className="px-4 py-3 text-gray-600">{u.email}</td>
                 <td className="px-4 py-3 text-gray-600">{ROLE_LABELS[u.role]}</td>
                 <td className="px-4 py-3">
-                  {u.active ? (
+                  {u.pendingInvitation ? (
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Invite Pending</span>
+                  ) : u.active ? (
                     <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Active</span>
                   ) : (
                     <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Inactive</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button variant="ghost" size="sm" onClick={() => setEditing(u)}>Edit</Button>
+                  <div className="flex items-center justify-end gap-2">
+                    {u.pendingInvitation && (
+                      <div className="flex items-center gap-2">
+                        {resendMsg?.id === u.id && (
+                          <span className={`text-xs ${resendMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{resendMsg.msg}</span>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleResendInvitation(u)}
+                          disabled={resendingId === u.id}
+                        >
+                          {resendingId === u.id ? 'Sending…' : 'Resend Invite'}
+                        </Button>
+                      </div>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(u)}>Edit</Button>
+                  </div>
                 </td>
               </tr>
             ))}
