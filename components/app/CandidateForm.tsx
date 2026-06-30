@@ -101,7 +101,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
   })
 
   useEffect(() => {
-    fetch('/api/users').then((r) => r.json()).then(setUsers).catch(() => {})
+    fetch('/api/users/options').then((r) => r.json()).then(setUsers).catch(() => {})
     fetch('/api/vendors?active=true').then((r) => r.json()).then(setVendors).catch(() => {})
   }, [])
 
