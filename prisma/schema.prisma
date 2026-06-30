@@ -159,17 +159,31 @@ model VerificationToken {
 }
 
 model Vendor {
-  id        String   @id @default(cuid())
-  name      String
-  pocName   String?
-  pocEmail  String?
-  phone     String?
-  notes     String?  @db.Text
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  pocName     String?
+  pocEmail    String?
+  phone       String?
+  notes       String?  @db.Text
+  active      Boolean  @default(true)
+  portalToken String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  candidates Candidate[]
+  candidates      Candidate[]
+  positionVendors PositionVendor[]
+}
+
+model PositionVendor {
+  id         String   @id @default(cuid())
+  positionId String
+  vendorId   String
+  assignedAt DateTime @default(now())
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  vendor   Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([positionId, vendorId])
 }
 
 model Position {
@@ -212,6 +226,7 @@ model Position {
 
   recruiter          User                @relation("RecruiterPositions", fields: [recruiterId], references: [id])
   candidatePositions CandidatePosition[]
+  positionVendors    PositionVendor[]
 }
 
 model Candidate {

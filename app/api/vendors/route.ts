@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { randomBytes } from 'crypto'
 
 const vendorSchema = z.object({
   name: z.string().min(1),
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const vendor = await db.vendor.create({ data: parsed.data })
+  const portalToken = randomBytes(32).toString('hex')
+  const vendor = await db.vendor.create({ data: { ...parsed.data, portalToken } })
   return NextResponse.json(vendor, { status: 201 })
 }

@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { VendorForm } from '@/components/app/VendorForm'
+import { VendorPortalLink } from '@/components/app/VendorPortalLink'
 
 export default async function EditVendorPage({
   params,
@@ -28,6 +29,13 @@ export default async function EditVendorPage({
         </nav>
         <h1 className="text-2xl font-semibold text-gray-900">Edit Vendor</h1>
       </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 max-w-2xl space-y-2">
+        <p className="text-sm font-medium text-gray-700">Vendor Portal Link</p>
+        <p className="text-xs text-gray-500">Share this link with the vendor so they can submit candidates directly.</p>
+        <VendorPortalLink vendorId={vendor.id} initialToken={vendor.portalToken} />
+      </div>
+
       <VendorForm
         mode="edit"
         defaultValues={{

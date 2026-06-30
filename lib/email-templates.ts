@@ -197,3 +197,41 @@ export function advanceNotificationEmail({
   })
   return { subject, html }
 }
+
+
+export function vendorPositionAssignedEmail(params: {
+  vendorContactName: string
+  positionTitle: string
+  client: string
+  portalLink: string
+}): { subject: string; html: string } {
+  return {
+    subject: `New position available: ${params.positionTitle}`,
+    html: `
+      <p>Hi ${params.vendorContactName},</p>
+      <p>You've been granted access to submit candidates for a new position:
+      <strong>${params.positionTitle}</strong> (${params.client}).</p>
+      <p><a href="${params.portalLink}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Position &amp; Submit Candidates</a></p>
+      <p>Best,<br/>${SIGNATURE_NAME}</p>
+    `,
+  }
+}
+
+export function vendorCandidateSubmittedEmail(params: {
+  recruiterName: string
+  candidateName: string
+  positionTitle: string
+  vendorName: string
+  link: string
+}): { subject: string; html: string } {
+  return {
+    subject: `New candidate from ${params.vendorName}: ${params.candidateName} - ${params.positionTitle}`,
+    html: `
+      <p>Hi ${params.recruiterName},</p>
+      <p><strong>${params.vendorName}</strong> has submitted a new candidate,
+      <strong>${params.candidateName}</strong>, for <strong>${params.positionTitle}</strong>.</p>
+      <p><a href="${params.link}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Candidate</a></p>
+      <p>Best,<br/>${SIGNATURE_NAME}</p>
+    `,
+  }
+}

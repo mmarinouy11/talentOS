@@ -14,6 +14,7 @@ import { VelocityTable } from '@/components/app/VelocityTable'
 import { PositionInsights } from '@/components/app/PositionInsights'
 import { STAGE_SEQUENCE } from '@/lib/pipeline'
 import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
+import { VendorAssignment } from '@/components/app/VendorAssignment'
 import type { Role } from '@prisma/client'
 
 function fmt(date: Date) {
@@ -42,7 +43,8 @@ export default async function PositionDetailPage({
 
   const { id } = await params
 
-  const position = await db.position.findFirst({
+  const [position, assignedVendors] = await Promise.all([
+  db.position.findFirst({
     where: { id, deletedAt: null },
     include: {
       recruiter: { select: { id: true, name: true, email: true } },
@@ -55,9 +57,16 @@ export default async function PositionDetailPage({
         orderBy: { createdAt: 'desc' },
       },
     },
-  })
+  }),
+  db.positionVendor.findMany({
+    where: { positionId: id },
+    include: { vendor: { select: { id: true, name: true, pocName: true, pocEmail: true, portalToken: true } } },
+    orderBy: { assignedAt: 'asc' },
+  }),
+  ])
 
   if (!position) notFound()
+  const initialVendors = assignedVendors.map((pv) => pv.vendor)
 
   const [hoursBaseline, positionFunnel, positionTimeInStage, positionLeadTime] = await Promise.all([
     getMonthlyHoursBaseline(),
@@ -287,6 +296,12 @@ export default async function PositionDetailPage({
           generatedAt: position.insightsGeneratedAt ?? null,
         }}
       />
+
+      {/* Vendor Assignment */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h2 className="text-sm font-medium text-gray-900 mb-3">Assigned Vendors</h2>
+        <VendorAssignment positionId={id} initialVendors={initialVendors} />
+      </div>
 
       {/* Job Description */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
