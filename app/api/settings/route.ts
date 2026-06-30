@@ -6,7 +6,8 @@ export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = session.user as { role?: string }
-  if (user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Any authenticated user may read settings (e.g. for DGM threshold display in PositionForm)
+  // Modifying settings remains ADMIN-only (see /api/settings/[key] PATCH)
   const settings = await db.systemSettings.findMany({ orderBy: { key: 'asc' } })
   return NextResponse.json(settings)
 }
