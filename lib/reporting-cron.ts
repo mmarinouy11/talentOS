@@ -1,6 +1,6 @@
 import cron from 'node-cron'
 import { db } from './db'
-import { sendEmail } from './email'
+import { sendEmailViaSystemGmail } from './email'
 import type { Stage } from '@prisma/client'
 
 // Railway containers run UTC. 11:00 UTC = 08:00 Montevideo (UTC-3, no DST in winter;
@@ -22,45 +22,54 @@ const STAGE_LABELS: Record<Stage, string> = {
   REJECTED: 'Rejected',
 }
 
-export function startReportingCron() {
-  cron.schedule(CRON_SCHEDULE, async () => {
-    const today = DAY_MAP[new Date().getDay()]
+export async function runReportingCron() {
+  const today = DAY_MAP[new Date().getDay()]
 
-    const positions = await db.position.findMany({
-      where: {
-        deletedAt: null,
-        status: 'OPEN',
-        reportingDays: { has: today },
-        reportingEmails: { isEmpty: false },
-      },
-      include: {
-        candidatePositions: {
-          where: { candidate: { deletedAt: null } },
-          include: {
-            candidate: { select: { firstName: true, lastName: true } },
-          },
+  const positions = await db.position.findMany({
+    where: {
+      deletedAt: null,
+      status: 'OPEN',
+      reportingDays: { has: today },
+      reportingEmails: { isEmpty: false },
+    },
+    include: {
+      candidatePositions: {
+        where: { candidate: { deletedAt: null } },
+        include: {
+          candidate: { select: { firstName: true, lastName: true } },
         },
       },
-    })
-
-    for (const position of positions) {
-      try {
-        const html = buildReportEmailHtml(position)
-        for (const email of position.reportingEmails) {
-          const result = await sendEmail({
-            to: email,
-            subject: `TalentOS Update: ${position.title} (${position.client})`,
-            html,
-            template: 'position-report',
-          })
-          if (!result.success) throw new Error(result.error)
-        }
-      } catch (err) {
-        console.error(`[reporting-cron] Failed for position ${position.id}:`, err)
-      }
-    }
+    },
   })
 
+  if (positions.length === 0) {
+    console.log('[reporting-cron] No positions scheduled for today, skipping')
+    return
+  }
+
+  // Check system Gmail up front — fail fast with a clear message
+  const systemAccount = await db.systemEmailAccount.findUnique({ where: { purpose: 'system_notifications' } })
+  if (!systemAccount?.refreshToken) {
+    console.warn('[reporting-cron] Skipped — no system Gmail account connected. Connect one in Settings to enable reporting emails.')
+    return
+  }
+
+  for (const position of positions) {
+    try {
+      const html = buildReportEmailHtml(position)
+      const subject = `TalentOS Update: ${position.title} (${position.client})`
+      for (const email of position.reportingEmails) {
+        await sendEmailViaSystemGmail({ to: email, subject, html })
+        console.log(`[reporting-cron] Sent report for position "${position.title}" to ${email}`)
+      }
+    } catch (err) {
+      console.error(`[reporting-cron] Failed for position ${position.id}:`, err)
+    }
+  }
+}
+
+export function startReportingCron() {
+  cron.schedule(CRON_SCHEDULE, runReportingCron)
   console.log(`[reporting-cron] Scheduled at ${CRON_SCHEDULE} UTC (≈08:00 Montevideo)`)
 }
 
