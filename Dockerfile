@@ -3,7 +3,8 @@ RUN apt-get update && apt-get install -y poppler-utils openssl && rm -rf /var/li
 WORKDIR /app
 COPY . .
 RUN npm ci --ignore-scripts
-RUN npx prisma generate --schema=prisma/schema.prisma
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+RUN npx prisma generate
 RUN npm run build
 ENV NODE_ENV=production
 CMD ["npm", "start"]
