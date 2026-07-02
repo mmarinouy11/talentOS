@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { parseTextFeedback } from '@/lib/feedback-parser'
-import { sendEmail, sendEmailViaSystemGmail } from '@/lib/email'
-import { interviewerFeedbackInviteEmail, feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
+import { sendEmail } from '@/lib/email'
+import { interviewerFeedbackInviteEmail } from '@/lib/email-templates'
 
 const patchSchema = z.object({
   action: z.literal('cancel').optional(),
@@ -203,53 +203,6 @@ export async function PATCH(
     },
     include: { decidedBy: { select: { name: true, email: true } } },
   })
-
-  // Send feedback notification to recruiter when feedback newly populated
-  const feedbackNewlySet =
-    (aiFields as Record<string, unknown>).feedbackSummary &&
-    !existing.feedbackSummary
-
-  if (feedbackNewlySet) {
-    try {
-      const INTERVIEW_TYPE_LABELS: Record<string, string> = {
-        TECHNICAL_INTERVIEW: 'Technical Interview',
-        MANAGER_INTERVIEW: 'Manager Interview',
-        SCREENING: 'Screening',
-        CLIENT_INTERVIEW: 'Client Interview',
-      }
-      const cp = await db.candidatePosition.findUnique({
-        where: { id: existing.candidatePositionId },
-        include: {
-          candidate: { select: { firstName: true, lastName: true, recruiterId: true } },
-          position: { select: { id: true, title: true } },
-        },
-      })
-      if (cp?.candidate.recruiterId) {
-        const recruiter = await db.user.findUnique({
-          where: { id: cp.candidate.recruiterId },
-          select: { id: true, email: true, name: true },
-        })
-        if (recruiter) {
-          const aiScore = (aiFields as Record<string, unknown>).aiScore as number | null
-          const scoreLabel = aiScore ? `${aiScore}/5` : 'N/A'
-          const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
-          const link = `${baseUrl}/positions/${cp.position.id}/candidates/${existing.candidatePositionId}?openInterview=${id}`
-          const { subject, html } = feedbackSubmittedNotificationEmail({
-            recruiterName: recruiter.name ?? recruiter.email,
-            candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
-            positionTitle: cp.position.title,
-            interviewType: INTERVIEW_TYPE_LABELS[existing.stage] ?? existing.stage,
-            scoreLabel,
-            link,
-          })
-          sendEmailViaSystemGmail({ to: recruiter.email, subject, html })
-            .catch((err) => console.error('[interview PATCH] Failed to send feedback notification:', err))
-        }
-      }
-    } catch (err) {
-      console.error('[interview PATCH] Notification error:', err)
-    }
-  }
 
   return NextResponse.json(interview)
 }
