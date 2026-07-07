@@ -81,6 +81,7 @@ function Spinner() {
 }
 
 type InterviewStatus = 'PENDING' | 'AWAITING_SCHEDULE' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
+type InterviewDecision = 'ADVANCE' | 'REJECT' | 'HOLD'
 
 const ROUND_STATUS_COLORS: Record<InterviewStatus, string> = {
   PENDING: 'bg-amber-100 text-amber-700',
@@ -98,11 +99,24 @@ const ROUND_STATUS_LABELS: Record<InterviewStatus, string> = {
   CANCELLED: 'Cancelled',
 }
 
+const DECISION_COLORS: Record<InterviewDecision, string> = {
+  ADVANCE: 'bg-green-100 text-green-700',
+  REJECT: 'bg-red-100 text-red-700',
+  HOLD: 'bg-amber-100 text-amber-700',
+}
+
+const DECISION_LABELS: Record<InterviewDecision, string> = {
+  ADVANCE: 'Advance',
+  REJECT: 'Reject',
+  HOLD: 'Hold',
+}
+
 interface CandidatePosition {
   id: string
   stage: Stage
   fitScore: number | null
   latestInterviewStatus?: string | null
+  latestInterviewDecision?: string | null
   compensationOutOfRange?: boolean
   candidate: {
     id: string
@@ -264,8 +278,15 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
                 </td>
                 <td className="px-4 py-3">
                   {cp.latestInterviewStatus ? (
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROUND_STATUS_COLORS[cp.latestInterviewStatus as InterviewStatus] ?? 'bg-gray-100 text-gray-700'}`}>
-                      {ROUND_STATUS_LABELS[cp.latestInterviewStatus as InterviewStatus] ?? cp.latestInterviewStatus}
+                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROUND_STATUS_COLORS[cp.latestInterviewStatus as InterviewStatus] ?? 'bg-gray-100 text-gray-700'}`}>
+                        {ROUND_STATUS_LABELS[cp.latestInterviewStatus as InterviewStatus] ?? cp.latestInterviewStatus}
+                      </span>
+                      {cp.latestInterviewDecision && (
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DECISION_COLORS[cp.latestInterviewDecision as InterviewDecision] ?? 'bg-gray-100 text-gray-700'}`}>
+                          {DECISION_LABELS[cp.latestInterviewDecision as InterviewDecision] ?? cp.latestInterviewDecision}
+                        </span>
+                      )}
                     </span>
                   ) : (
                     <span className="text-gray-400">—</span>
