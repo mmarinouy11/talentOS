@@ -12,7 +12,6 @@ import { PositionCandidatesPanel } from '@/components/app/PositionCandidatesPane
 import { FunnelChart } from '@/components/app/FunnelChart'
 import { VelocityTable } from '@/components/app/VelocityTable'
 import { PositionInsights } from '@/components/app/PositionInsights'
-import { STAGE_SEQUENCE } from '@/lib/pipeline'
 import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
 import { VendorAssignment } from '@/components/app/VendorAssignment'
 import type { Role } from '@prisma/client'
@@ -74,11 +73,15 @@ export default async function PositionDetailPage({
     getTimeInStage(id),
     getLeadTime(id),
   ])
-  // Sort: later stages first, then by fitScore desc (nulls last)
+  const STAGE_ORDER: Record<string, number> = {
+    HIRED: 0, OFFER: 1, CLIENT_INTERVIEW: 2, MANAGER_INTERVIEW: 3,
+    TECHNICAL_INTERVIEW: 4, SCREENING: 5, APPLIED: 6, REJECTED: 7,
+  }
+  // Sort: most advanced stage first (HIRED→REJECTED), then fitScore desc (nulls last)
   const sortedCandidatePositions = [...position.candidatePositions].sort((a, b) => {
-    const aIdx = STAGE_SEQUENCE.indexOf(a.stage as typeof STAGE_SEQUENCE[number])
-    const bIdx = STAGE_SEQUENCE.indexOf(b.stage as typeof STAGE_SEQUENCE[number])
-    if (bIdx !== aIdx) return bIdx - aIdx
+    const aStage = STAGE_ORDER[a.stage] ?? 8
+    const bStage = STAGE_ORDER[b.stage] ?? 8
+    if (aStage !== bStage) return aStage - bStage
     if (a.fitScore == null && b.fitScore == null) return 0
     if (a.fitScore == null) return 1
     if (b.fitScore == null) return -1

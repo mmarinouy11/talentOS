@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddCandidateToPositionModal } from './AddCandidateToPositionModal'
 import type { Stage } from '@prisma/client'
-import { STAGE_SEQUENCE } from '@/lib/pipeline'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 const STAGE_LABELS: Record<Stage, string> = {
@@ -19,10 +18,16 @@ const STAGE_LABELS: Record<Stage, string> = {
   REJECTED: 'Rejected',
 }
 
-// REJECTED is not in STAGE_SEQUENCE — put it last
-function stageOrder(stage: Stage): number {
-  const idx = STAGE_SEQUENCE.indexOf(stage as typeof STAGE_SEQUENCE[number])
-  return idx === -1 ? STAGE_SEQUENCE.length : idx
+// Lower number = more advanced stage = sorts first in ascending order
+const STAGE_ORDER: Record<string, number> = {
+  HIRED: 0,
+  OFFER: 1,
+  CLIENT_INTERVIEW: 2,
+  MANAGER_INTERVIEW: 3,
+  TECHNICAL_INTERVIEW: 4,
+  SCREENING: 5,
+  APPLIED: 6,
+  REJECTED: 7,
 }
 
 type SortDir = 'asc' | 'desc'
@@ -120,9 +125,9 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
   const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
   const [scoringIds, setScoringIds] = useState<Set<string>>(new Set())
 
-  // Default: stage desc (later stages first), then fitScore desc — matches server-side sort
+  // Default: stage asc by STAGE_ORDER (HIRED=0 first, REJECTED=7 last)
   const [sortKey, setSortKey] = useState<SortKey>('stage')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -174,8 +179,8 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         av = a.candidate.seniority ?? ''
         bv = b.candidate.seniority ?? ''
       } else if (sortKey === 'stage') {
-        av = stageOrder(a.stage)
-        bv = stageOrder(b.stage)
+        av = STAGE_ORDER[a.stage] ?? 8
+        bv = STAGE_ORDER[b.stage] ?? 8
         // Tie-break by fitScore desc
         if (av === bv) {
           const aFit = liveScores[a.id] ?? a.fitScore ?? -1
