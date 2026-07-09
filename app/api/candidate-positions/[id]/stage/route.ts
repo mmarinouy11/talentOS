@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const schema = z.object({
-  newStage: z.enum(['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED', 'REJECTED']),
+  newStage: z.enum(['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED']),
   notes: z.string().optional().nullable(),
 })
 
@@ -29,9 +29,11 @@ export async function PATCH(
   const { newStage, notes } = parsed.data
   const userId = (session.user as { id?: string }).id!
 
+  const statusUpdate = newStage === 'HIRED' ? { status: 'HIRED' as const } : {}
+
   const updated = await db.candidatePosition.update({
     where: { id },
-    data: { stage: newStage, stageEnteredAt: new Date() },
+    data: { stage: newStage, stageEnteredAt: new Date(), ...statusUpdate },
   })
 
   await db.stageHistory.create({

@@ -68,6 +68,7 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
       onCandidateAdded({
         id: cp.id,
         stage: 'APPLIED',
+        status: 'ACTIVE',
         fitScore: null,
         candidate: cp.candidate,
       })

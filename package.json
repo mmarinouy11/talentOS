@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "backfill:cp-status": "npx tsx scripts/backfill-cp-status.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

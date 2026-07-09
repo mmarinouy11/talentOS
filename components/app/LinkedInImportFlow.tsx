@@ -11,6 +11,7 @@ export type { ParsedCandidate }
 export interface NewCandidatePosition {
   id: string
   stage: 'APPLIED'
+  status: 'ACTIVE'
   fitScore: null
   compensationOutOfRange?: boolean
   candidate: {

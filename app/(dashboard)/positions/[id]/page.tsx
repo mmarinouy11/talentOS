@@ -90,7 +90,7 @@ export default async function PositionDetailPage({
 
   const days = aging(position.createdAt)
   const activeCandidates = position.candidatePositions.filter(
-    (cp) => !['HIRED', 'REJECTED'].includes(cp.stage)
+    (cp) => cp.status === 'ACTIVE'
   ).length
 
   return (
@@ -238,6 +238,7 @@ export default async function PositionDetailPage({
         candidatePositions={sortedCandidatePositions.map((cp) => ({
           id: cp.id,
           stage: cp.stage,
+          status: cp.status,
           fitScore: cp.fitScore,
           latestInterviewStatus: cp.interviews[0]?.status ?? null,
           latestInterviewDecision: cp.interviews[0]?.decision ?? null,

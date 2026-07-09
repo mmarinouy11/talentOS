@@ -204,6 +204,14 @@ export async function PATCH(
     include: { decidedBy: { select: { name: true, email: true } } },
   })
 
+  // Sync CandidatePosition.status when a terminal decision is recorded
+  if (decision === 'REJECT') {
+    await db.candidatePosition.update({
+      where: { id: existing.candidatePositionId },
+      data: { status: 'REJECTED' },
+    })
+  }
+
   return NextResponse.json(interview)
 }
 

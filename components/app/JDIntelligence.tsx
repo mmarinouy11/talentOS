@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { SkillTags } from './SkillTags'
 import { SeniorityBadge } from './SeniorityBadge'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Seniority } from '@prisma/client'
 
 interface JDIntelligenceProps {
@@ -49,6 +50,16 @@ export function JDIntelligence({
   const [parsing, setParsing] = useState(false)
   const [generatingQueries, setGeneratingQueries] = useState(false)
   const [queries, setQueries] = useState<string[]>(linkedinSearchQueries)
+  const storageKey = `jd-linkedin-collapsed-${positionId}`
+  const [queriesCollapsed, setQueriesCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = localStorage.getItem(storageKey)
+    return v === null ? true : v === 'true'
+  })
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, String(queriesCollapsed))
+  }, [queriesCollapsed, storageKey])
 
   async function parse() {
     setParsing(true)
@@ -124,46 +135,52 @@ export function JDIntelligence({
 
       {/* LinkedIn Search Queries */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">LinkedIn Search Queries</p>
-          {queries.length === 0 && (
-            <button
-              onClick={generateQueries}
-              disabled={generatingQueries}
-              className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
-            >
-              {generatingQueries ? 'Generating…' : 'Generate'}
-            </button>
-          )}
-          {queries.length > 0 && (
-            <button
-              onClick={generateQueries}
-              disabled={generatingQueries}
-              className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
-            >
-              {generatingQueries ? 'Regenerating…' : 'Regenerate'}
-            </button>
-          )}
+        <div className="flex items-center justify-between">
+          <button
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wide hover:text-gray-700 transition-colors"
+            onClick={() => setQueriesCollapsed((v) => !v)}
+          >
+            {queriesCollapsed
+              ? <ChevronRight size={13} className="text-gray-400" />
+              : <ChevronDown size={13} className="text-gray-400" />
+            }
+            LinkedIn Search Queries
+            {queries.length > 0 && (
+              <span className="normal-case font-normal text-gray-400 ml-0.5">({queries.length})</span>
+            )}
+          </button>
+          <button
+            onClick={generateQueries}
+            disabled={generatingQueries}
+            className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          >
+            {generatingQueries
+              ? (queries.length === 0 ? 'Generating…' : 'Regenerating…')
+              : (queries.length === 0 ? 'Generate' : 'Regenerate')
+            }
+          </button>
         </div>
 
-        {queries.length === 0 && !generatingQueries && (
-          <p className="text-xs text-gray-400">No queries generated yet.</p>
-        )}
-
-        {generatingQueries && queries.length === 0 && (
-          <p className="text-xs text-gray-400 italic">Generating…</p>
-        )}
-
-        {queries.length > 0 && (
-          <div className="space-y-2">
-            {queries.map((q, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <code className="flex-1 block text-xs bg-gray-50 border border-gray-200 rounded px-3 py-2 font-mono text-gray-700 leading-relaxed break-all">
-                  {q}
-                </code>
-                <CopyButton text={q} />
+        {!queriesCollapsed && (
+          <div className="mt-2">
+            {queries.length === 0 && !generatingQueries && (
+              <p className="text-xs text-gray-400">No queries generated yet.</p>
+            )}
+            {generatingQueries && queries.length === 0 && (
+              <p className="text-xs text-gray-400 italic">Generating…</p>
+            )}
+            {queries.length > 0 && (
+              <div className="space-y-2">
+                {queries.map((q, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <code className="flex-1 block text-xs bg-gray-50 border border-gray-200 rounded px-3 py-2 font-mono text-gray-700 leading-relaxed break-all">
+                      {q}
+                    </code>
+                    <CopyButton text={q} />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>

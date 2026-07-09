@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddCandidateToPositionModal } from './AddCandidateToPositionModal'
-import type { Stage } from '@prisma/client'
+import type { Stage, CandidateStatus } from '@prisma/client'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 
 const STAGE_LABELS: Record<Stage, string> = {
@@ -114,6 +114,7 @@ const DECISION_LABELS: Record<InterviewDecision, string> = {
 interface CandidatePosition {
   id: string
   stage: Stage
+  status: CandidateStatus
   fitScore: number | null
   latestInterviewStatus?: string | null
   latestInterviewDecision?: string | null
@@ -138,8 +139,8 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
   const [showModal, setShowModal] = useState(false)
   const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
   const [scoringIds, setScoringIds] = useState<Set<string>>(new Set())
+  const [inactiveExpanded, setInactiveExpanded] = useState(false)
 
-  // Default: stage asc by STAGE_ORDER (HIRED=0 first, REJECTED=7 last)
   const [sortKey, setSortKey] = useState<SortKey>('stage')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -178,8 +179,8 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
 
   const existingCandidateIds = new Set(rows.map((cp) => cp.candidate.id))
 
-  const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => {
+  function sortRows(list: CandidatePosition[]) {
+    return [...list].sort((a, b) => {
       let av: number | string | null = null
       let bv: number | string | null = null
 
@@ -195,7 +196,6 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
       } else if (sortKey === 'stage') {
         av = STAGE_ORDER[a.stage] ?? 8
         bv = STAGE_ORDER[b.stage] ?? 8
-        // Tie-break by fitScore desc
         if (av === bv) {
           const aFit = liveScores[a.id] ?? a.fitScore ?? -1
           const bFit = liveScores[b.id] ?? b.fitScore ?? -1
@@ -215,6 +215,13 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
       if (av > bv) return sortDir === 'asc' ? 1 : -1
       return 0
     })
+  }
+
+  const { activeRows, inactiveRows } = useMemo(() => {
+    const active = rows.filter((cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED')
+    const inactive = rows.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN')
+    return { activeRows: sortRows(active), inactiveRows: sortRows(inactive) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, sortKey, sortDir, liveScores])
 
   function fitCell(cp: CandidatePosition) {
@@ -233,6 +240,70 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
     return <SortableHeader label={label} active={sortKey === key} direction={sortDir} onClick={() => toggleSort(key)} className={className} />
   }
 
+  function renderRow(cp: CandidatePosition) {
+    return (
+      <tr key={cp.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { window.location.href = `/positions/${positionId}/candidates/${cp.id}` }}>
+        <td className="px-4 py-3 font-medium text-gray-900">
+          <Link href={`/positions/${positionId}/candidates/${cp.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
+            {cp.candidate.firstName} {cp.candidate.lastName}
+          </Link>
+          {cp.compensationOutOfRange && (
+            <span className="ml-1.5 text-red-600" title="Compensation out of range">💰</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-gray-600">{cp.candidate.email}</td>
+        <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>
+        <td className="px-4 py-3">
+          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+            {STAGE_LABELS[cp.stage]}
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          {cp.latestInterviewStatus ? (
+            <span className="inline-flex items-center gap-1.5 flex-wrap">
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROUND_STATUS_COLORS[cp.latestInterviewStatus as InterviewStatus] ?? 'bg-gray-100 text-gray-700'}`}>
+                {ROUND_STATUS_LABELS[cp.latestInterviewStatus as InterviewStatus] ?? cp.latestInterviewStatus}
+              </span>
+              {cp.latestInterviewDecision && (
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DECISION_COLORS[cp.latestInterviewDecision as InterviewDecision] ?? 'bg-gray-100 text-gray-700'}`}>
+                  {DECISION_LABELS[cp.latestInterviewDecision as InterviewDecision] ?? cp.latestInterviewDecision}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="text-gray-400">—</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
+        <td className="px-4 py-3 text-right">
+          <button
+            onClick={(e) => { e.stopPropagation(); handleRemove(cp.id, `${cp.candidate.firstName} ${cp.candidate.lastName}`) }}
+            className="text-gray-400 hover:text-red-600 transition-colors"
+            title="Remove from position"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </td>
+      </tr>
+    )
+  }
+
+  const thead = (
+    <thead>
+      <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+        {sh('Name', 'name')}
+        {sh('Email', 'email')}
+        {sh('Seniority', 'seniority')}
+        {sh('Stage', 'stage')}
+        <th className="px-4 py-3 text-left font-medium text-gray-600">Round Status</th>
+        {sh('Fit', 'fitScore', 'text-right')}
+        <th className="px-4 py-3" />
+      </tr>
+    </thead>
+  )
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="border-b border-gray-100 px-6 py-3 flex items-center justify-between">
@@ -246,68 +317,50 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
       {rows.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-400">No candidates yet.</div>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
-              {sh('Name', 'name')}
-              {sh('Email', 'email')}
-              {sh('Seniority', 'seniority')}
-              {sh('Stage', 'stage')}
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Round Status</th>
-              {sh('Fit', 'fitScore', 'text-right')}
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {sorted.map((cp) => (
-              <tr key={cp.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { window.location.href = `/positions/${positionId}/candidates/${cp.id}` }}>
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  <Link href={`/positions/${positionId}/candidates/${cp.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
-                    {cp.candidate.firstName} {cp.candidate.lastName}
-                  </Link>
-                  {cp.compensationOutOfRange && (
-                    <span className="ml-1.5 text-red-600" title="Compensation out of range">💰</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-600">{cp.candidate.email}</td>
-                <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                    {STAGE_LABELS[cp.stage]}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {cp.latestInterviewStatus ? (
-                    <span className="inline-flex items-center gap-1.5 flex-wrap">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROUND_STATUS_COLORS[cp.latestInterviewStatus as InterviewStatus] ?? 'bg-gray-100 text-gray-700'}`}>
-                        {ROUND_STATUS_LABELS[cp.latestInterviewStatus as InterviewStatus] ?? cp.latestInterviewStatus}
-                      </span>
-                      {cp.latestInterviewDecision && (
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DECISION_COLORS[cp.latestInterviewDecision as InterviewDecision] ?? 'bg-gray-100 text-gray-700'}`}>
-                          {DECISION_LABELS[cp.latestInterviewDecision as InterviewDecision] ?? cp.latestInterviewDecision}
-                        </span>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleRemove(cp.id, `${cp.candidate.firstName} ${cp.candidate.lastName}`) }}
-                    className="text-gray-400 hover:text-red-600 transition-colors"
-                    title="Remove from position"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div>
+          {/* Active group */}
+          <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Active ({activeRows.length})
+            </span>
+          </div>
+          {activeRows.length === 0 ? (
+            <div className="px-6 py-4 text-sm text-gray-400">No active candidates.</div>
+          ) : (
+            <table className="w-full text-sm">
+              {thead}
+              <tbody className="divide-y divide-gray-50">
+                {activeRows.map(renderRow)}
+              </tbody>
+            </table>
+          )}
+
+          {/* Not Moving Forward group */}
+          {inactiveRows.length > 0 && (
+            <div className="border-t border-gray-200">
+              <button
+                className="w-full px-6 py-2 bg-gray-50 flex items-center gap-2 hover:bg-gray-100 transition-colors text-left"
+                onClick={() => setInactiveExpanded((v) => !v)}
+              >
+                {inactiveExpanded
+                  ? <ChevronDown size={14} className="text-gray-400 shrink-0" />
+                  : <ChevronUp size={14} className="text-gray-400 shrink-0 rotate-180" />
+                }
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Not Moving Forward ({inactiveRows.length})
+                </span>
+              </button>
+              {inactiveExpanded && (
+                <table className="w-full text-sm">
+                  {thead}
+                  <tbody className="divide-y divide-gray-50">
+                    {inactiveRows.map(renderRow)}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {showModal && (
