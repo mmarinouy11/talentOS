@@ -22,7 +22,8 @@ export default async function EditCandidatePage({
       desiredCompensation: true, minimumCompensation: true,
       skills: true, languages: true,
       sourcedByType: true, sourcedByUserId: true, sourcedByVendorId: true, sourcedByOther: true,
-      recruiterId: true,
+      recruiterId: true, linkedinUrl: true, notes: true,
+      cvDriveId: true, cvOriginalName: true,
     },
   })
 
@@ -62,6 +63,10 @@ export default async function EditCandidatePage({
           sourcedByVendorId: candidate.sourcedByVendorId,
           sourcedByOther: candidate.sourcedByOther,
           recruiterId: candidate.recruiterId,
+          linkedinUrl: candidate.linkedinUrl,
+          notes: candidate.notes,
+          cvDriveId: candidate.cvDriveId,
+          cvOriginalName: candidate.cvOriginalName,
         }}
       />
     </div>

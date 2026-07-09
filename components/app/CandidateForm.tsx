@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { TagInput } from './TagInput'
 import { CVUpload, type ParsedCV } from './CVUpload'
+import { CandidateCVUpdate } from './CandidateCVUpdate'
 import type { Seniority } from '@prisma/client'
 
 const LATAM_COUNTRIES = [
@@ -107,6 +108,35 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
 
   function setField<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function handleReparsed(reparsed: {
+    firstName?: string | null
+    lastName?: string | null
+    phone?: string | null
+    country?: string | null
+    seniority?: import('@prisma/client').Seniority | null
+    yearsOfExperience?: number | null
+    skills?: string[]
+    languages?: string[]
+    summary?: string | null
+    cvOriginalName?: string | null
+    cvDriveId?: string | null
+  }) {
+    if (reparsed.cvDriveId) setCvDriveId(reparsed.cvDriveId)
+    if (reparsed.cvOriginalName) setCvOriginalName(reparsed.cvOriginalName)
+    setFields((prev) => ({
+      ...prev,
+      ...(reparsed.firstName != null ? { firstName: reparsed.firstName } : {}),
+      ...(reparsed.lastName != null ? { lastName: reparsed.lastName } : {}),
+      ...(reparsed.phone !== undefined ? { phone: reparsed.phone ?? '' } : {}),
+      ...(reparsed.country !== undefined ? { country: reparsed.country ?? '' } : {}),
+      ...(reparsed.seniority !== undefined ? { seniority: reparsed.seniority ?? '' } : {}),
+      ...(reparsed.yearsOfExperience !== undefined ? { yearsOfExperience: reparsed.yearsOfExperience?.toString() ?? '' } : {}),
+      ...(reparsed.summary != null ? { notes: reparsed.summary } : {}),
+    }))
+    if (reparsed.skills?.length) setSkills(reparsed.skills)
+    if (reparsed.languages?.length) setLanguages(reparsed.languages)
   }
 
   function handleParsed(parsed: ParsedCV, fileId: string, fileName: string) {
@@ -439,6 +469,15 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
             className="min-h-[100px]"
           />
         </div>
+
+        {mode === 'edit' && defaultValues.id && (
+          <CandidateCVUpdate
+            candidateId={defaultValues.id}
+            currentCvOriginalName={cvOriginalName || null}
+            currentCvDriveId={cvDriveId || null}
+            onReparsed={handleReparsed}
+          />
+        )}
       </div>
 
       <div className="flex gap-3 pt-2">
