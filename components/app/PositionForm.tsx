@@ -468,10 +468,13 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             )}
           </div>
         )}
-        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <h3 className="text-sm font-medium text-gray-900 mb-1">Screening Thresholds</h3>
+          <p className="text-xs text-gray-400 mb-3">Per-position overrides for the global fit score minimums. Leave blank to use the global setting.</p>
+          <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="vendorMinFitScore">Min Fit Score — Vendor Submissions</Label>
-            <p className="text-xs text-gray-400 mb-1">Override global default ({globalVendorThreshold}). Leave blank to use global.</p>
+            <Label htmlFor="vendorMinFitScore">Vendor Submission Min Score</Label>
+            <p className="text-xs text-gray-400 mb-1">Global default: {globalVendorThreshold}</p>
             <Input
               id="vendorMinFitScore"
               type="number"
@@ -479,12 +482,12 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
               max={100}
               value={vendorMinFitScore}
               onChange={(e) => setVendorMinFitScore(e.target.value)}
-              placeholder={String(globalVendorThreshold)}
+              placeholder={`Default: ${globalVendorThreshold} (from Settings)`}
             />
           </div>
           <div>
-            <Label htmlFor="directMinFitScore">Min Fit Score — Direct Applications</Label>
-            <p className="text-xs text-gray-400 mb-1">Override global default ({globalDirectThreshold}). Leave blank to use global.</p>
+            <Label htmlFor="directMinFitScore">Direct Application Min Score</Label>
+            <p className="text-xs text-gray-400 mb-1">Global default: {globalDirectThreshold}</p>
             <Input
               id="directMinFitScore"
               type="number"
@@ -492,9 +495,10 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
               max={100}
               value={directMinFitScore}
               onChange={(e) => setDirectMinFitScore(e.target.value)}
-              placeholder={String(globalDirectThreshold)}
+              placeholder={`Default: ${globalDirectThreshold} (from Settings)`}
             />
           </div>
+        </div>
         </div>
       </div>
 
