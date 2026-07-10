@@ -18,9 +18,9 @@ async function main() {
     select: {
       id: true,
       stage: true,
+      // Fetch ALL interviews — do NOT limit to 1, as batch-imported rounds
+      // may have inconsistent createdAt ordering.
       interviews: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
         select: { decision: true },
       },
       stageHistory: {
@@ -42,15 +42,17 @@ async function main() {
 
     // stage === REJECTED → status=REJECTED, find previous stage
     if (cp.stage === 'REJECTED') {
-      // Find the history entry that moved INTO REJECTED, use its fromStage
       const intoRejected = cp.stageHistory.find((h) => h.toStage === 'REJECTED')
       const prevStage = intoRejected?.fromStage ?? 'SCREENING'
       decisions.push({ id: cp.id, status: 'REJECTED', prevStage })
       continue
     }
 
-    // Most recent interview has REJECT decision → status=REJECTED
-    if (cp.interviews[0]?.decision === 'REJECT') {
+    // ANY interview has decision=REJECT → status=REJECTED
+    // (checking all rounds, not just the last, because batch-imported rounds
+    //  may have createdAt values that don't reflect actual pipeline order)
+    const anyReject = cp.interviews.some((i) => i.decision === 'REJECT')
+    if (anyReject) {
       decisions.push({ id: cp.id, status: 'REJECTED' })
       continue
     }

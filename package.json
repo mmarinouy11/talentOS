@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "backfill:cp-status": "npx tsx scripts/backfill-cp-status.ts"
+    "backfill:cp-status": "npx tsx scripts/backfill-cp-status.ts",
+    "fix:fde-rejected": "npx tsx scripts/fix-fde-rejected-status.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
