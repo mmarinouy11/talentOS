@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJDInBackground } from '@/lib/jd-parser'
 import { computePositionDGM } from '@/lib/dgm'
+import { randomBytes } from 'crypto'
 
 const positionSchema = z.object({
   title: z.string().min(1),
@@ -57,11 +58,13 @@ export async function POST(request: Request) {
 
   const userId = (session.user as { id?: string }).id!
   const { dgm, dgmAtRisk } = await computePositionDGM(parsed.data.clientRate, parsed.data.internalCostBudget)
+  const applicationToken = randomBytes(32).toString('hex')
   const position = await db.position.create({
     data: {
       ...parsed.data,
       status: 'OPEN',
       recruiterId: parsed.data.recruiterId || userId,
+      applicationToken,
       dgm,
       dgmAtRisk,
     },
