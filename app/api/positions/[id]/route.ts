@@ -24,6 +24,7 @@ const patchSchema = z.object({
   internalCostBudget: z.number().optional().nullable(),
   vendorMinFitScore: z.number().int().min(0).max(100).optional().nullable(),
   directMinFitScore: z.number().int().min(0).max(100).optional().nullable(),
+  screeningQuestions: z.array(z.string()).optional(),
   talentId: z.string().optional().nullable(),
   reportingEmails: z.array(z.string().email()).optional(),
   reportingDays: z.array(z.string()).optional(),

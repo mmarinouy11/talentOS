@@ -60,6 +60,7 @@ enum CompensationRisk {
 enum SourceType {
   RECRUITER
   VENDOR
+  DIRECT
   OTHER
 }
 
@@ -212,6 +213,8 @@ model Position {
   internalCostBudget  Float?
   vendorMinFitScore   Int?
   directMinFitScore   Int?
+  applicationToken    String?  @unique
+  screeningQuestions  String[]
   dgm                 Float?
   dgmAtRisk           Boolean @default(false)
   jdParsed             Boolean    @default(false)

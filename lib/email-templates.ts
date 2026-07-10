@@ -258,3 +258,22 @@ export function vendorCandidateSubmittedEmail(params: {
     `,
   }
 }
+
+export function directCandidateSubmittedEmail(params: {
+  recruiterName: string
+  candidateName: string
+  positionTitle: string
+  fitScore: number
+  link: string
+}): { subject: string; html: string } {
+  return {
+    subject: `New direct application: ${params.candidateName} — ${params.positionTitle}`,
+    html: `
+      <p>Hi ${params.recruiterName},</p>
+      <p>A new direct application has been submitted by <strong>${params.candidateName}</strong> for <strong>${params.positionTitle}</strong>.</p>
+      <p>Profile fit score: <strong>${Math.round(params.fitScore)}%</strong></p>
+      <p><a href="${params.link}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Application</a></p>
+      <p>Best,<br/>${SIGNATURE_NAME}</p>
+    `,
+  }
+}
