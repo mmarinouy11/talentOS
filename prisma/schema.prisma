@@ -128,6 +128,7 @@ model User {
   candidatesManaged     Candidate[]         @relation("CandidateRecruiter")
   decidedInterviews     Interview[]         @relation("InterviewDecidedBy")
   emailLogs             EmailLog[]
+  updatedEmailTemplates SystemEmailTemplate[]
 }
 
 model Account {
@@ -209,6 +210,8 @@ model Position {
   sales_contact_email  String?
   clientRate          Float?
   internalCostBudget  Float?
+  vendorMinFitScore   Int?
+  directMinFitScore   Int?
   dgm                 Float?
   dgmAtRisk           Boolean @default(false)
   jdParsed             Boolean    @default(false)
@@ -417,4 +420,16 @@ model SystemEmailAccount {
   refreshToken   String?   @db.Text
   tokenExpiry    DateTime?
   updatedAt      DateTime  @updatedAt
+}
+
+model SystemEmailTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  subject     String
+  htmlBody    String   @db.Text
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id])
 }

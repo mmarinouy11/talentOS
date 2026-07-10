@@ -45,7 +45,7 @@ export async function GET(
       title: p.title,
       client: p.client,
       status: p.status,
-      description: p.description ?? null,
+      jdRaw: p.description ?? null,
       jdSummary: p.jdSummary ?? null,
       location: p.location ?? [],
       budgetMonthly: p.internalCostBudget != null
