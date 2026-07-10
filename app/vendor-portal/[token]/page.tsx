@@ -19,7 +19,7 @@ interface Position {
   title: string
   client: string
   status: string
-  description: string | null
+  jdRaw: string | null
   jdSummary: string | null
   location: string[]
   budgetMonthly: number | null
@@ -245,7 +245,7 @@ export default function VendorPortalPage() {
           ) : (
             <div className="space-y-3">
               {openPositions.map((pos) => {
-                const jdText = pos.jdSummary || pos.description
+                const jdText = pos.jdRaw || pos.jdSummary
                 const jdOpen = expandedJD.has(pos.id)
                 return (
                   <div key={pos.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
