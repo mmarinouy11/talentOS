@@ -69,6 +69,26 @@ async function main() {
     },
   })
 
+  await db.systemSettings.upsert({
+    where: { key: 'VENDOR_MIN_FIT_SCORE' },
+    update: {},
+    create: {
+      key: 'VENDOR_MIN_FIT_SCORE',
+      value: '70',
+      description: 'Minimum fit score (0–100) for vendor-submitted candidates. Submissions below this threshold are automatically rejected.',
+    },
+  })
+
+  await db.systemSettings.upsert({
+    where: { key: 'DIRECT_MIN_FIT_SCORE' },
+    update: {},
+    create: {
+      key: 'DIRECT_MIN_FIT_SCORE',
+      value: '30',
+      description: 'Minimum fit score (0–100) for direct (portal) applications. Applications below this threshold are automatically rejected.',
+    },
+  })
+
   console.log('Seeded admin user:', user.email, '— role:', user.role)
   await db.$disconnect()
 }

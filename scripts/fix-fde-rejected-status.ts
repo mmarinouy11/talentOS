@@ -7,9 +7,9 @@
  *   DATABASE_URL=<real-url> npx tsx scripts/fix-fde-rejected-status.ts --apply
  */
 
-import { PrismaClient } from '@prisma/client'
+import { db } from "../lib/db"
 
-const db = new PrismaClient()
+
 const apply = process.argv.includes('--apply')
 
 // Name fragments to match (case-insensitive). Enough to be unambiguous.
@@ -29,8 +29,8 @@ async function main() {
     where: {
       deletedAt: null,
       OR: [
-        { title: { contains: 'FDE', mode: 'insensitive' } },
-        { title: { contains: 'Full', mode: 'insensitive' } },
+        { id: 'cmqk2zptl0000tpsdphfgqvyq' },
+        
       ],
     },
     select: { id: true, title: true },

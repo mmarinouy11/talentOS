@@ -10,9 +10,9 @@
  * Without --positionId: targets ALL positions.
  */
 
-import { PrismaClient } from '@prisma/client'
+import { db } from "../lib/db"
 
-const db = new PrismaClient()
+
 const apply = process.argv.includes('--apply')
 const positionIdArg = (() => {
   const idx = process.argv.indexOf('--positionId')
