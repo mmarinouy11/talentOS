@@ -16,6 +16,7 @@ import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
 import { VendorAssignment } from '@/components/app/VendorAssignment'
 import { ApplicationPortalLink } from '@/components/app/ApplicationPortalLink'
 import type { Role } from '@prisma/client'
+import { randomBytes } from 'crypto'
 
 // Stage order for picking the "most meaningful" interview to display.
 // Higher = more advanced.
@@ -92,6 +93,14 @@ export default async function PositionDetailPage({
   ])
 
   if (!position) notFound()
+
+  // Backfill applicationToken for positions created before the portal feature
+  if (!position.applicationToken) {
+    const applicationToken = randomBytes(32).toString('hex')
+    await db.position.update({ where: { id }, data: { applicationToken } })
+    position.applicationToken = applicationToken
+  }
+
   const initialVendors = assignedVendors.map((pv) => pv.vendor)
 
   const [hoursBaseline, positionFunnel, positionTimeInStage, positionLeadTime] = await Promise.all([
