@@ -8,11 +8,21 @@ const LATAM_COUNTRIES = [
   'Mexico', 'Paraguay', 'Peru', 'Uruguay', 'Venezuela', 'Other',
 ]
 
+interface Check {
+  name: string
+  passed: boolean
+  detail: string
+}
+
 interface Position {
   id: string
   title: string
   client: string
   status: string
+  description: string | null
+  jdSummary: string | null
+  location: string[]
+  budgetMonthly: number | null
 }
 
 interface VendorData {
@@ -44,6 +54,7 @@ export default function VendorPortalPage() {
   const [submitError, setSubmitError] = useState('')
   const [rejectionReason, setRejectionReason] = useState<RejectionReason | null>(null)
   const [rejectionMessage, setRejectionMessage] = useState('')
+  const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -102,6 +113,7 @@ export default function VendorPortalPage() {
       if (d.rejected) {
         setRejectionReason(d.reason as RejectionReason)
         setRejectionMessage(d.message)
+        setRejectionChecks(d.checks ?? [])
         setState('rejected')
       } else {
         setState('success')
@@ -128,6 +140,17 @@ export default function VendorPortalPage() {
   function backToList() {
     setState('list')
     setSelectedPosition(null)
+  }
+
+  const [expandedJD, setExpandedJD] = useState<Set<string>>(new Set())
+
+  function toggleJD(id: string) {
+    setExpandedJD((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   function submitAnother() {
@@ -178,10 +201,23 @@ export default function VendorPortalPage() {
       'Submission not accepted'
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-md text-center">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-md w-full text-center">
           <div className="text-5xl mb-4">❌</div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">{heading}</h1>
           <p className="text-gray-600 mb-6">{rejectionMessage}</p>
+          {rejectionChecks.length > 0 && (
+            <div className="mb-6 text-left space-y-2">
+              {rejectionChecks.map((check) => (
+                <div key={check.name} className="flex items-start gap-3 bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="text-base mt-0.5">{check.passed ? '✅' : '❌'}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{check.name}</p>
+                    <p className="text-xs text-gray-500">{check.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <button onClick={submitAnother} className="bg-black text-white font-medium py-2 px-6 rounded-xl hover:bg-gray-800 transition-colors">
             Try a different candidate
           </button>
@@ -208,20 +244,51 @@ export default function VendorPortalPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {openPositions.map((pos) => (
-                <div key={pos.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold text-gray-900">{pos.title}</h2>
-                    <p className="text-sm text-gray-500">{pos.client}</p>
+              {openPositions.map((pos) => {
+                const jdText = pos.jdSummary || pos.description
+                const jdOpen = expandedJD.has(pos.id)
+                return (
+                  <div key={pos.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h2 className="font-semibold text-gray-900">{pos.title}</h2>
+                        <p className="text-sm text-gray-500">{pos.client}</p>
+                        <div className="flex flex-wrap gap-3 mt-2">
+                          {pos.budgetMonthly != null && (
+                            <span className="text-xs text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">
+                              Up to ${pos.budgetMonthly.toLocaleString()}/month
+                            </span>
+                          )}
+                          {pos.location.map((loc) => (
+                            <span key={loc} className="text-xs text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">{loc}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => startSubmit(pos)}
+                        className="shrink-0 bg-black text-white font-medium py-2 px-4 rounded-lg text-sm hover:bg-gray-800 transition-colors"
+                      >
+                        Submit a Candidate
+                      </button>
+                    </div>
+                    {jdText && (
+                      <div className="mt-3 border-t border-gray-100 pt-3">
+                        <button
+                          onClick={() => toggleJD(pos.id)}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                        >
+                          {jdOpen ? '▾ Hide job description' : '▸ View job description'}
+                        </button>
+                        {jdOpen && (
+                          <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+                            {jdText}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => startSubmit(pos)}
-                    className="bg-black text-white font-medium py-2 px-4 rounded-lg text-sm hover:bg-gray-800 transition-colors"
-                  >
-                    Submit a Candidate
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
