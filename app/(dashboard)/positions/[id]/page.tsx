@@ -62,7 +62,9 @@ export default async function PositionDetailPage({
   const session = await auth()
   if (!session?.user) redirect('/login')
 
-  const isAdmin = (session.user as { role?: Role }).role === 'ADMIN'
+  const sessionUser = session.user as { id?: string; role?: Role }
+  const isAdmin = sessionUser.role === 'ADMIN'
+  const currentUserId = sessionUser.id
 
   const { id } = await params
 
@@ -279,6 +281,7 @@ export default async function PositionDetailPage({
           },
         }))}
         activeCandidates={activeCandidates}
+        currentUserId={currentUserId}
       />
 
       {/* Position Velocity */}

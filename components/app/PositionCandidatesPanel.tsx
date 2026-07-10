@@ -132,9 +132,10 @@ interface Props {
   positionId: string
   candidatePositions: CandidatePosition[]
   activeCandidates: number
+  currentUserId?: string
 }
 
-export function PositionCandidatesPanel({ positionId, candidatePositions: initial, activeCandidates }: Props) {
+export function PositionCandidatesPanel({ positionId, candidatePositions: initial, activeCandidates, currentUserId }: Props) {
   const [rows, setRows] = useState<CandidatePosition[]>(initial)
   const [showModal, setShowModal] = useState(false)
   const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
@@ -388,6 +389,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         <AddCandidateToPositionModal
           positionId={positionId}
           existingCandidateIds={existingCandidateIds}
+          currentUserId={currentUserId}
           onCandidateAdded={handleCandidateAdded}
           onClose={() => setShowModal(false)}
         />

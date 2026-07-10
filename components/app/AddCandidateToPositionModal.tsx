@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SeniorityBadge } from './SeniorityBadge'
 import { LinkedInImportFlow, type NewCandidatePosition } from './LinkedInImportFlow'
+import { CreateCandidateInPositionForm } from './CreateCandidateInPositionForm'
 import type { Seniority } from '@prisma/client'
 import type { ConfirmResult } from '@/app/api/candidates/bulk-import/confirm/route'
 
@@ -19,13 +20,14 @@ interface Candidate {
 interface Props {
   positionId: string
   existingCandidateIds: Set<string>
+  currentUserId?: string
   onCandidateAdded: (newRow: NewCandidatePosition) => void
   onClose: () => void
 }
 
-type Tab = 'search' | 'import'
+type Tab = 'search' | 'create' | 'import'
 
-export function AddCandidateToPositionModal({ positionId, existingCandidateIds, onCandidateAdded, onClose }: Props) {
+export function AddCandidateToPositionModal({ positionId, existingCandidateIds, currentUserId, onCandidateAdded, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('search')
 
   // Search tab state
@@ -82,18 +84,26 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
     existingCandidateIds.has(candidateId) || added.has(candidateId)
 
   function handleImportDone(result: ConfirmResult, newPositions?: NewCandidatePosition[]) {
-    // Add each new candidate-position to the panel
     if (newPositions) {
-      for (const cp of newPositions) {
-        onCandidateAdded(cp)
-      }
+      for (const cp of newPositions) onCandidateAdded(cp)
     }
     onClose()
   }
 
+  function handleCreated(newRow: NewCandidatePosition) {
+    onCandidateAdded(newRow)
+    onClose()
+  }
+
+  function tabClass(t: Tab) {
+    return `py-3 text-sm font-medium border-b-2 mr-6 transition-colors ${
+      tab === t ? 'border-[#8DF000] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-sm font-semibold text-gray-900">Add Candidate to Position</h2>
@@ -102,26 +112,9 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
 
         {/* Tabs */}
         <div className="flex border-b border-gray-100 shrink-0 px-6">
-          <button
-            className={`py-3 text-sm font-medium border-b-2 mr-6 transition-colors ${
-              tab === 'search'
-                ? 'border-[#8DF000] text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-            onClick={() => setTab('search')}
-          >
-            Search Existing
-          </button>
-          <button
-            className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === 'import'
-                ? 'border-[#8DF000] text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-            onClick={() => setTab('import')}
-          >
-            Import from LinkedIn
-          </button>
+          <button className={tabClass('search')} onClick={() => setTab('search')}>Search Existing</button>
+          <button className={tabClass('create')} onClick={() => setTab('create')}>Create New</button>
+          <button className={tabClass('import')} onClick={() => setTab('import')}>Import from LinkedIn</button>
         </div>
 
         {/* Search tab */}
@@ -184,7 +177,19 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
           </>
         )}
 
-        {/* Import tab */}
+        {/* Create New tab */}
+        {tab === 'create' && (
+          <div className="flex-1 overflow-y-auto">
+            <CreateCandidateInPositionForm
+              positionId={positionId}
+              currentUserId={currentUserId}
+              onCreated={handleCreated}
+              onCancel={onClose}
+            />
+          </div>
+        )}
+
+        {/* Import from LinkedIn tab */}
         {tab === 'import' && (
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <LinkedInImportFlow
