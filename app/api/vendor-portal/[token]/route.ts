@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 
 export async function GET(
   _request: Request,
@@ -13,7 +14,17 @@ export async function GET(
       positionVendors: {
         include: {
           position: {
-            select: { id: true, title: true, client: true, status: true, deletedAt: true },
+            select: {
+              id: true,
+              title: true,
+              client: true,
+              status: true,
+              deletedAt: true,
+              description: true,
+              jdSummary: true,
+              internalCostBudget: true,
+              location: true,
+            },
           },
         },
       },
@@ -24,9 +35,23 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid token' }, { status: 404 })
   }
 
+  const hoursBaseline = await getMonthlyHoursBaseline()
+
   const positions = vendor.positionVendors
     .map((pv) => pv.position)
     .filter((p) => !p.deletedAt)
+    .map((p) => ({
+      id: p.id,
+      title: p.title,
+      client: p.client,
+      status: p.status,
+      description: p.description ?? null,
+      jdSummary: p.jdSummary ?? null,
+      location: p.location ?? [],
+      budgetMonthly: p.internalCostBudget != null
+        ? Math.round(hourlyToMonthly(p.internalCostBudget, hoursBaseline))
+        : null,
+    }))
 
   return NextResponse.json({
     vendorId: vendor.id,

@@ -76,6 +76,9 @@ export async function POST(
       rejected: true,
       reason: 'duplicate',
       message: 'A candidate with this email address has already been submitted for this position.',
+      checks: [
+        { name: 'Duplicate Check', passed: false, detail: 'A candidate with this email was already submitted for this position.' },
+      ],
     })
   }
 
@@ -164,13 +167,18 @@ export async function POST(
   const thresholdSetting = await db.systemSettings.findUnique({ where: { key: 'VENDOR_MIN_FIT_SCORE' } })
   const threshold = thresholdSetting ? parseFloat(thresholdSetting.value) : 60
 
-  if ((scored?.fitScore ?? 0) < threshold) {
+  const fitScore = scored?.fitScore ?? 0
+  if (fitScore < threshold) {
     await db.candidatePosition.delete({ where: { id: cp.id } })
     if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
     return NextResponse.json({
       rejected: true,
       reason: 'low_score',
       message: 'This candidate does not meet the technical requirements for this position based on their profile and skills.',
+      checks: [
+        { name: 'Duplicate Check', passed: true, detail: 'No prior submission found for this position.' },
+        { name: 'Profile Match', passed: false, detail: `Score: ${Math.round(fitScore)}% (below minimum: ${Math.round(threshold)}%)` },
+      ],
     })
   }
 
@@ -185,6 +193,11 @@ export async function POST(
         rejected: true,
         reason: 'over_budget',
         message: `This candidate's expected compensation ($${desiredCompensation.toLocaleString()} USD/month) exceeds the budget for this position.`,
+        checks: [
+          { name: 'Duplicate Check', passed: true, detail: 'No prior submission found for this position.' },
+          { name: 'Profile Match', passed: true, detail: `Score: ${Math.round(fitScore)}% (minimum: ${Math.round(threshold)}%)` },
+          { name: 'Compensation', passed: false, detail: `$${desiredCompensation.toLocaleString()}/month exceeds the budget for this position.` },
+        ],
       })
     }
   }
