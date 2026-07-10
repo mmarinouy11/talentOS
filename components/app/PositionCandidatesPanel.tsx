@@ -179,6 +179,23 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
 
   const existingCandidateIds = new Set(rows.map((cp) => cp.candidate.id))
 
+  function roundReadiness(cp: CandidatePosition): number {
+    const status = cp.latestInterviewStatus
+    const decision = cp.latestInterviewDecision
+    if (!status) return 8 // NO_ROUND
+    if (status === 'COMPLETED') {
+      if (decision === 'ADVANCE') return 0
+      if (!decision) return 1
+      if (decision === 'HOLD') return 2
+      if (decision === 'REJECT') return 6
+    }
+    if (status === 'SCHEDULED') return 3
+    if (status === 'AWAITING_SCHEDULE') return 4
+    if (status === 'PENDING') return 5
+    if (status === 'CANCELLED') return 7
+    return 8
+  }
+
   function sortRows(list: CandidatePosition[]) {
     return [...list].sort((a, b) => {
       let av: number | string | null = null
@@ -197,6 +214,10 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         av = STAGE_ORDER[a.stage] ?? 8
         bv = STAGE_ORDER[b.stage] ?? 8
         if (av === bv) {
+          // Secondary: round readiness
+          const rDiff = roundReadiness(a) - roundReadiness(b)
+          if (rDiff !== 0) return rDiff
+          // Tertiary: fitScore desc
           const aFit = liveScores[a.id] ?? a.fitScore ?? -1
           const bFit = liveScores[b.id] ?? b.fitScore ?? -1
           return bFit - aFit
