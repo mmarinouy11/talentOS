@@ -16,10 +16,7 @@ export function ApplicationPortalLink({ positionId, initialToken, screeningQuest
   const [regenerating, setRegenerating] = useState(false)
   const [savingQuestions, setSavingQuestions] = useState(false)
   const [questionsFeedback, setQuestionsFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
-<<<<<<< HEAD
-=======
   const [regeneratingQuestions, setRegeneratingQuestions] = useState(false)
->>>>>>> origin/claude/loving-cray-m76Oa
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
   const applyUrl = token ? `${baseUrl}/apply/${token}` : null
@@ -45,8 +42,6 @@ export function ApplicationPortalLink({ positionId, initialToken, screeningQuest
     }
   }
 
-<<<<<<< HEAD
-=======
   async function handleRegenerateQuestions() {
     setRegeneratingQuestions(true)
     setQuestionsFeedback(null)
@@ -67,7 +62,6 @@ export function ApplicationPortalLink({ positionId, initialToken, screeningQuest
     }
   }
 
->>>>>>> origin/claude/loving-cray-m76Oa
   async function handleSaveQuestions() {
     setSavingQuestions(true)
     setQuestionsFeedback(null)
@@ -124,12 +118,6 @@ export function ApplicationPortalLink({ positionId, initialToken, screeningQuest
 
       {/* Screening Questions */}
       <div className="border-t border-gray-100 pt-4 space-y-3">
-<<<<<<< HEAD
-        <p className="text-xs font-medium text-gray-700">Screening Questions</p>
-        <p className="text-xs text-gray-400">These are shown to applicants on the form. Auto-generated from JD; edit as needed.</p>
-        {questions.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">No questions yet — will be generated when the JD is parsed.</p>
-=======
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium text-gray-700">Screening Questions</p>
           <Button
@@ -145,7 +133,6 @@ export function ApplicationPortalLink({ positionId, initialToken, screeningQuest
         <p className="text-xs text-gray-400">These are shown to applicants on the form. Auto-generated from JD; edit as needed.</p>
         {questions.length === 0 ? (
           <p className="text-sm text-gray-400 italic">No questions yet — click "Generate Questions" above to create them from the JD.</p>
->>>>>>> origin/claude/loving-cray-m76Oa
         ) : (
           questions.map((q, i) => (
             <div key={i}>
