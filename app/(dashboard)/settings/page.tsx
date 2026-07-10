@@ -19,6 +19,20 @@ export default async function SettingsPage({
 
   const { systemGmail } = await searchParams
 
+  // Ensure new settings keys exist for existing deployments that predate the seed update
+  await Promise.all([
+    db.systemSettings.upsert({
+      where: { key: 'VENDOR_MIN_FIT_SCORE' },
+      update: {},
+      create: { key: 'VENDOR_MIN_FIT_SCORE', value: '70', description: 'Minimum fit score (0–100) for vendor-submitted candidates. Submissions below this threshold are automatically rejected.' },
+    }),
+    db.systemSettings.upsert({
+      where: { key: 'DIRECT_MIN_FIT_SCORE' },
+      update: {},
+      create: { key: 'DIRECT_MIN_FIT_SCORE', value: '30', description: 'Minimum fit score (0–100) for direct (portal) applications. Applications below this threshold are automatically rejected.' },
+    }),
+  ])
+
   const [settings, headerSetting, systemEmailAccount] = await Promise.all([
     db.systemSettings.findMany({ orderBy: { key: 'asc' } }),
     db.systemSettings.findUnique({ where: { key: 'EMAIL_HEADER_IMAGE_URL' } }),
