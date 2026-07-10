@@ -75,7 +75,7 @@ export async function POST(
     return NextResponse.json({
       rejected: true,
       reason: 'duplicate',
-      message: 'A candidate with this email has already been submitted for this position.',
+      message: 'A candidate with this email address has already been submitted for this position.',
     })
   }
 
@@ -170,7 +170,7 @@ export async function POST(
     return NextResponse.json({
       rejected: true,
       reason: 'low_score',
-      message: 'This candidate does not meet the minimum requirements for this position.',
+      message: 'This candidate does not meet the technical requirements for this position based on their profile and skills.',
     })
   }
 
@@ -184,7 +184,7 @@ export async function POST(
       return NextResponse.json({
         rejected: true,
         reason: 'over_budget',
-        message: "This candidate's expected compensation exceeds the budget for this position.",
+        message: `This candidate's expected compensation ($${desiredCompensation.toLocaleString()} USD/month) exceeds the budget for this position.`,
       })
     }
   }

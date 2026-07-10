@@ -173,8 +173,9 @@ export default function VendorPortalPage() {
   if (state === 'rejected') {
     const heading =
       rejectionReason === 'duplicate' ? 'Candidate already submitted' :
-      rejectionReason === 'over_budget' ? 'Candidate not suitable for this position' :
-      'Candidate does not meet requirements'
+      rejectionReason === 'over_budget' ? 'Compensation out of range' :
+      rejectionReason === 'low_score' ? 'Candidate does not meet requirements' :
+      'Submission not accepted'
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-md text-center">
