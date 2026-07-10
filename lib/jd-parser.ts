@@ -60,6 +60,23 @@ Location: ${position.location.join(', ') || 'not specified'}`
       linkedinQueries = []
     }
 
+    let screeningQuestions: string[] = []
+    try {
+      const sqPrompt = `Based on the following job description, generate exactly 3 short screening questions to quickly assess if a candidate is a good fit. Questions should be direct and answerable in 1-2 sentences.
+
+Return ONLY a JSON array of 3 strings, no other text:
+["Question 1?", "Question 2?", "Question 3?"]
+
+Job description:
+${position.description.slice(0, 4000)}`
+      const sqRaw = await callClaudeJSON<string[]>(sqPrompt, 'FAST')
+      if (Array.isArray(sqRaw) && sqRaw.length > 0) {
+        screeningQuestions = sqRaw.slice(0, 3).map(String)
+      }
+    } catch {
+      screeningQuestions = []
+    }
+
     await db.position.update({
       where: { id: positionId },
       data: {
@@ -69,6 +86,7 @@ Location: ${position.location.join(', ') || 'not specified'}`
         jdLanguages: parsed.languages ?? [],
         jdSummary: parsed.summary ?? null,
         linkedinSearchQueries: linkedinQueries,
+        ...(screeningQuestions.length > 0 ? { screeningQuestions } : {}),
       },
     })
 

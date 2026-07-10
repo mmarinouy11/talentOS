@@ -14,6 +14,7 @@ import { VelocityTable } from '@/components/app/VelocityTable'
 import { PositionInsights } from '@/components/app/PositionInsights'
 import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
 import { VendorAssignment } from '@/components/app/VendorAssignment'
+import { ApplicationPortalLink } from '@/components/app/ApplicationPortalLink'
 import type { Role } from '@prisma/client'
 
 // Stage order for picking the "most meaningful" interview to display.
@@ -333,6 +334,16 @@ export default async function PositionDetailPage({
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h2 className="text-sm font-medium text-gray-900 mb-3">Assigned Vendors</h2>
         <VendorAssignment positionId={id} initialVendors={initialVendors} />
+      </div>
+
+      {/* Application Portal */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h2 className="text-sm font-medium text-gray-900 mb-3">Application Portal</h2>
+        <ApplicationPortalLink
+          positionId={id}
+          initialToken={position.applicationToken ?? null}
+          screeningQuestions={position.screeningQuestions}
+        />
       </div>
 
       {/* Job Description */}
