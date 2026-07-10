@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 const tabs = [
   { href: '/settings', label: 'General' },
   { href: '/settings/users', label: 'Users' },
+  { href: '/settings/email-templates', label: 'Email Templates' },
 ]
 
 export function SettingsNav() {

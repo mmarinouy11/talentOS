@@ -32,6 +32,7 @@ interface Interview {
   calendarLinkUsed: string | null
   scheduledAt: string | null
   interviewerEmail: string | null
+  magicLinkToken: string | null
   humanScore: number | null
   feedbackText: string | null
   feedbackPdfUrl: string | null
@@ -933,6 +934,7 @@ function EditInterviewModal({
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [postSaveFlow, setPostSaveFlow] = useState<'rejection-email' | 'next-round' | null>(null)
   const [parsing, setParsing] = useState(false)
   const [previewResult, setPreviewResult] = useState<{ summary: string; strengths: string[]; concerns: string[]; score: number } | null>(null)
@@ -1011,12 +1013,22 @@ function EditInterviewModal({
 
     setCurrentInterview(updated)
 
+    // Show feedback request confirmation when magic link was just generated
+    const magicLinkJustSent =
+      updated.magicLinkToken &&
+      !interview.magicLinkToken &&
+      updated.interviewerEmail
+
+    if (magicLinkJustSent) {
+      setSuccessMsg(`Interview scheduled. A feedback request has been sent to ${updated.interviewerEmail}.`)
+    }
+
     const decisionChanged = updated.decision !== interview.decision
     if (decisionChanged && updated.decision === 'REJECT') {
       setPostSaveFlow('rejection-email')
     } else if (decisionChanged && updated.decision === 'ADVANCE') {
       setPostSaveFlow('next-round')
-    } else {
+    } else if (!magicLinkJustSent) {
       onSaved(updated)
     }
   }
@@ -1303,6 +1315,7 @@ function EditInterviewModal({
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {successMsg && <p className="text-sm text-green-600">{successMsg}</p>}
 
           <div className="flex items-center justify-between pt-2">
             {canSendSchedulingEmail ? (
