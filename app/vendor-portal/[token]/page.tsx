@@ -3,6 +3,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 
+const LATAM_COUNTRIES = [
+  'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Ecuador',
+  'Mexico', 'Paraguay', 'Peru', 'Uruguay', 'Venezuela', 'Other',
+]
+
 interface Position {
   id: string
   title: string
@@ -17,8 +22,9 @@ interface VendorData {
 }
 
 type PageState = 'loading' | 'invalid' | 'list' | 'submit' | 'success' | 'rejected'
+type RejectionReason = 'duplicate' | 'low_score' | 'over_budget'
 
-type RejectionReason = 'duplicate' | 'low_score'
+const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
 
 export default function VendorPortalPage() {
   const { token } = useParams<{ token: string }>()
@@ -31,6 +37,8 @@ export default function VendorPortalPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [country, setCountry] = useState('')
+  const [desiredCompensation, setDesiredCompensation] = useState('')
   const [parsing, setParsing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -62,13 +70,14 @@ export default function VendorPortalPage() {
       if (res.ok) {
         const d = await res.json()
         if (d.parsed) {
-          setFirstName(d.parsed.firstName ?? '')
-          setLastName(d.parsed.lastName ?? '')
-          setEmail(d.parsed.email ?? '')
+          if (d.parsed.firstName) setFirstName(d.parsed.firstName)
+          if (d.parsed.lastName) setLastName(d.parsed.lastName)
+          if (d.parsed.email) setEmail(d.parsed.email)
+          if (d.parsed.country) setCountry(d.parsed.country)
         }
       }
     } catch {
-      // parsing failure is non-fatal — user can fill in manually
+      // non-fatal — user can fill in manually
     } finally {
       setParsing(false)
     }
@@ -86,6 +95,8 @@ export default function VendorPortalPage() {
       fd.append('firstName', firstName)
       fd.append('lastName', lastName)
       fd.append('email', email)
+      fd.append('country', country)
+      fd.append('desiredCompensation', desiredCompensation)
       const res = await fetch(`/api/vendor-portal/${token}/submit`, { method: 'POST', body: fd })
       const d = await res.json()
       if (d.rejected) {
@@ -108,6 +119,8 @@ export default function VendorPortalPage() {
     setFirstName('')
     setLastName('')
     setEmail('')
+    setCountry('')
+    setDesiredCompensation('')
     setSubmitError('')
     setState('submit')
   }
@@ -149,10 +162,7 @@ export default function VendorPortalPage() {
           <div className="text-5xl mb-4">✅</div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Candidate submitted!</h1>
           <p className="text-gray-600 mb-6">The candidate has been successfully added to the pipeline. Our team will review and be in touch.</p>
-          <button
-            onClick={submitAnother}
-            className="bg-black text-white font-medium py-2 px-6 rounded-xl hover:bg-gray-800 transition-colors"
-          >
+          <button onClick={submitAnother} className="bg-black text-white font-medium py-2 px-6 rounded-xl hover:bg-gray-800 transition-colors">
             Submit another candidate
           </button>
         </div>
@@ -161,17 +171,17 @@ export default function VendorPortalPage() {
   }
 
   if (state === 'rejected') {
-    const heading = rejectionReason === 'duplicate' ? 'Candidate already submitted' : 'Candidate does not meet requirements'
+    const heading =
+      rejectionReason === 'duplicate' ? 'Candidate already submitted' :
+      rejectionReason === 'over_budget' ? 'Candidate not suitable for this position' :
+      'Candidate does not meet requirements'
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-md text-center">
           <div className="text-5xl mb-4">❌</div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">{heading}</h1>
           <p className="text-gray-600 mb-6">{rejectionMessage}</p>
-          <button
-            onClick={submitAnother}
-            className="bg-black text-white font-medium py-2 px-6 rounded-xl hover:bg-gray-800 transition-colors"
-          >
+          <button onClick={submitAnother} className="bg-black text-white font-medium py-2 px-6 rounded-xl hover:bg-gray-800 transition-colors">
             Try a different candidate
           </button>
         </div>
@@ -234,6 +244,7 @@ export default function VendorPortalPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* CV upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">CV / Resume (PDF) *</label>
               <input
@@ -248,43 +259,54 @@ export default function VendorPortalPage() {
               {file && !parsing && <p className="text-xs text-green-600 mt-1">CV ready — please review the fields below before submitting.</p>}
             </div>
 
+            {/* Name */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required className={inputClass} />
               </div>
             </div>
 
+            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
             </div>
 
-            {submitError && (
-              <p className="text-sm text-red-600">{submitError}</p>
-            )}
+            {/* Country */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Country *</label>
+              <select value={country} onChange={(e) => setCountry(e.target.value)} required className={inputClass}>
+                <option value="">— Select country —</option>
+                {LATAM_COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Desired Compensation */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Expected Monthly Compensation (USD) *
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="1"
+                value={desiredCompensation}
+                onChange={(e) => setDesiredCompensation(e.target.value)}
+                required
+                placeholder="e.g. 3500"
+                className={inputClass}
+              />
+              <p className="text-xs text-gray-400 mt-1">Gross monthly amount in USD that the candidate expects to earn.</p>
+            </div>
+
+            {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
             <button
               type="submit"

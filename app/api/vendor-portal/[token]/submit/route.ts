@@ -6,6 +6,7 @@ import { uploadFileToDrive } from '@/lib/google'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
 import { vendorCandidateSubmittedEmail } from '@/lib/email-templates'
+import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 
 const CV_PARSE_SYSTEM = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -35,9 +36,16 @@ export async function POST(
   const firstName = (formData.get('firstName') as string | null)?.trim() ?? ''
   const lastName = (formData.get('lastName') as string | null)?.trim() ?? ''
   const emailRaw = (formData.get('email') as string | null)?.trim().toLowerCase() ?? ''
+  const countryRaw = (formData.get('country') as string | null)?.trim() ?? ''
+  const compensationRaw = (formData.get('desiredCompensation') as string | null)?.trim() ?? ''
 
-  if (!cvFile || !positionId || !firstName || !lastName || !emailRaw) {
+  if (!cvFile || !positionId || !firstName || !lastName || !emailRaw || !countryRaw || !compensationRaw) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  const desiredCompensation = parseFloat(compensationRaw)
+  if (isNaN(desiredCompensation) || desiredCompensation < 0) {
+    return NextResponse.json({ error: 'Invalid compensation value' }, { status: 400 })
   }
 
   // Security: confirm this position is actually assigned to this vendor
@@ -94,7 +102,7 @@ export async function POST(
       CV_PARSE_SYSTEM
     )
   } catch {
-    // Non-fatal — proceed with empty fields; fit scorer will still work with skills/summary
+    // Non-fatal — proceed with empty fields
   }
 
   // Upload CV to Drive (non-fatal)
@@ -124,6 +132,8 @@ export async function POST(
         firstName,
         lastName,
         email: emailRaw,
+        country: countryRaw,
+        desiredCompensation,
         seniority: parsed.seniority ?? undefined,
         yearsOfExperience: parsed.yearsOfExperience ?? null,
         skills: parsed.skills ?? [],
@@ -147,26 +157,36 @@ export async function POST(
     },
   })
 
-  // CHECK 2 — Score synchronously
+  // CHECK 2 — Fit score (synchronous)
   await scoreCandidateForPosition(cp.id)
-
   const scored = await db.candidatePosition.findUnique({ where: { id: cp.id } })
 
-  // Get threshold (default 60 if not configured)
   const thresholdSetting = await db.systemSettings.findUnique({ where: { key: 'VENDOR_MIN_FIT_SCORE' } })
   const threshold = thresholdSetting ? parseFloat(thresholdSetting.value) : 60
 
   if ((scored?.fitScore ?? 0) < threshold) {
-    // Reject — clean up
     await db.candidatePosition.delete({ where: { id: cp.id } })
-    if (createdCandidate) {
-      await db.candidate.delete({ where: { id: candidate.id } })
-    }
+    if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
     return NextResponse.json({
       rejected: true,
       reason: 'low_score',
       message: 'This candidate does not meet the minimum requirements for this position.',
     })
+  }
+
+  // CHECK 3 — Compensation vs position budget (only if internalCostBudget is set)
+  if (position.internalCostBudget != null) {
+    const hoursBaseline = await getMonthlyHoursBaseline()
+    const budgetMonthly = hourlyToMonthly(position.internalCostBudget, hoursBaseline)
+    if (desiredCompensation > budgetMonthly) {
+      await db.candidatePosition.delete({ where: { id: cp.id } })
+      if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
+      return NextResponse.json({
+        rejected: true,
+        reason: 'over_budget',
+        message: "This candidate's expected compensation exceeds the budget for this position.",
+      })
+    }
   }
 
   // Accepted — notify recruiter
