@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { vendorPositionAssignedEmail } from '@/lib/email-templates'
+import { vendorPositionAssignedEmail, vendorRemovedFromPositionEmail } from '@/lib/email-templates'
 
 const patchSchema = z.object({
   vendorIds: z.array(z.string()),
@@ -55,15 +55,43 @@ export async function PATCH(
   const toAdd = vendorIds.filter((vid) => !currentIds.has(vid))
   const toRemove = [...currentIds].filter((vid) => !desiredIds.has(vid))
 
-  // Remove unassigned vendors
+  // Check upfront whether system Gmail is connected
+  const systemAccount = await db.systemEmailAccount.findUnique({
+    where: { purpose: 'system_notifications' },
+    select: { refreshToken: true, connectedEmail: true },
+  })
+  const gmailConnected = !!systemAccount?.refreshToken
+
+  const emailWarnings: string[] = []
+  const emailSuccesses: string[] = []
+
+  // Remove unassigned vendors and notify them
   if (toRemove.length > 0) {
+    const removedVendors = await db.vendor.findMany({
+      where: { id: { in: toRemove } },
+      select: { id: true, name: true, pocName: true, pocEmail: true },
+    })
     await db.positionVendor.deleteMany({
       where: { positionId, vendorId: { in: toRemove } },
     })
+    if (gmailConnected) {
+      for (const vendor of removedVendors) {
+        if (!vendor.pocEmail) continue
+        try {
+          const { subject, html } = vendorRemovedFromPositionEmail({
+            vendorContactName: vendor.pocName ?? vendor.name,
+            positionTitle: position.title,
+            client: position.client,
+          })
+          await sendEmailViaSystemGmail({ to: vendor.pocEmail, subject, html })
+        } catch (err) {
+          console.error(`[position-vendors] removal email failed for ${vendor.pocEmail}:`, err)
+        }
+      }
+    }
   }
 
   // Add new vendors and send notification emails
-  const emailWarnings: string[] = []
 
   if (toAdd.length > 0) {
     await db.positionVendor.createMany({
@@ -76,14 +104,6 @@ export async function PATCH(
       select: { id: true, name: true, pocName: true, pocEmail: true, portalToken: true },
     })
 
-    // Check upfront whether system Gmail is connected — sendEmailViaSystemGmail
-    // silently returns (no throw) when the account is missing, so we must
-    // detect this ourselves to surface a warning in the UI.
-    const systemAccount = await db.systemEmailAccount.findUnique({
-      where: { purpose: 'system_notifications' },
-      select: { refreshToken: true, connectedEmail: true },
-    })
-    const gmailConnected = !!systemAccount?.refreshToken
     console.log(`[position-vendors] system Gmail connected: ${gmailConnected}, account: ${systemAccount?.connectedEmail ?? 'none'}`)
 
     const baseUrl = process.env.NEXTAUTH_URL ?? ''
@@ -119,6 +139,7 @@ export async function PATCH(
         console.log(`[position-vendors] sending assignment email to ${vendor.pocEmail}`)
         await sendEmailViaSystemGmail({ to: vendor.pocEmail, subject, html })
         console.log(`[position-vendors] email sent successfully to ${vendor.pocEmail}`)
+        emailSuccesses.push(vendor.name)
       } catch (err) {
         console.error(`[position-vendors] send failed for vendor ${vendor.id} (${vendor.pocEmail}):`, err)
         emailWarnings.push(`Failed to email ${vendor.name} (${vendor.pocEmail}): ${err instanceof Error ? err.message : String(err)}`)
@@ -134,8 +155,7 @@ export async function PATCH(
 
   return NextResponse.json({
     vendors: updatedVendors.map((r) => r.vendor),
-    // Keep the single emailError field for UI compatibility but populate it
-    // with all warnings joined, so the banner shows the real reason.
     emailError: emailWarnings.length > 0 ? emailWarnings.join(' | ') : null,
+    emailSuccesses,
   })
 }

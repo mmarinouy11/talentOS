@@ -59,6 +59,8 @@ interface PositionFormProps {
     sales_contact_email?: string | null
     clientRate?: number | null
     internalCostBudget?: number | null
+    vendorMinFitScore?: number | null
+    directMinFitScore?: number | null
     talentId?: string | null
     reportingEmails?: string[]
     reportingDays?: string[]
@@ -78,6 +80,14 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
   const [internalCostBudget, setInternalCostBudget] = useState<string>(
     defaultValues.internalCostBudget != null ? String(defaultValues.internalCostBudget) : ''
   )
+  const [vendorMinFitScore, setVendorMinFitScore] = useState<string>(
+    defaultValues.vendorMinFitScore != null ? String(defaultValues.vendorMinFitScore) : ''
+  )
+  const [directMinFitScore, setDirectMinFitScore] = useState<string>(
+    defaultValues.directMinFitScore != null ? String(defaultValues.directMinFitScore) : ''
+  )
+  const [globalVendorThreshold, setGlobalVendorThreshold] = useState<number>(70)
+  const [globalDirectThreshold, setGlobalDirectThreshold] = useState<number>(30)
   const [dgmThreshold, setDgmThreshold] = useState<number>(0.4)
   const [reportingEmails, setReportingEmails] = useState<string[]>(defaultValues.reportingEmails ?? [])
   const [reportingEmailInput, setReportingEmailInput] = useState('')
@@ -90,8 +100,12 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
     fetch('/api/settings')
       .then((r) => (r.ok ? r.json() : []))
       .then((settings: { key: string; value: string }[]) => {
-        const s = settings.find((x) => x.key === 'MIN_DGM_PERCENT')
-        if (s) setDgmThreshold(parseFloat(s.value) / 100)
+        const dgm = settings.find((x) => x.key === 'MIN_DGM_PERCENT')
+        if (dgm) setDgmThreshold(parseFloat(dgm.value) / 100)
+        const vt = settings.find((x) => x.key === 'VENDOR_MIN_FIT_SCORE')
+        if (vt) setGlobalVendorThreshold(parseFloat(vt.value))
+        const dt = settings.find((x) => x.key === 'DIRECT_MIN_FIT_SCORE')
+        if (dt) setGlobalDirectThreshold(parseFloat(dt.value))
       })
       .catch(() => {})
   }, [])
@@ -167,6 +181,8 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
       sales_contact_email: (fd.get('sales_contact_email') as string) || null,
       clientRate: clientRate !== '' && !isNaN(crNum) ? crNum : null,
       internalCostBudget: internalCostBudget !== '' && !isNaN(icbNum) ? icbNum : null,
+      vendorMinFitScore: vendorMinFitScore !== '' && !isNaN(parseInt(vendorMinFitScore)) ? parseInt(vendorMinFitScore) : null,
+      directMinFitScore: directMinFitScore !== '' && !isNaN(parseInt(directMinFitScore)) ? parseInt(directMinFitScore) : null,
       talentId: (fd.get('talentId') as string) || null,
       reportingEmails,
       reportingDays,
@@ -452,6 +468,34 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             )}
           </div>
         )}
+        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="vendorMinFitScore">Min Fit Score — Vendor Submissions</Label>
+            <p className="text-xs text-gray-400 mb-1">Override global default ({globalVendorThreshold}). Leave blank to use global.</p>
+            <Input
+              id="vendorMinFitScore"
+              type="number"
+              min={0}
+              max={100}
+              value={vendorMinFitScore}
+              onChange={(e) => setVendorMinFitScore(e.target.value)}
+              placeholder={String(globalVendorThreshold)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="directMinFitScore">Min Fit Score — Direct Applications</Label>
+            <p className="text-xs text-gray-400 mb-1">Override global default ({globalDirectThreshold}). Leave blank to use global.</p>
+            <Input
+              id="directMinFitScore"
+              type="number"
+              min={0}
+              max={100}
+              value={directMinFitScore}
+              onChange={(e) => setDirectMinFitScore(e.target.value)}
+              placeholder={String(globalDirectThreshold)}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Reporting */}

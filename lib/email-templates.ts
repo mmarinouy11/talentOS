@@ -217,6 +217,29 @@ export function vendorPositionAssignedEmail(params: {
   }
 }
 
+export function vendorPositionClosedEmail(params: { vendorContactName: string; positionTitle: string; client: string }): { subject: string; html: string } {
+  return {
+    subject: `Position update: ${params.positionTitle}`,
+    html: `
+      <p>Hi ${params.vendorContactName},</p>
+      <p>The <strong>${params.positionTitle}</strong> (${params.client}) position has been closed and is no longer accepting submissions.</p>
+      <p>Thank you for your partnership.</p>
+      <p>Best,<br/>${SIGNATURE_NAME}</p>
+    `,
+  }
+}
+
+export function vendorRemovedFromPositionEmail(params: { vendorContactName: string; positionTitle: string; client: string }): { subject: string; html: string } {
+  return {
+    subject: `Position update: ${params.positionTitle}`,
+    html: `
+      <p>Hi ${params.vendorContactName},</p>
+      <p>You have been removed from the sourcing list for <strong>${params.positionTitle}</strong> (${params.client}). Please stop submitting candidates for this position.</p>
+      <p>Best,<br/>${SIGNATURE_NAME}</p>
+    `,
+  }
+}
+
 export function vendorCandidateSubmittedEmail(params: {
   recruiterName: string
   candidateName: string

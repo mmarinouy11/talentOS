@@ -21,6 +21,7 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
   const [allVendors, setAllVendors] = useState<Vendor[]>([])
   const [saving, setSaving] = useState(false)
   const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
   async function save(newIds: string[]) {
     setSaving(true)
     setEmailError(null)
+    setEmailSuccess(null)
     try {
       const res = await fetch(`/api/positions/${positionId}/vendors`, {
         method: 'PATCH',
@@ -49,6 +51,10 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
         const data = await res.json()
         setAssigned(data.vendors)
         if (data.emailError) setEmailError(data.emailError)
+        if (data.emailSuccesses?.length > 0) {
+          const names = (data.emailSuccesses as string[]).join(', ')
+          setEmailSuccess(`Vendor${data.emailSuccesses.length > 1 ? 's' : ''} assigned. A notification email has been sent to ${names}.`)
+        }
       }
     } finally {
       setSaving(false)
@@ -67,6 +73,11 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
 
   return (
     <div className="space-y-3">
+      {emailSuccess && (
+        <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+          {emailSuccess}
+        </div>
+      )}
       {emailError && (
         <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 space-y-1">
           {emailError.split(' | ').map((msg, i) => (
