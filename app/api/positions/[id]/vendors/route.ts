@@ -62,23 +62,53 @@ export async function PATCH(
     })
   }
 
-  // Add new vendors
-  let emailError: string | null = null
+  // Add new vendors and send notification emails
+  const emailWarnings: string[] = []
+
   if (toAdd.length > 0) {
     await db.positionVendor.createMany({
       data: toAdd.map((vendorId) => ({ positionId, vendorId })),
       skipDuplicates: true,
     })
 
-    // Send notification emails to newly added vendors
     const vendors = await db.vendor.findMany({
       where: { id: { in: toAdd } },
       select: { id: true, name: true, pocName: true, pocEmail: true, portalToken: true },
     })
 
+    // Check upfront whether system Gmail is connected — sendEmailViaSystemGmail
+    // silently returns (no throw) when the account is missing, so we must
+    // detect this ourselves to surface a warning in the UI.
+    const systemAccount = await db.systemEmailAccount.findUnique({
+      where: { purpose: 'system_notifications' },
+      select: { refreshToken: true, connectedEmail: true },
+    })
+    const gmailConnected = !!systemAccount?.refreshToken
+    console.log(`[position-vendors] system Gmail connected: ${gmailConnected}, account: ${systemAccount?.connectedEmail ?? 'none'}`)
+
     const baseUrl = process.env.NEXTAUTH_URL ?? ''
+
     for (const vendor of vendors) {
-      if (!vendor.pocEmail || !vendor.portalToken) continue
+      console.log(`[position-vendors] notifying vendor "${vendor.name}" (${vendor.id}): pocEmail=${vendor.pocEmail ?? 'NOT SET'}, portalToken=${vendor.portalToken ? 'set' : 'NOT SET'}`)
+
+      if (!vendor.portalToken) {
+        console.warn(`[position-vendors] vendor ${vendor.id} has no portalToken — skipping email`)
+        emailWarnings.push(`${vendor.name}: no portal link generated yet (visit the vendor's edit page to regenerate).`)
+        continue
+      }
+
+      if (!vendor.pocEmail) {
+        console.warn(`[position-vendors] vendor ${vendor.id} has no pocEmail — skipping email`)
+        emailWarnings.push(`${vendor.name}: no contact email on record — add one on their edit page to receive notifications.`)
+        continue
+      }
+
+      if (!gmailConnected) {
+        console.warn('[position-vendors] system Gmail not connected — cannot send notification')
+        emailWarnings.push(`Could not email ${vendor.name} (${vendor.pocEmail}) — no system Gmail account connected. Go to Settings to connect one.`)
+        continue
+      }
+
       try {
         const { subject, html } = vendorPositionAssignedEmail({
           vendorContactName: vendor.pocName ?? vendor.name,
@@ -86,10 +116,12 @@ export async function PATCH(
           client: position.client,
           portalLink: `${baseUrl}/vendor-portal/${vendor.portalToken}`,
         })
+        console.log(`[position-vendors] sending assignment email to ${vendor.pocEmail}`)
         await sendEmailViaSystemGmail({ to: vendor.pocEmail, subject, html })
+        console.log(`[position-vendors] email sent successfully to ${vendor.pocEmail}`)
       } catch (err) {
-        console.error(`[position-vendors] Failed to notify vendor ${vendor.id}:`, err)
-        emailError = 'Cannot send notification — connect a system Gmail account in Settings first.'
+        console.error(`[position-vendors] send failed for vendor ${vendor.id} (${vendor.pocEmail}):`, err)
+        emailWarnings.push(`Failed to email ${vendor.name} (${vendor.pocEmail}): ${err instanceof Error ? err.message : String(err)}`)
       }
     }
   }
@@ -102,6 +134,8 @@ export async function PATCH(
 
   return NextResponse.json({
     vendors: updatedVendors.map((r) => r.vendor),
-    emailError,
+    // Keep the single emailError field for UI compatibility but populate it
+    // with all warnings joined, so the banner shows the real reason.
+    emailError: emailWarnings.length > 0 ? emailWarnings.join(' | ') : null,
   })
 }
