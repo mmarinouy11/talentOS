@@ -18,6 +18,8 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   DEFAULT_DURATION_SCREENING_MANAGER: { label: 'Default Duration — Screening & Manager (minutes)', type: 'number', min: 5, max: 480 },
   DEFAULT_DURATION_OTHER: { label: 'Default Duration — Technical & Client (minutes)', type: 'number', min: 5, max: 480 },
   TECHNICAL_FEEDBACK_SKILL_LIMIT: { label: 'Technical Feedback Skill Limit', type: 'number', min: 1, max: 20 },
+  VENDOR_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Vendor Submissions (default: 70)', type: 'number', min: 0, max: 100 },
+  DIRECT_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Direct Applications (default: 30)', type: 'number', min: 0, max: 100 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {

@@ -165,7 +165,8 @@ export async function POST(
   const scored = await db.candidatePosition.findUnique({ where: { id: cp.id } })
 
   const thresholdSetting = await db.systemSettings.findUnique({ where: { key: 'VENDOR_MIN_FIT_SCORE' } })
-  const threshold = thresholdSetting ? parseFloat(thresholdSetting.value) : 60
+  const globalThreshold = thresholdSetting ? parseFloat(thresholdSetting.value) : 70
+  const threshold = position.vendorMinFitScore ?? globalThreshold
 
   const fitScore = scored?.fitScore ?? 0
   if (fitScore < threshold) {

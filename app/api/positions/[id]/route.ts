@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJDInBackground } from '@/lib/jd-parser'
 import { computePositionDGM } from '@/lib/dgm'
+import { sendEmailViaSystemGmail } from '@/lib/email'
+import { vendorPositionClosedEmail } from '@/lib/email-templates'
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -20,6 +22,8 @@ const patchSchema = z.object({
   sales_contact_email: z.string().email().optional().nullable(),
   clientRate: z.number().optional().nullable(),
   internalCostBudget: z.number().optional().nullable(),
+  vendorMinFitScore: z.number().int().min(0).max(100).optional().nullable(),
+  directMinFitScore: z.number().int().min(0).max(100).optional().nullable(),
   talentId: z.string().optional().nullable(),
   reportingEmails: z.array(z.string().email()).optional(),
   reportingDays: z.array(z.string()).optional(),
@@ -106,10 +110,34 @@ export async function DELETE(
 
   const { id } = await params
 
-  const existing = await db.position.findFirst({ where: { id, deletedAt: null } })
+  const existing = await db.position.findFirst({
+    where: { id, deletedAt: null },
+    include: {
+      positionVendors: {
+        include: { vendor: { select: { name: true, pocName: true, pocEmail: true } } },
+      },
+    },
+  })
   if (!existing) return NextResponse.json({ error: 'Position not found' }, { status: 404 })
 
   await db.position.update({ where: { id }, data: { deletedAt: new Date() } })
 
-  return NextResponse.json({ success: true })
+  // Notify assigned vendors (non-fatal)
+  let notifiedCount = 0
+  for (const pv of existing.positionVendors) {
+    if (!pv.vendor.pocEmail) continue
+    try {
+      const { subject, html } = vendorPositionClosedEmail({
+        vendorContactName: pv.vendor.pocName ?? pv.vendor.name,
+        positionTitle: existing.title,
+        client: existing.client,
+      })
+      await sendEmailViaSystemGmail({ to: pv.vendor.pocEmail, subject, html })
+      notifiedCount++
+    } catch {
+      // non-fatal
+    }
+  }
+
+  return NextResponse.json({ success: true, notifiedVendors: notifiedCount })
 }
