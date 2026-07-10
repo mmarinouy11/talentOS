@@ -16,6 +16,30 @@ import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
 import { VendorAssignment } from '@/components/app/VendorAssignment'
 import type { Role } from '@prisma/client'
 
+// Stage order for picking the "most meaningful" interview to display.
+// Higher = more advanced.
+const INTERVIEW_STAGE_ORDER: Record<string, number> = {
+  OFFER: 6,
+  CLIENT_INTERVIEW: 5,
+  MANAGER_INTERVIEW: 4,
+  TECHNICAL_INTERVIEW: 3,
+  SCREENING: 2,
+  APPLIED: 1,
+}
+
+function pickLatestInterview(
+  interviews: { status: string; decision: string | null; stage: string }[]
+) {
+  if (!interviews.length) return null
+  // If any round has decision=REJECT, show that one (decisive round).
+  const rejected = interviews.find((i) => i.decision === 'REJECT')
+  if (rejected) return rejected
+  // Otherwise show the interview at the highest stage.
+  return interviews.reduce((best, cur) =>
+    (INTERVIEW_STAGE_ORDER[cur.stage] ?? 0) >= (INTERVIEW_STAGE_ORDER[best.stage] ?? 0) ? cur : best
+  )
+}
+
 function fmt(date: Date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -51,7 +75,7 @@ export default async function PositionDetailPage({
         where: { candidate: { deletedAt: null } },
         include: {
           candidate: { select: { id: true, firstName: true, lastName: true, email: true, seniority: true, minimumCompensation: true } },
-          interviews: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true, decision: true } },
+          interviews: { select: { status: true, decision: true, stage: true } },
         },
         orderBy: { createdAt: 'desc' },
       },
@@ -240,8 +264,8 @@ export default async function PositionDetailPage({
           stage: cp.stage,
           status: cp.status,
           fitScore: cp.fitScore,
-          latestInterviewStatus: cp.interviews[0]?.status ?? null,
-          latestInterviewDecision: cp.interviews[0]?.decision ?? null,
+          latestInterviewStatus: pickLatestInterview(cp.interviews)?.status ?? null,
+          latestInterviewDecision: pickLatestInterview(cp.interviews)?.decision ?? null,
           compensationOutOfRange:
             cp.candidate.minimumCompensation != null && position.internalCostBudget != null
               ? cp.candidate.minimumCompensation > hourlyToMonthly(position.internalCostBudget, hoursBaseline)

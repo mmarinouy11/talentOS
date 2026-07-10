@@ -9,7 +9,8 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "backfill:cp-status": "npx tsx scripts/backfill-cp-status.ts",
-    "fix:fde-rejected": "npx tsx scripts/fix-fde-rejected-status.ts"
+    "fix:fde-rejected": "npx tsx scripts/fix-fde-rejected-status.ts",
+    "fix:rejected-stage": "npx tsx scripts/fix-rejected-stage.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
