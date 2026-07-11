@@ -194,22 +194,6 @@ export default async function PositionDetailPage({
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor Min Score</p>
-            <p className="text-sm text-gray-900 mt-0.5">
-              {position.vendorMinFitScore != null
-                ? <>{position.vendorMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
-                : <>{globalVendorMin} <span className="text-xs text-gray-400">(default)</span></>}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Direct Min Score</p>
-            <p className="text-sm text-gray-900 mt-0.5">
-              {position.directMinFitScore != null
-                ? <>{position.directMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
-                : <>{globalDirectMin} <span className="text-xs text-gray-400">(default)</span></>}
-            </p>
-          </div>
-          <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hiring Manager</p>
             <p className="text-sm text-gray-900 mt-0.5">{position.hiring_manager_name ?? '—'}</p>
             {position.hiring_manager_email && (
@@ -235,6 +219,22 @@ export default async function PositionDetailPage({
               </p>
             </div>
           )}
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor Min Score</p>
+            <p className="text-sm text-gray-900 mt-0.5">
+              {position.vendorMinFitScore != null
+                ? <>{position.vendorMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
+                : <>{globalVendorMin} <span className="text-xs text-gray-400">(default)</span></>}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Direct Min Score</p>
+            <p className="text-sm text-gray-900 mt-0.5">
+              {position.directMinFitScore != null
+                ? <>{position.directMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
+                : <>{globalDirectMin} <span className="text-xs text-gray-400">(default)</span></>}
+            </p>
+          </div>
         </div>
 
         {(position.clientRate || position.internalCostBudget) && (
