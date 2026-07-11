@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
+import { BrandHeader } from '@/components/public/BrandHeader'
 
 const LATAM_COUNTRIES = [
   'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Ecuador',
@@ -34,7 +35,32 @@ interface VendorData {
 type PageState = 'loading' | 'invalid' | 'list' | 'submit' | 'success' | 'rejected'
 type RejectionReason = 'duplicate' | 'low_score' | 'over_budget'
 
-const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  border: '1.5px solid #e5e0da',
+  borderRadius: 10,
+  padding: '10px 14px',
+  fontSize: 14,
+  background: '#fff',
+  outline: 'none',
+  boxSizing: 'border-box',
+  fontFamily: 'Arial, "Open Sans", sans-serif',
+  color: '#2F2C29',
+  transition: 'border-color 0.15s',
+}
+
+function InputField({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2F2C29', marginBottom: 6, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+        {label}
+        {required && <span style={{ color: '#8CF000', marginLeft: 3 }}>*</span>}
+        {hint && <span style={{ color: '#9a9490', fontWeight: 400, marginLeft: 6 }}>{hint}</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
 
 export default function VendorPortalPage() {
   const { token } = useParams<{ token: string }>()
@@ -42,7 +68,6 @@ export default function VendorPortalPage() {
   const [data, setData] = useState<VendorData | null>(null)
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null)
 
-  // Submission form state
   const [file, setFile] = useState<File | null>(null)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -55,6 +80,7 @@ export default function VendorPortalPage() {
   const [rejectionReason, setRejectionReason] = useState<RejectionReason | null>(null)
   const [rejectionMessage, setRejectionMessage] = useState('')
   const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
+  const [expandedJD, setExpandedJD] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -88,7 +114,7 @@ export default function VendorPortalPage() {
         }
       }
     } catch {
-      // non-fatal — user can fill in manually
+      // non-fatal
     } finally {
       setParsing(false)
     }
@@ -142,13 +168,10 @@ export default function VendorPortalPage() {
     setSelectedPosition(null)
   }
 
-  const [expandedJD, setExpandedJD] = useState<Set<string>>(new Set())
-
   function toggleJD(id: string) {
     setExpandedJD((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
@@ -158,41 +181,56 @@ export default function VendorPortalPage() {
     setSelectedPosition(null)
   }
 
+  // ─── Loading ───
   if (state === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading…</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F0EB' }}>
+        <p style={{ color: '#9a9490', fontFamily: 'Arial, "Open Sans", sans-serif' }}>Loading…</p>
       </div>
     )
   }
 
+  // ─── Invalid ───
   if (state === 'invalid' || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-md text-center">
-          <div className="text-5xl mb-4">🔒</div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Invalid link</h1>
-          <p className="text-gray-600">This link is invalid. Please contact your TalentOS contact for a valid link.</p>
+      <div style={{ minHeight: '100vh', background: '#F5F0EB', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+        <BrandHeader />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 16px' }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '48px 40px', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#2F2C29', marginBottom: 8 }}>Invalid link</h1>
+            <p style={{ color: '#9a9490', fontSize: 14 }}>This link is invalid. Please contact your Tenarai contact for a valid link.</p>
+          </div>
         </div>
       </div>
     )
   }
 
+  // ─── Success ───
   if (state === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-md text-center">
-          <div className="text-5xl mb-4">✅</div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Candidate submitted!</h1>
-          <p className="text-gray-600 mb-6">The candidate has been successfully added to the pipeline. Our team will review and be in touch.</p>
-          <button onClick={submitAnother} className="bg-black text-white font-medium py-2 px-6 rounded-xl hover:bg-gray-800 transition-colors">
-            Submit another candidate
-          </button>
+      <div style={{ minHeight: '100vh', background: '#F5F0EB', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+        <BrandHeader />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 16px' }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '48px 40px', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#8CF000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 20px' }}>✓</div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#2F2C29', marginBottom: 10 }}>Candidate submitted!</h1>
+            <p style={{ color: '#6b6560', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>The candidate has been successfully added to the pipeline. Our team will review and be in touch.</p>
+            <button
+              onClick={submitAnother}
+              style={{ background: '#8CF000', color: '#000', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Arial, "Open Sans", sans-serif' }}
+              onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = '#7ada00' }}
+              onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = '#8CF000' }}
+            >
+              Submit another candidate
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
+  // ─── Rejected ───
   if (state === 'rejected') {
     const heading =
       rejectionReason === 'duplicate' ? 'Candidate already submitted' :
@@ -200,27 +238,44 @@ export default function VendorPortalPage() {
       rejectionReason === 'low_score' ? 'Candidate does not meet requirements' :
       'Submission not accepted'
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 max-w-md w-full text-center">
-          <div className="text-5xl mb-4">❌</div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">{heading}</h1>
-          <p className="text-gray-600 mb-6">{rejectionMessage}</p>
-          {rejectionChecks.length > 0 && (
-            <div className="mb-6 text-left space-y-2">
-              {rejectionChecks.map((check) => (
-                <div key={check.name} className="flex items-start gap-3 bg-gray-50 rounded-lg px-3 py-2">
-                  <span className="text-base mt-0.5">{check.passed ? '✅' : '❌'}</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{check.name}</p>
-                    <p className="text-xs text-gray-500">{check.detail}</p>
-                  </div>
-                </div>
-              ))}
+      <div style={{ minHeight: '100vh', background: '#F5F0EB', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+        <BrandHeader />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 16px' }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '40px', maxWidth: 480, width: '100%', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ fontSize: 44, marginBottom: 12 }}>❌</div>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: '#2F2C29', marginBottom: 8 }}>{heading}</h1>
+              <p style={{ color: '#6b6560', fontSize: 14 }}>{rejectionMessage}</p>
             </div>
-          )}
-          <button onClick={submitAnother} className="bg-black text-white font-medium py-2 px-6 rounded-xl hover:bg-gray-800 transition-colors">
-            Try a different candidate
-          </button>
+            {rejectionChecks.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+                {rejectionChecks.map((check) => (
+                  <div key={check.name} style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 12,
+                    borderRadius: 12, padding: '12px 16px',
+                    background: check.passed ? '#f0fde0' : '#fff5f5',
+                    border: `1px solid ${check.passed ? '#c4f060' : '#fca5a5'}`,
+                  }}>
+                    <span style={{ fontSize: 16, marginTop: 1 }}>{check.passed ? '✅' : '❌'}</span>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: check.passed ? '#3a6600' : '#b91c1c', marginBottom: 2 }}>{check.name}</p>
+                      <p style={{ fontSize: 12, color: check.passed ? '#4d7c0f' : '#dc2626' }}>{check.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ textAlign: 'center' }}>
+              <button
+                onClick={submitAnother}
+                style={{ background: '#8CF000', color: '#000', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Arial, "Open Sans", sans-serif' }}
+                onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = '#7ada00' }}
+                onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = '#8CF000' }}
+              >
+                Try a different candidate
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -228,59 +283,65 @@ export default function VendorPortalPage() {
 
   const openPositions = data.positions.filter((p) => p.status === 'OPEN')
 
+  // ─── List ───
   if (state === 'list') {
     return (
-      <div className="min-h-screen bg-gray-50 py-10 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-8">
-            <p className="text-sm text-gray-500 uppercase tracking-wide font-medium mb-1">Partner Portal</p>
-            <h1 className="text-2xl font-bold text-gray-900">{data.vendorName}</h1>
-            <p className="text-gray-600 mt-1">Submit candidates for open positions below.</p>
+      <div style={{ minHeight: '100vh', background: '#F5F0EB', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+        <BrandHeader />
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 16px 60px' }}>
+          <div style={{ marginBottom: 28 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9a9490', marginBottom: 6 }}>Partner Portal</p>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#2F2C29', marginBottom: 6 }}>{data.vendorName}</h1>
+            <div style={{ height: 3, width: 40, background: '#8CF000', borderRadius: 2, marginBottom: 10 }} />
+            <p style={{ fontSize: 14, color: '#6b6560' }}>Submit candidates for open positions below.</p>
           </div>
 
           {openPositions.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
-              <p className="text-gray-500">No open positions are currently assigned to you. Check back later or contact your TalentOS contact.</p>
+            <div style={{ background: '#fff', borderRadius: 20, padding: '40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+              <p style={{ color: '#9a9490', fontSize: 14 }}>No open positions are currently assigned to you. Check back later or contact your Tenarai contact.</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {openPositions.map((pos) => {
                 const jdText = pos.jdRaw || pos.jdSummary
                 const jdOpen = expandedJD.has(pos.id)
                 return (
-                  <div key={pos.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <h2 className="font-semibold text-gray-900">{pos.title}</h2>
-                        <p className="text-sm text-gray-500">Tenarai</p>
-                        <div className="flex flex-wrap gap-3 mt-2">
+                  <div key={pos.id} style={{ background: '#fff', borderRadius: 20, padding: '24px 28px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#2F2C29', marginBottom: 4 }}>{pos.title}</h2>
+                        <p style={{ fontSize: 13, color: '#9a9490', marginBottom: 8 }}>Tenarai</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                           {pos.budgetMonthly != null && (
-                            <span className="text-xs text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">
+                            <span style={{ background: '#f0fde0', border: '1px solid #c4f060', borderRadius: 999, padding: '3px 10px', fontSize: 12, color: '#3a6600', fontWeight: 500 }}>
                               Up to ${pos.budgetMonthly.toLocaleString()}/month
                             </span>
                           )}
                           {pos.location.map((loc) => (
-                            <span key={loc} className="text-xs text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">{loc}</span>
+                            <span key={loc} style={{ background: '#F5F0EB', border: '1px solid #e5e0da', borderRadius: 999, padding: '3px 10px', fontSize: 12, color: '#5a5550', fontWeight: 500 }}>{loc}</span>
                           ))}
                         </div>
                       </div>
                       <button
                         onClick={() => startSubmit(pos)}
-                        className="shrink-0 bg-black text-white font-medium py-2 px-4 rounded-lg text-sm hover:bg-gray-800 transition-colors"
+                        style={{ flexShrink: 0, background: '#8CF000', color: '#000', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Arial, "Open Sans", sans-serif', whiteSpace: 'nowrap' }}
+                        onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = '#7ada00' }}
+                        onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = '#8CF000' }}
                       >
-                        Submit a Candidate
+                        Submit Candidate
                       </button>
                     </div>
                     {jdText && (
-                      <div className="mt-3 border-t border-gray-100 pt-3">
+                      <div style={{ marginTop: 14, borderTop: '1px solid #f0ebe5', paddingTop: 12 }}>
                         <button
                           onClick={() => toggleJD(pos.id)}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2F2C29', fontSize: 13, fontWeight: 600, padding: 0, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Arial, "Open Sans", sans-serif' }}
                         >
-                          {jdOpen ? '▾ Hide job description' : '▸ View job description'}
+                          <span style={{ color: '#8CF000', fontSize: 14 }}>{jdOpen ? '▲' : '▼'}</span>
+                          {jdOpen ? 'Hide job description' : 'View job description'}
                         </button>
                         {jdOpen && (
-                          <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+                          <div style={{ marginTop: 10, fontSize: 14, color: '#4a4540', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: 260, overflowY: 'auto' }}>
                             {jdText}
                           </div>
                         )}
@@ -296,95 +357,141 @@ export default function VendorPortalPage() {
     )
   }
 
-  // submit state
+  // ─── Submit ───
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-2xl mx-auto">
-        <button onClick={backToList} className="text-sm text-gray-500 hover:text-gray-900 mb-6 flex items-center gap-1">
+    <div style={{ minHeight: '100vh', background: '#F5F0EB', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+      <BrandHeader />
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 16px 60px' }}>
+        <button
+          onClick={backToList}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b6560', fontSize: 13, fontWeight: 500, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6, padding: 0, fontFamily: 'Arial, "Open Sans", sans-serif' }}
+        >
           ← Back to positions
         </button>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <div className="mb-6">
-            <p className="text-sm text-gray-500 uppercase tracking-wide font-medium mb-1">Submit Candidate</p>
-            <h1 className="text-xl font-bold text-gray-900">{selectedPosition?.title}</h1>
-            <p className="text-gray-600">Tenarai</p>
-          </div>
+        {/* Position hero */}
+        <div style={{ background: '#fff', borderRadius: 20, padding: '28px 36px', marginBottom: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9a9490', marginBottom: 8 }}>Submit Candidate</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#2F2C29', marginBottom: 6 }}>{selectedPosition?.title}</h1>
+          <div style={{ height: 3, width: 36, background: '#8CF000', borderRadius: 2 }} />
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* CV upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CV / Resume (PDF) *</label>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="application/pdf"
-                onChange={handleFileChange}
-                required
-                className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-              />
-              {parsing && <p className="text-xs text-blue-600 mt-1">Parsing CV…</p>}
-              {file && !parsing && <p className="text-xs text-green-600 mt-1">CV ready — please review the fields below before submitting.</p>}
+        {/* Form */}
+        <form onSubmit={handleSubmit}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '32px 36px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, color: '#2F2C29', marginBottom: 20 }}>Candidate Details</h2>
+
+            {/* CV */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#2F2C29', marginBottom: 6 }}>
+                CV / Resume <span style={{ color: '#8CF000' }}>*</span>
+                <span style={{ color: '#9a9490', fontWeight: 400, marginLeft: 6 }}>(PDF)</span>
+              </label>
+              <div
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  border: `2px dashed ${file ? '#8CF000' : '#d5d0ca'}`,
+                  borderRadius: 12,
+                  padding: '20px 16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  background: file ? '#f9ffe6' : '#fafaf8',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {file ? (
+                  <p style={{ fontSize: 14, color: '#3a6600', fontWeight: 500 }}>📄 {file.name}</p>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 14, color: '#9a9490' }}>Click to upload CV</p>
+                    <p style={{ fontSize: 12, color: '#b5b0aa', marginTop: 4 }}>PDF only</p>
+                  </>
+                )}
+                {parsing && <p style={{ fontSize: 12, color: '#5a8a00', marginTop: 6 }}>Parsing CV…</p>}
+                {file && !parsing && <p style={{ fontSize: 12, color: '#5a8a00', marginTop: 6 }}>CV ready — please review the fields below.</p>}
+              </div>
+              <input ref={fileRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handleFileChange} required />
             </div>
 
             {/* Name */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
-                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required className={inputClass} />
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <InputField label="First Name" required>
+                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#8CF000'; e.target.style.boxShadow = '0 0 0 3px rgba(140,240,0,0.15)' }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e5e0da'; e.target.style.boxShadow = 'none' }}
+                />
+              </InputField>
+              <InputField label="Last Name" required>
+                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#8CF000'; e.target.style.boxShadow = '0 0 0 3px rgba(140,240,0,0.15)' }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e5e0da'; e.target.style.boxShadow = 'none' }}
+                />
+              </InputField>
             </div>
 
             {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} />
+            <div style={{ marginBottom: 14 }}>
+              <InputField label="Email" required>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#8CF000'; e.target.style.boxShadow = '0 0 0 3px rgba(140,240,0,0.15)' }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e5e0da'; e.target.style.boxShadow = 'none' }}
+                />
+              </InputField>
             </div>
 
             {/* Country */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Country *</label>
-              <select value={country} onChange={(e) => setCountry(e.target.value)} required className={inputClass}>
-                <option value="">— Select country —</option>
-                {LATAM_COUNTRIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+            <div style={{ marginBottom: 14 }}>
+              <InputField label="Country" required>
+                <select value={country} onChange={(e) => setCountry(e.target.value)} required style={{ ...inputStyle, cursor: 'pointer' }}
+                  onFocus={(e) => { e.target.style.borderColor = '#8CF000'; e.target.style.boxShadow = '0 0 0 3px rgba(140,240,0,0.15)' }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e5e0da'; e.target.style.boxShadow = 'none' }}
+                >
+                  <option value="">— Select country —</option>
+                  {LATAM_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </InputField>
             </div>
 
-            {/* Desired Compensation */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Expected Monthly Compensation (USD) *
-              </label>
-              <input
-                type="number"
-                min={0}
-                step="1"
-                value={desiredCompensation}
-                onChange={(e) => setDesiredCompensation(e.target.value)}
-                required
-                placeholder="e.g. 3500"
-                className={inputClass}
-              />
-              <p className="text-xs text-gray-400 mt-1">Gross monthly amount in USD that the candidate expects to earn.</p>
+            {/* Compensation */}
+            <div style={{ marginBottom: 8 }}>
+              <InputField label="Expected Monthly Compensation" required hint="(USD)">
+                <input
+                  type="number" min={0} step="1" value={desiredCompensation}
+                  onChange={(e) => setDesiredCompensation(e.target.value)}
+                  required placeholder="e.g. 3500" style={inputStyle}
+                  onFocus={(e) => { e.target.style.borderColor = '#8CF000'; e.target.style.boxShadow = '0 0 0 3px rgba(140,240,0,0.15)' }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e5e0da'; e.target.style.boxShadow = 'none' }}
+                />
+                <p style={{ fontSize: 12, color: '#9a9490', marginTop: 4 }}>Gross monthly amount in USD that the candidate expects to earn.</p>
+              </InputField>
             </div>
 
-            {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+            {submitError && <p style={{ color: '#e53e3e', fontSize: 13, marginTop: 8 }}>{submitError}</p>}
 
             <button
               type="submit"
               disabled={submitting || parsing || !file}
-              className="w-full bg-black hover:bg-gray-800 disabled:bg-gray-300 text-white font-medium py-3 px-6 rounded-xl transition-colors"
+              style={{
+                width: '100%',
+                marginTop: 24,
+                background: submitting || parsing || !file ? '#d5d0ca' : '#8CF000',
+                color: submitting || parsing || !file ? '#9a9490' : '#000',
+                border: 'none',
+                borderRadius: 12,
+                padding: '14px 24px',
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: submitting || parsing || !file ? 'not-allowed' : 'pointer',
+                transition: 'background 0.15s',
+                fontFamily: 'Arial, "Open Sans", sans-serif',
+              }}
+              onMouseEnter={(e) => { if (!submitting && !parsing && file) (e.target as HTMLButtonElement).style.background = '#7ada00' }}
+              onMouseLeave={(e) => { if (!submitting && !parsing && file) (e.target as HTMLButtonElement).style.background = '#8CF000' }}
             >
               {submitting ? 'Submitting…' : 'Submit Candidate'}
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   )
