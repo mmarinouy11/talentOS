@@ -217,9 +217,6 @@ export default function ApplyPage() {
               ))}
             </div>
           )}
-          {position.budgetMonthly != null && (
-            <p className="text-sm text-gray-500 mt-2">Budget: up to ${position.budgetMonthly.toLocaleString()} USD/month</p>
-          )}
           {jdText && (
             <div className="mt-4">
               <button
