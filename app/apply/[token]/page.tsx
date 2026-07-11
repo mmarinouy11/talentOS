@@ -4,9 +4,11 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 
 const COUNTRIES = [
-  'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Ecuador',
-  'Mexico', 'Paraguay', 'Peru', 'Uruguay', 'Venezuela',
-  'United States', 'Canada', 'Spain', 'Other',
+  'Argentina', 'Bolivia', 'Brazil', 'Canada', 'Chile', 'Colombia',
+  'Costa Rica', 'Cuba', 'Dominican Republic', 'Ecuador', 'El Salvador',
+  'Guatemala', 'Haiti', 'Honduras', 'Jamaica', 'Mexico', 'Nicaragua',
+  'Panama', 'Paraguay', 'Peru', 'Puerto Rico', 'Spain',
+  'Trinidad and Tobago', 'United States', 'Uruguay', 'Venezuela', 'Other',
 ]
 
 interface Check {
@@ -49,6 +51,7 @@ export default function ApplyPage() {
   const [answers, setAnswers] = useState<string[]>([])
   const [parsing, setParsing] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [answersErrors, setAnswersErrors] = useState<boolean[]>([])
 
   // Result
   const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
@@ -97,6 +100,14 @@ export default function ApplyPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!position || !file) return
+
+    // Validate screening questions
+    if (position.screeningQuestions.length > 0) {
+      const errors = answers.map((a) => !a.trim())
+      setAnswersErrors(errors)
+      if (errors.some(Boolean)) return
+    }
+
     setState('submitting')
     setSubmitError('')
     try {
@@ -342,7 +353,7 @@ export default function ApplyPage() {
           {/* Screening questions */}
           {position.screeningQuestions.length > 0 && (
             <div className="space-y-4 border-t border-gray-100 pt-4">
-              <p className="text-xs font-medium text-gray-700">Screening Questions</p>
+              <p className="text-xs font-medium text-gray-700">Screening Questions <span className="text-red-500">*</span></p>
               {position.screeningQuestions.map((q, i) => (
                 <div key={i}>
                   <label className="block text-xs text-gray-700 mb-1">{i + 1}. {q}</label>
@@ -353,10 +364,18 @@ export default function ApplyPage() {
                       const next = [...answers]
                       next[i] = e.target.value
                       setAnswers(next)
+                      if (answersErrors[i]) {
+                        const errs = [...answersErrors]
+                        errs[i] = false
+                        setAnswersErrors(errs)
+                      }
                     }}
-                    className={inputClass}
+                    className={`${inputClass} ${answersErrors[i] ? 'border-red-400 focus:ring-red-400' : ''}`}
                     placeholder="Your answer…"
                   />
+                  {answersErrors[i] && (
+                    <p className="text-xs text-red-600 mt-1">This question requires an answer.</p>
+                  )}
                 </div>
               ))}
             </div>
