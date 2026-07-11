@@ -220,7 +220,7 @@ export default async function PositionDetailPage({
             </div>
           )}
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor Min Score</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Partner Min Score</p>
             <p className="text-sm text-gray-900 mt-0.5">
               {position.vendorMinFitScore != null
                 ? <>{position.vendorMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
@@ -275,6 +275,7 @@ export default async function PositionDetailPage({
         jdSeniority={position.jdSeniority}
         jdLanguages={position.jdLanguages}
         linkedinSearchQueries={position.linkedinSearchQueries}
+        coreSkills={position.coreSkills}
       />
 
       {/* Metrics */}
@@ -362,7 +363,7 @@ export default async function PositionDetailPage({
 
       {/* Vendor Assignment */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Assigned Vendors</h2>
+        <h2 className="text-sm font-medium text-gray-900 mb-3">Assigned Partners</h2>
         <VendorAssignment positionId={id} initialVendors={initialVendors} />
       </div>
 

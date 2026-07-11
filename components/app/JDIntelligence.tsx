@@ -16,6 +16,7 @@ interface JDIntelligenceProps {
   jdSeniority: Seniority | null
   jdLanguages: string[]
   linkedinSearchQueries: string[]
+  coreSkills: string[]
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -45,11 +46,14 @@ export function JDIntelligence({
   jdSeniority,
   jdLanguages,
   linkedinSearchQueries,
+  coreSkills: initialCoreSkills,
 }: JDIntelligenceProps) {
   const router = useRouter()
   const [parsing, setParsing] = useState(false)
   const [generatingQueries, setGeneratingQueries] = useState(false)
   const [queries, setQueries] = useState<string[]>(linkedinSearchQueries)
+  const [coreSkills, setCoreSkills] = useState<Set<string>>(new Set(initialCoreSkills))
+  const [savingCore, setSavingCore] = useState(false)
   const storageKey = `jd-linkedin-collapsed-${positionId}`
   const [queriesCollapsed, setQueriesCollapsed] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -76,6 +80,23 @@ export function JDIntelligence({
       if (res.ok && json.queries) setQueries(json.queries)
     } finally {
       setGeneratingQueries(false)
+    }
+  }
+
+  async function toggleCoreSkill(skill: string) {
+    const next = new Set(coreSkills)
+    if (next.has(skill)) next.delete(skill)
+    else next.add(skill)
+    setCoreSkills(next)
+    setSavingCore(true)
+    try {
+      await fetch(`/api/positions/${positionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coreSkills: Array.from(next) }),
+      })
+    } finally {
+      setSavingCore(false)
     }
   }
 
@@ -113,8 +134,36 @@ export function JDIntelligence({
 
       {jdSkills.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Required Skills</p>
-          <SkillTags tags={jdSkills} />
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Required Skills</p>
+            <span className="text-xs text-gray-400">
+              {savingCore ? 'Saving…' : coreSkills.size > 0 ? `${coreSkills.size} core` : 'Click to mark core skills'}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {jdSkills.map((skill) => {
+              const isCore = coreSkills.has(skill)
+              return (
+                <button
+                  key={skill}
+                  type="button"
+                  onClick={() => toggleCoreSkill(skill)}
+                  title={isCore ? 'Core skill (click to unmark)' : 'Click to mark as core'}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    isCore
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {isCore && <span className="text-[10px]">★</span>}
+                  {skill}
+                </button>
+              )
+            })}
+          </div>
+          {coreSkills.size > 0 && (
+            <p className="text-xs text-blue-600 mt-1.5">★ Core skills penalize candidates who lack them during fit scoring.</p>
+          )}
         </div>
       )}
 

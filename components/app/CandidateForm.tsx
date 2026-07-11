@@ -399,7 +399,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
           >
             <option value="">— Not specified —</option>
             <option value="RECRUITER">Internal Recruiter</option>
-            <option value="VENDOR">Vendor</option>
+            <option value="VENDOR">Partner</option>
             <option value="OTHER">Other</option>
           </Select>
         </div>
@@ -422,13 +422,13 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
 
         {fields.sourcedByType === 'VENDOR' && (
           <div>
-            <Label htmlFor="sourcedByVendorId">Vendor</Label>
+            <Label htmlFor="sourcedByVendorId">Partner</Label>
             <Select
               id="sourcedByVendorId"
               value={fields.sourcedByVendorId}
               onChange={(e) => setField('sourcedByVendorId', e.target.value)}
             >
-              <option value="">— Select vendor —</option>
+              <option value="">— Select partner —</option>
               {vendors.map((v) => (
                 <option key={v.id} value={v.id}>{v.name}</option>
               ))}

@@ -18,8 +18,8 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   DEFAULT_DURATION_SCREENING_MANAGER: { label: 'Default Duration — Screening & Manager (minutes)', type: 'number', min: 5, max: 480 },
   DEFAULT_DURATION_OTHER: { label: 'Default Duration — Technical & Client (minutes)', type: 'number', min: 5, max: 480 },
   TECHNICAL_FEEDBACK_SKILL_LIMIT: { label: 'Technical Feedback Skill Limit', type: 'number', min: 1, max: 20 },
-  VENDOR_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Vendor Submissions (default: 70)', type: 'number', min: 0, max: 100 },
-  DIRECT_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Direct Applications (default: 30)', type: 'number', min: 0, max: 100 },
+  VENDOR_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Partner Submissions', type: 'number', min: 0, max: 100 },
+  DIRECT_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Direct Applications', type: 'number', min: 0, max: 100 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -79,14 +79,27 @@ function SettingRow({ setting }: { setting: Setting }) {
   )
 }
 
+const DISPLAY_ORDER = [
+  'MIN_DGM_PERCENT',
+  'MONTHLY_HOURS_BASELINE',
+  'DEFAULT_DURATION_SCREENING_MANAGER',
+  'DEFAULT_DURATION_OTHER',
+  'VENDOR_MIN_FIT_SCORE',
+  'DIRECT_MIN_FIT_SCORE',
+]
+
 export function SettingsForm({ settings }: { settings: Setting[] }) {
-  const filtered = settings.filter((s) => s.key !== 'EMAIL_HEADER_IMAGE_URL' && s.key !== 'SENDER_EMAIL')
-  if (filtered.length === 0) {
+  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL'])
+  const ordered = [
+    ...DISPLAY_ORDER.map((key) => settings.find((s) => s.key === key)).filter(Boolean) as Setting[],
+    ...settings.filter((s) => !excluded.has(s.key) && !DISPLAY_ORDER.includes(s.key)),
+  ]
+  if (ordered.length === 0) {
     return <p className="text-sm text-gray-400">No settings configured.</p>
   }
   return (
     <div className="space-y-4 max-w-2xl">
-      {filtered.map((s) => (
+      {ordered.map((s) => (
         <SettingRow key={s.id} setting={s} />
       ))}
     </div>

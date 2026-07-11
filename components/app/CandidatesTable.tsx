@@ -87,7 +87,7 @@ function SourceCell({ row }: { row: CandidateRow }) {
   if (row.sourcedByType === 'VENDOR') return (
     <span className="text-gray-700 text-xs">
       {row.sourcedByVendor?.name ?? '—'}{' '}
-      <span className="inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">Vendor</span>
+      <span className="inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">Partner</span>
     </span>
   )
   return (

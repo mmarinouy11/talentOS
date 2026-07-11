@@ -82,7 +82,7 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
-          <Label htmlFor="name">Vendor Name *</Label>
+          <Label htmlFor="name">Partner Name *</Label>
           <Input
             id="name"
             required
@@ -129,7 +129,7 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
               onChange={(e) => setActive(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 accent-[#8DF000]"
             />
-            <span className="text-sm font-medium text-gray-700">Active vendor</span>
+            <span className="text-sm font-medium text-gray-700">Active partner</span>
           </label>
         </div>
 
@@ -139,7 +139,7 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Any additional notes about this vendor…"
+            placeholder="Any additional notes about this partner…"
             className="min-h-[100px]"
           />
         </div>
@@ -147,7 +147,7 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
 
       <div className="flex gap-3 pt-2">
         <Button type="submit" disabled={loading}>
-          {loading ? 'Saving…' : mode === 'edit' ? 'Save Changes' : 'Create Vendor'}
+          {loading ? 'Saving…' : mode === 'edit' ? 'Save Changes' : 'Create Partner'}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel

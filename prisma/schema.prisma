@@ -219,6 +219,7 @@ model Position {
   dgmAtRisk           Boolean @default(false)
   jdParsed             Boolean    @default(false)
   jdSkills             String[]
+  coreSkills           String[]
   jdSeniority          Seniority?
   jdLanguages          String[]
   jdSummary            String?    @db.Text

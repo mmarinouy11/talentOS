@@ -113,7 +113,7 @@ export async function PATCH(
 
       if (!vendor.portalToken) {
         console.warn(`[position-vendors] vendor ${vendor.id} has no portalToken — skipping email`)
-        emailWarnings.push(`${vendor.name}: no portal link generated yet (visit the vendor's edit page to regenerate).`)
+        emailWarnings.push(`${vendor.name}: no portal link generated yet (visit the partner's edit page to regenerate).`)
         continue
       }
 

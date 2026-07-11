@@ -233,7 +233,7 @@ export default function VendorPortalPage() {
       <div className="min-h-screen bg-gray-50 py-10 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="mb-8">
-            <p className="text-sm text-gray-500 uppercase tracking-wide font-medium mb-1">Vendor Portal</p>
+            <p className="text-sm text-gray-500 uppercase tracking-wide font-medium mb-1">Partner Portal</p>
             <h1 className="text-2xl font-bold text-gray-900">{data.vendorName}</h1>
             <p className="text-gray-600 mt-1">Submit candidates for open positions below.</p>
           </div>
@@ -252,7 +252,7 @@ export default function VendorPortalPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <h2 className="font-semibold text-gray-900">{pos.title}</h2>
-                        <p className="text-sm text-gray-500">{pos.client}</p>
+                        <p className="text-sm text-gray-500">Tenarai</p>
                         <div className="flex flex-wrap gap-3 mt-2">
                           {pos.budgetMonthly != null && (
                             <span className="text-xs text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">
@@ -308,7 +308,7 @@ export default function VendorPortalPage() {
           <div className="mb-6">
             <p className="text-sm text-gray-500 uppercase tracking-wide font-medium mb-1">Submit Candidate</p>
             <h1 className="text-xl font-bold text-gray-900">{selectedPosition?.title}</h1>
-            <p className="text-gray-600">{selectedPosition?.client}</p>
+            <p className="text-gray-600">Tenarai</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -473,7 +473,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
           <p className="text-xs text-gray-400 mb-3">Per-position overrides for the global fit score minimums. Leave blank to use the global setting.</p>
           <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="vendorMinFitScore">Vendor Submission Min Score</Label>
+            <Label htmlFor="vendorMinFitScore">Partner Submission Min Score</Label>
             <p className="text-xs text-gray-400 mb-1">Global default: {globalVendorThreshold}</p>
             <Input
               id="vendorMinFitScore"

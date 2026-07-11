@@ -161,7 +161,7 @@ export default function ApplyPage() {
           <div className="text-5xl mb-4">🎉</div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Application submitted!</h1>
           <p className="text-gray-500 text-sm mb-4">
-            Your application for <strong>{position.title}</strong> at {position.client} has been received.
+            Your application for <strong>{position.title}</strong> has been received.
             The recruiting team will be in touch if your profile is a match.
           </p>
           {fitScore !== null && (
@@ -206,7 +206,7 @@ export default function ApplyPage() {
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header card */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">{position.client}</p>
+          <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Tenarai</p>
           <h1 className="text-2xl font-bold text-gray-900">{position.title}</h1>
           {position.location.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">

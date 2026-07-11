@@ -43,7 +43,7 @@ export function VendorPortalLink({ vendorId, initialToken }: VendorPortalLinkPro
   if (!token) {
     return (
       <p className="text-sm text-gray-400 italic">
-        No portal link yet — save the vendor first or regenerate below.
+        No portal link yet — save the partner first or regenerate below.
       </p>
     )
   }

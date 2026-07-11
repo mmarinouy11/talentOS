@@ -243,7 +243,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
           >
             <option value="">— Not specified —</option>
             <option value="RECRUITER">Internal Recruiter</option>
-            <option value="VENDOR">Vendor</option>
+            <option value="VENDOR">Partner</option>
             <option value="OTHER">Other</option>
           </Select>
         </div>
@@ -259,7 +259,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
         )}
         {sourcedByType === 'VENDOR' && (
           <div>
-            <Label htmlFor="cn-sourcedVendor">Vendor</Label>
+            <Label htmlFor="cn-sourcedVendor">Partner</Label>
             <Select id="cn-sourcedVendor" className="mt-1" value={sourcedByVendorId} onChange={(e) => setSourcedByVendorId(e.target.value)}>
               <option value="">— Select —</option>
               {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}

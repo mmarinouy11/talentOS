@@ -10,7 +10,7 @@ import { GmailReminderBanner } from '@/components/app/GmailReminderBanner'
 const navItems = [
   { href: '/positions', label: 'Positions' },
   { href: '/candidates', label: 'Candidates' },
-  { href: '/vendors', label: 'Vendors' },
+  { href: '/vendors', label: 'Partners' },
   { href: '/reports', label: 'Reports' },
   { href: '/profile', label: 'My Profile' },
 ]

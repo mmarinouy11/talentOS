@@ -17,12 +17,14 @@ interface TemplateEntry {
   description: string
   placeholders: readonly string[]
   override: TemplateOverride | null
+  defaultSubject?: string
+  defaultHtml?: string
 }
 
 function TemplateRow({ template }: { template: TemplateEntry }) {
   const [expanded, setExpanded] = useState(false)
-  const [subject, setSubject] = useState(template.override?.subject ?? '')
-  const [htmlBody, setHtmlBody] = useState(template.override?.htmlBody ?? '')
+  const [subject, setSubject] = useState(template.override?.subject ?? template.defaultSubject ?? '')
+  const [htmlBody, setHtmlBody] = useState(template.override?.htmlBody ?? template.defaultHtml ?? '')
   const [saving, setSaving] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
@@ -63,8 +65,8 @@ function TemplateRow({ template }: { template: TemplateEntry }) {
       if (res.ok) {
         setHasOverride(false)
         setOverrideDate(null)
-        setSubject('')
-        setHtmlBody('')
+        setSubject(template.defaultSubject ?? '')
+        setHtmlBody(template.defaultHtml ?? '')
         setFeedback({ ok: true, msg: 'Reset to default.' })
       } else {
         setFeedback({ ok: false, msg: 'Failed to reset' })
@@ -117,7 +119,7 @@ function TemplateRow({ template }: { template: TemplateEntry }) {
               id={`${template.key}-subject`}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Leave blank to use default subject"
+              placeholder={template.defaultSubject ?? 'Subject…'}
               className="mt-1"
             />
           </div>
@@ -128,7 +130,7 @@ function TemplateRow({ template }: { template: TemplateEntry }) {
               id={`${template.key}-body`}
               value={htmlBody}
               onChange={(e) => setHtmlBody(e.target.value)}
-              placeholder="Leave blank to use default body"
+              placeholder={template.defaultHtml ?? 'HTML body…'}
               rows={10}
               className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
             />

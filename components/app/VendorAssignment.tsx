@@ -53,7 +53,7 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
         if (data.emailError) setEmailError(data.emailError)
         if (data.emailSuccesses?.length > 0) {
           const names = (data.emailSuccesses as string[]).join(', ')
-          setEmailSuccess(`Vendor${data.emailSuccesses.length > 1 ? 's' : ''} assigned. A notification email has been sent to ${names}.`)
+          setEmailSuccess(`Partner${data.emailSuccesses.length > 1 ? 's' : ''} assigned. A notification email has been sent to ${names}.`)
         }
       }
     } finally {
@@ -107,7 +107,7 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-400 italic">No vendors assigned yet.</p>
+        <p className="text-sm text-gray-400 italic">No partners assigned yet.</p>
       )}
 
       <div className="relative">
@@ -115,7 +115,7 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search vendors to assign…"
+          placeholder="Search partners to assign…"
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {search && unassigned.length > 0 && (
@@ -136,7 +136,7 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
         )}
         {search && unassigned.length === 0 && (
           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-400">
-            No matching vendors found.
+            No matching partners found.
           </div>
         )}
       </div>

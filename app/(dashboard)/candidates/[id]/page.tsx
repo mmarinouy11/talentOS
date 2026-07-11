@@ -11,7 +11,7 @@ import { CvSection } from '@/components/app/CvSection'
 function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' }) {
   const config = {
     RECRUITER: { label: 'Internal', className: 'bg-blue-100 text-blue-700' },
-    VENDOR: { label: 'Vendor', className: 'bg-purple-100 text-purple-700' },
+    VENDOR: { label: 'Partner', className: 'bg-purple-100 text-purple-700' },
     OTHER: { label: 'Other', className: 'bg-gray-100 text-gray-600' },
   }
   const { label, className } = config[type]

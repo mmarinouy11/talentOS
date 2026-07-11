@@ -33,10 +33,20 @@ export async function scoreCandidateForPosition(candidatePositionId: string): Pr
 
   const { candidate, position } = cp
 
+  const coreSkills = position.coreSkills ?? []
+  const nonCoreSkills = (position.jdSkills ?? []).filter((s) => !coreSkills.includes(s))
+
+  const skillsSection = coreSkills.length > 0
+    ? `CRITICAL REQUIREMENTS (must-have skills): ${coreSkills.join(', ')}
+If the candidate is missing most of these critical skills, their overall fit score must be significantly penalized — ideally below 40% regardless of other strengths.
+
+Additional skills: ${nonCoreSkills.join(', ') || 'Not specified'}`
+    : `Required Skills: ${position.jdSkills.join(', ') || 'Not specified'}`
+
   const prompt = `POSITION:
 Title: ${position.title}
 Client: ${position.client}
-Required Skills: ${position.jdSkills.join(', ') || 'Not specified'}
+${skillsSection}
 Expected Seniority: ${position.jdSeniority ?? 'Not specified'}
 Required Languages: ${position.jdLanguages.join(', ') || 'Not specified'}
 Job Summary: ${position.jdSummary ?? 'Not specified'}
