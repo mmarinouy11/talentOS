@@ -469,7 +469,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
           </div>
         )}
         <div className="mt-4 pt-4 border-t border-gray-100">
-          <h3 className="text-sm font-medium text-gray-900 mb-1">Screening Thresholds</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-1">Screening Thresholds (per position)</h3>
           <p className="text-xs text-gray-400 mb-3">Per-position overrides for the global fit score minimums. Leave blank to use the global setting.</p>
           <div className="grid grid-cols-2 gap-4">
           <div>

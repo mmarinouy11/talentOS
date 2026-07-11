@@ -103,12 +103,17 @@ export default async function PositionDetailPage({
 
   const initialVendors = assignedVendors.map((pv) => pv.vendor)
 
-  const [hoursBaseline, positionFunnel, positionTimeInStage, positionLeadTime] = await Promise.all([
+  const [hoursBaseline, positionFunnel, positionTimeInStage, positionLeadTime, vendorMinSetting, directMinSetting] = await Promise.all([
     getMonthlyHoursBaseline(),
     getFunnelData(id),
     getTimeInStage(id),
     getLeadTime(id),
+    db.systemSettings.findUnique({ where: { key: 'VENDOR_MIN_FIT_SCORE' } }),
+    db.systemSettings.findUnique({ where: { key: 'DIRECT_MIN_FIT_SCORE' } }),
   ])
+  const globalVendorMin = vendorMinSetting ? parseInt(vendorMinSetting.value) : 70
+  const globalDirectMin = directMinSetting ? parseInt(directMinSetting.value) : 30
+
   const STAGE_ORDER: Record<string, number> = {
     HIRED: 0, OFFER: 1, CLIENT_INTERVIEW: 2, MANAGER_INTERVIEW: 3,
     TECHNICAL_INTERVIEW: 4, SCREENING: 5, APPLIED: 6, REJECTED: 7,
@@ -187,6 +192,22 @@ export default async function PositionDetailPage({
                 : <span className="text-sm text-gray-900">—</span>
               }
             </div>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor Min Score</p>
+            <p className="text-sm text-gray-900 mt-0.5">
+              {position.vendorMinFitScore != null
+                ? <>{position.vendorMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
+                : <>{globalVendorMin} <span className="text-xs text-gray-400">(default)</span></>}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Direct Min Score</p>
+            <p className="text-sm text-gray-900 mt-0.5">
+              {position.directMinFitScore != null
+                ? <>{position.directMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
+                : <>{globalDirectMin} <span className="text-xs text-gray-400">(default)</span></>}
+            </p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hiring Manager</p>
