@@ -137,6 +137,7 @@ type InterviewEntry = {
 type CandidatePositionFull = {
   id: string
   stage: Stage
+  status: string
   createdAt: Date
   candidate: { firstName: string; lastName: string }
   stageHistory: StageHistoryEntry[]
@@ -154,7 +155,9 @@ type PositionFull = {
 function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): string {
   const allCPs = position.candidatePositions
   const total = allCPs.length
-  const active = allCPs.filter((cp) => cp.stage !== 'HIRED' && cp.stage !== 'REJECTED').length
+  // Active = not rejected or withdrawn from pipeline
+  const activeCPs = allCPs.filter((cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED')
+  const notMovingForward = total - activeCPs.length
 
   const tdLabel = 'padding:4px 12px 4px 0;color:#6b7280;vertical-align:top;'
   const tdValue = 'padding:4px 0;font-weight:600;color:#111827;vertical-align:top;'
@@ -165,7 +168,8 @@ function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): 
     // First-ever report: no baseline to compare against
     movementsHtml = `<p style="color:#6b7280;font-size:14px;margin:0;">No previous report on record — movements tracking starts from this send.</p>`
   } else {
-    const newCandidates = allCPs.filter((cp) => cp.createdAt >= lastSentAt)
+    // Only report new active candidates (not immediately rejected/withdrawn)
+    const newCandidates = activeCPs.filter((cp) => cp.createdAt >= lastSentAt)
 
     const stageChanges: { name: string; from: Stage; to: Stage }[] = []
     for (const cp of allCPs) {
@@ -221,8 +225,9 @@ function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): 
   }
 
   // ── Stage breakdown with candidate names + aging ─────────────────────────
+  // Only include active/hired candidates in the breakdown
   const byStage = new Map<Stage, CandidatePositionFull[]>()
-  for (const cp of allCPs) {
+  for (const cp of activeCPs) {
     const arr = byStage.get(cp.stage) ?? []
     arr.push(cp)
     byStage.set(cp.stage, arr)
@@ -266,8 +271,8 @@ function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): 
 <p style="margin:0 0 24px;font-size:13px;color:#9ca3af;">${formatDate(new Date())}</p>
 
 <table style="border-collapse:collapse;margin-bottom:20px;">
-  <tr><td style="${tdLabel}">Total candidates</td><td style="${tdValue}">${total}</td></tr>
-  <tr><td style="${tdLabel}">Active in pipeline</td><td style="${tdValue}">${active}</td></tr>
+  <tr><td style="${tdLabel}">Total candidates</td><td style="${tdValue}">${total} <span style="font-weight:400;color:#6b7280;">(Active: ${activeCPs.length})</span></td></tr>
+  <tr><td style="${tdLabel}">Active in pipeline</td><td style="${tdValue}">${activeCPs.length}</td></tr>
 </table>
 
 <h3 style="margin:0 0 10px;font-size:14px;color:#374151;text-transform:uppercase;letter-spacing:.05em;border-top:1px solid #e5e7eb;padding-top:16px;">${movementsHeading}</h3>
@@ -277,6 +282,8 @@ ${movementsHtml}
 <table style="border-collapse:collapse;width:100%;">
   ${stageRowsHtml}
 </table>
+
+${notMovingForward > 0 ? `<p style="margin-top:16px;font-size:13px;color:#6b7280;border-top:1px solid #f3f4f6;padding-top:12px;">Not moving forward: <strong>${notMovingForward} candidate${notMovingForward === 1 ? '' : 's'}</strong> (rejected or withdrawn)</p>` : ''}
 
 <p style="margin-top:24px;font-size:12px;color:#9ca3af;">Sent by TalentOS · View full details in the app.</p>
 </body></html>`
