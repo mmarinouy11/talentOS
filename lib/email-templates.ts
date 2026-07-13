@@ -210,7 +210,7 @@ export function vendorPositionAssignedEmail(params: {
     html: `
       <p>Hi ${params.vendorContactName},</p>
       <p>You've been granted access to submit candidates for a new position:
-      <strong>${params.positionTitle}</strong> (${params.client}).</p>
+      <strong>${params.positionTitle}</strong>.</p>
       <p><a href="${params.portalLink}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Position &amp; Submit Candidates</a></p>
       <p>Best,<br/>${SIGNATURE_NAME}</p>
     `,
@@ -222,7 +222,7 @@ export function vendorPositionClosedEmail(params: { vendorContactName: string; p
     subject: `Position update: ${params.positionTitle}`,
     html: `
       <p>Hi ${params.vendorContactName},</p>
-      <p>The <strong>${params.positionTitle}</strong> (${params.client}) position has been closed and is no longer accepting submissions.</p>
+      <p>The <strong>${params.positionTitle}</strong> position has been closed and is no longer accepting submissions.</p>
       <p>Thank you for your partnership.</p>
       <p>Best,<br/>${SIGNATURE_NAME}</p>
     `,
@@ -234,7 +234,7 @@ export function vendorRemovedFromPositionEmail(params: { vendorContactName: stri
     subject: `Position update: ${params.positionTitle}`,
     html: `
       <p>Hi ${params.vendorContactName},</p>
-      <p>You have been removed from the sourcing list for <strong>${params.positionTitle}</strong> (${params.client}). Please stop submitting candidates for this position.</p>
+      <p>You have been removed from the sourcing list for <strong>${params.positionTitle}</strong>. Please stop submitting candidates for this position.</p>
       <p>Best,<br/>${SIGNATURE_NAME}</p>
     `,
   }
