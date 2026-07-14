@@ -71,6 +71,7 @@ function sourceLabel(row: CandidateRow): string {
   if (!row.sourcedByType) return ''
   if (row.sourcedByType === 'RECRUITER') return row.sourcedByUser?.name ?? row.sourcedByUser?.email ?? ''
   if (row.sourcedByType === 'VENDOR') return row.sourcedByVendor?.name ?? ''
+  if (row.sourcedByType === 'DIRECT') return 'Direct Application'
   return row.sourcedByOther ?? ''
 }
 
@@ -88,6 +89,12 @@ function SourceCell({ row }: { row: CandidateRow }) {
     <span className="text-gray-700 text-xs">
       {row.sourcedByVendor?.name ?? '—'}{' '}
       <span className="inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700">Partner</span>
+    </span>
+  )
+  if (row.sourcedByType === 'DIRECT') return (
+    <span className="text-gray-700 text-xs">
+      Direct Application{' '}
+      <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">Direct</span>
     </span>
   )
   return (

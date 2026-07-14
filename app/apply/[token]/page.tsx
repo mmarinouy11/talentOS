@@ -219,14 +219,9 @@ export default function ApplyPage() {
           <div style={{ background: '#fff', borderRadius: 20, padding: '48px 40px', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#8CF000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, margin: '0 auto 20px' }}>✓</div>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#2F2C29', marginBottom: 10, fontFamily: 'Arial, "Open Sans", sans-serif' }}>Application submitted!</h1>
-            <p style={{ color: '#6b6560', fontSize: 14, lineHeight: 1.6, fontFamily: 'Arial, "Open Sans", sans-serif', marginBottom: fitScore !== null ? 20 : 0 }}>
+            <p style={{ color: '#6b6560', fontSize: 14, lineHeight: 1.6, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
               Your application for <strong>{position.title}</strong> has been received. The recruiting team will be in touch if your profile is a match.
             </p>
-            {fitScore !== null && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f0fde0', border: '1px solid #c4f060', borderRadius: 999, padding: '8px 20px', fontSize: 14, color: '#3a6600', fontWeight: 600, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
-                Profile match: {fitScore}%
-              </div>
-            )}
           </div>
         </div>
       </div>

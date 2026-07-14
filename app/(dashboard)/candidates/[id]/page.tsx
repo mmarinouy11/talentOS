@@ -8,11 +8,12 @@ import { SkillTags } from '@/components/app/SkillTags'
 import { CandidateDetailClient } from '@/components/app/CandidateDetailClient'
 import { CvSection } from '@/components/app/CvSection'
 
-function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' }) {
+function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' | 'DIRECT' }) {
   const config = {
     RECRUITER: { label: 'Internal', className: 'bg-blue-100 text-blue-700' },
     VENDOR: { label: 'Partner', className: 'bg-purple-100 text-purple-700' },
     OTHER: { label: 'Other', className: 'bg-gray-100 text-gray-600' },
+    DIRECT: { label: 'Direct', className: 'bg-green-100 text-green-700' },
   }
   const { label, className } = config[type]
   return (
@@ -136,6 +137,11 @@ export default async function CandidateDetailPage({
                         <span className="text-gray-900">—</span>
                       )}
                       <SourceBadge type="VENDOR" />
+                    </div>
+                  ) : candidate.sourcedByType === 'DIRECT' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-900">Direct Application</span>
+                      <SourceBadge type="DIRECT" />
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
