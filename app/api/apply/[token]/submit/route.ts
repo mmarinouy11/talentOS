@@ -5,7 +5,7 @@ import { callClaudeJSON } from '@/lib/anthropic'
 import { uploadFileToDrive } from '@/lib/google'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { directCandidateSubmittedEmail } from '@/lib/email-templates'
+import { directCandidateSubmittedEmail, directReturningCandidateEmail } from '@/lib/email-templates'
 import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 
 const CV_PARSE_SYSTEM = `You are a CV parser. Extract structured information from the CV text provided.
@@ -60,25 +60,7 @@ export async function POST(
 
   const currentCompensation = currentCompensationRaw ? parseFloat(currentCompensationRaw) : null
 
-  // CHECK 1 — Duplicate
-  const existingCP = await db.candidatePosition.findFirst({
-    where: {
-      positionId: position.id,
-      candidate: { email: emailRaw, deletedAt: null },
-    },
-  })
-  if (existingCP) {
-    return NextResponse.json({
-      rejected: true,
-      reason: 'duplicate',
-      message: 'You have already applied for this position.',
-      checks: [
-        { name: 'Duplicate Check', passed: false, detail: 'An application with this email address already exists for this position.' },
-      ],
-    })
-  }
-
-  // Parse CV
+  // Parse CV (needed for all three cases to update/create candidate data)
   const buffer = Buffer.from(await cvFile.arrayBuffer())
   let cvText = ''
   try {
@@ -120,12 +102,46 @@ export async function POST(
     // continue without Drive upload
   }
 
-  // Create or find candidate
-  let candidate = await db.candidate.findFirst({
+  // Build notes from screening Q&A
+  let notes: string | undefined
+  if (position.screeningQuestions.length > 0 && screeningAnswers.some(Boolean)) {
+    notes = position.screeningQuestions
+      .map((q, i) => `Q: ${q}\nA: ${screeningAnswers[i] || '(no answer)'}`)
+      .join('\n\n')
+  }
+
+  // Determine which of the three cases applies
+  const existingCandidate = await db.candidate.findFirst({
     where: { email: emailRaw, deletedAt: null },
   })
-  const createdCandidate = !candidate
-  if (!candidate) {
+
+  // Case 1 — Email exists AND already linked to this position → reject
+  if (existingCandidate) {
+    const existingCP = await db.candidatePosition.findFirst({
+      where: { positionId: position.id, candidateId: existingCandidate.id },
+    })
+    if (existingCP) {
+      return NextResponse.json({
+        rejected: true,
+        reason: 'duplicate',
+        message: 'You have already applied for this position.',
+        checks: [
+          { name: 'Eligibility Check', passed: false, detail: 'An application with this email address already exists for this position.' },
+        ],
+      })
+    }
+  }
+
+  // Case 2 — Email exists but NOT linked to this position → re-surface existing candidate
+  let candidate: { id: string; firstName: string; lastName: string } | null = null
+  let createdCandidate = false
+  let isReturning = false
+
+  if (existingCandidate) {
+    candidate = existingCandidate
+    isReturning = true
+  } else {
+    // Case 3 — New candidate
     candidate = await db.candidate.create({
       data: {
         firstName,
@@ -147,23 +163,18 @@ export async function POST(
         recruiterId: position.recruiterId,
       },
     })
+    createdCandidate = true
   }
 
-  // Build notes from screening Q&A
-  let notes: string | undefined
-  if (position.screeningQuestions.length > 0 && screeningAnswers.some(Boolean)) {
-    notes = position.screeningQuestions
-      .map((q, i) => `Q: ${q}\nA: ${screeningAnswers[i] || '(no answer)'}`)
-      .join('\n\n')
-  }
-
-  // Create CandidatePosition
+  // Create CandidatePosition (Cases 2 and 3)
   const cp = await db.candidatePosition.create({
     data: {
       candidateId: candidate.id,
       positionId: position.id,
       recruiterId: position.recruiterId,
-      notes: notes ?? null,
+      notes: isReturning
+        ? ['Re-applied via direct portal', notes].filter(Boolean).join('\n\n')
+        : (notes ?? null),
     },
   })
 
@@ -185,7 +196,7 @@ export async function POST(
       fitScore: Math.round(fitScore),
       message: 'Your profile does not meet the requirements for this position at this time.',
       checks: [
-        { name: 'Duplicate Check', passed: true, detail: 'No prior application found for this position.' },
+        { name: 'Eligibility Check', passed: true, detail: 'No prior application found for this position.' },
         { name: 'Profile Match', passed: false, detail: `Your profile scored ${Math.round(fitScore)}% (minimum required: ${Math.round(threshold)}%).` },
       ],
     })
@@ -204,7 +215,7 @@ export async function POST(
         fitScore: Math.round(fitScore),
         message: `Your expected compensation exceeds the budget for this position.`,
         checks: [
-          { name: 'Duplicate Check', passed: true, detail: 'No prior application found for this position.' },
+          { name: 'Eligibility Check', passed: true, detail: 'No prior application found for this position.' },
           { name: 'Profile Match', passed: true, detail: `Your profile scored ${Math.round(fitScore)}%.` },
           { name: 'Compensation', passed: false, detail: `Your desired compensation ($${desiredCompensation.toLocaleString()}/month) exceeds the budget for this position.` },
         ],
@@ -214,9 +225,10 @@ export async function POST(
 
   // Accepted — notify recruiter (non-fatal)
   const baseUrl = process.env.NEXTAUTH_URL ?? ''
-  const candidateName = `${firstName} ${lastName}`
+  const candidateName = `${candidate.firstName} ${candidate.lastName}`
   try {
-    const { subject, html } = directCandidateSubmittedEmail({
+    const emailFn = isReturning ? directReturningCandidateEmail : directCandidateSubmittedEmail
+    const { subject, html } = emailFn({
       recruiterName: position.recruiter.name ?? position.recruiter.email,
       candidateName,
       positionTitle: position.title,

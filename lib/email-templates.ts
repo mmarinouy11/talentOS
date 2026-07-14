@@ -277,3 +277,23 @@ export function directCandidateSubmittedEmail(params: {
     `,
   }
 }
+
+export function directReturningCandidateEmail(params: {
+  recruiterName: string
+  candidateName: string
+  positionTitle: string
+  fitScore: number
+  link: string
+}): { subject: string; html: string } {
+  return {
+    subject: `Returning candidate: ${params.candidateName} applied for ${params.positionTitle}`,
+    html: `
+      <p>Hi ${params.recruiterName},</p>
+      <p><strong>${params.candidateName}</strong> has applied directly for <strong>${params.positionTitle}</strong>.</p>
+      <p>Profile fit score: <strong>${Math.round(params.fitScore)}%</strong></p>
+      <p><em>Note: This candidate already exists in TalentOS from a previous interaction. Their profile has been linked to this position.</em></p>
+      <p><a href="${params.link}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Application</a></p>
+      <p>Best,<br/>${SIGNATURE_NAME}</p>
+    `,
+  }
+}

@@ -64,20 +64,27 @@ export async function POST(
     return NextResponse.json({ error: 'Position not found or not open' }, { status: 404 })
   }
 
-  // CHECK 1 — Duplicate: candidate with this email already linked to this position
-  const existingCP = await db.candidatePosition.findFirst({
-    where: {
-      positionId,
-      candidate: { email: emailRaw, deletedAt: null },
-    },
+  // CHECK 1 — Duplicate (strict): reject if candidate email exists anywhere in DB
+  const existingCandidate = await db.candidate.findFirst({
+    where: { email: emailRaw, deletedAt: null },
   })
-  if (existingCP) {
+  if (existingCandidate) {
+    // Check if also linked to this position for a more specific message
+    const existingCP = await db.candidatePosition.findFirst({
+      where: { positionId, candidateId: existingCandidate.id },
+    })
+    const detail = existingCP
+      ? 'A candidate with this email has already been submitted for this position.'
+      : 'A candidate with this email address already exists in our system.'
+    const message = existingCP
+      ? 'A candidate with this email has already been submitted for this position.'
+      : 'A candidate with this email address already exists in our system.'
     return NextResponse.json({
       rejected: true,
       reason: 'duplicate',
-      message: 'A candidate with this email address has already been submitted for this position.',
+      message,
       checks: [
-        { name: 'Duplicate Check', passed: false, detail: 'A candidate with this email was already submitted for this position.' },
+        { name: 'Eligibility Check', passed: false, detail },
       ],
     })
   }
@@ -177,7 +184,7 @@ export async function POST(
       reason: 'low_score',
       message: 'This candidate does not meet the technical requirements for this position based on their profile and skills.',
       checks: [
-        { name: 'Duplicate Check', passed: true, detail: 'No prior submission found for this position.' },
+        { name: 'Eligibility Check', passed: true, detail: 'No prior submission found for this candidate.' },
         { name: 'Profile Match', passed: false, detail: `Score: ${Math.round(fitScore)}% (below minimum: ${Math.round(threshold)}%)` },
       ],
     })
@@ -195,7 +202,7 @@ export async function POST(
         reason: 'over_budget',
         message: `This candidate's expected compensation ($${desiredCompensation.toLocaleString()} USD/month) exceeds the budget for this position.`,
         checks: [
-          { name: 'Duplicate Check', passed: true, detail: 'No prior submission found for this position.' },
+          { name: 'Eligibility Check', passed: true, detail: 'No prior submission found for this candidate.' },
           { name: 'Profile Match', passed: true, detail: `Score: ${Math.round(fitScore)}% (minimum: ${Math.round(threshold)}%)` },
           { name: 'Compensation', passed: false, detail: `$${desiredCompensation.toLocaleString()}/month exceeds the budget for this position.` },
         ],
