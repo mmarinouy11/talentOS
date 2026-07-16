@@ -19,6 +19,7 @@ export interface NewCandidatePosition {
     firstName: string
     lastName: string
     email: string
+    country: string | null
     seniority: string | null
   }
 }

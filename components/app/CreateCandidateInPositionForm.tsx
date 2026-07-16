@@ -160,6 +160,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
         firstName: candidate.firstName,
         lastName: candidate.lastName,
         email: candidate.email,
+        country: candidate.country ?? null,
         seniority: candidate.seniority ?? null,
       },
     })
