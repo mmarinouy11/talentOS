@@ -1,9 +1,9 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
-import { extractPdfText } from '@/lib/pdf-extract'
+import { extractPdfText, renderPdfToImages } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
 
 const SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -58,16 +58,87 @@ export async function POST(
 
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  // Extract text
+  // Step 1: Try text extraction
   let text = ''
   try {
     text = await extractPdfText(buffer)
-  } catch {
-    return NextResponse.json({ error: 'Could not extract text from PDF' }, { status: 422 })
+  } catch (err) {
+    console.warn('[reparse-cv] Text extraction failed, will try vision fallback:', err)
   }
 
-  if (!text.trim()) {
-    return NextResponse.json({ error: 'Could not extract text from this PDF' }, { status: 422 })
+  const MIN_TEXT_LENGTH = 100
+  const useVision = text.trim().length < MIN_TEXT_LENGTH
+
+  // Step 2: Vision fallback for image-based PDFs
+  if (useVision) {
+    console.log(`[reparse-cv] Text too short (${text.trim().length} chars) — using vision fallback`)
+    let pageImages: Buffer[]
+    try {
+      pageImages = await renderPdfToImages(buffer, 6)
+    } catch (err) {
+      console.error('[reparse-cv] Vision render failed:', err)
+      return NextResponse.json({ error: 'Could not extract text from this PDF. Ensure it is a valid PDF or try a text-based PDF.' }, { status: 422 })
+    }
+    if (pageImages.length === 0) {
+      return NextResponse.json({ error: 'Could not render PDF pages for extraction.' }, { status: 422 })
+    }
+
+    // Use vision model to extract CV text
+    const anthropic = getAnthropic()
+    const imageBlocks = pageImages.map((buf) => ({
+      type: 'image' as const,
+      source: { type: 'base64' as const, media_type: 'image/png' as const, data: buf.toString('base64') },
+    }))
+    try {
+      const response = await anthropic.messages.create({
+        model: MODELS.SMART,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: [...imageBlocks, { type: 'text', text: 'Parse this CV from the images and return the structured JSON.' }],
+        }],
+      })
+      const block = response.content[0]
+      if (block.type !== 'text') throw new Error('Unexpected vision response type')
+      const clean = block.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+      const visionParsed = JSON.parse(clean)
+
+      // Upload to Drive (non-fatal)
+      let cvDriveId: string | null = null
+      let cvOriginalName: string | null = file.name
+      try {
+        const { fileId, fileName } = await uploadFileToDrive(buffer, `${Date.now()}_${file.name}`, file.type, process.env.GOOGLE_DRIVE_FOLDER_ID!)
+        cvDriveId = fileId
+        cvOriginalName = fileName
+      } catch (err) {
+        console.error('[reparse-cv] Drive upload failed (non-fatal):', err)
+      }
+
+      const candidate = await db.candidate.update({
+        where: { id },
+        data: {
+          ...(visionParsed.firstName ? { firstName: visionParsed.firstName } : {}),
+          ...(visionParsed.lastName ? { lastName: visionParsed.lastName } : {}),
+          ...(visionParsed.phone !== undefined ? { phone: visionParsed.phone } : {}),
+          ...(visionParsed.country !== undefined ? { country: visionParsed.country } : {}),
+          ...(visionParsed.seniority ? { seniority: visionParsed.seniority } : {}),
+          ...(visionParsed.yearsOfExperience !== undefined ? { yearsOfExperience: visionParsed.yearsOfExperience } : {}),
+          skills: visionParsed.skills ?? [],
+          languages: visionParsed.languages ?? [],
+          summary: visionParsed.summary ?? null,
+          strengths: visionParsed.strengths ?? [],
+          risks: visionParsed.risks ?? [],
+          ...(visionParsed.currentCompensation !== undefined ? { currentCompensation: visionParsed.currentCompensation } : {}),
+          cvDriveId,
+          cvOriginalName,
+        },
+      })
+      return NextResponse.json({ candidate, parsed: visionParsed })
+    } catch (err) {
+      console.error('[reparse-cv] Vision parsing failed:', err)
+      return NextResponse.json({ error: 'Could not parse this PDF. The file may be corrupt or unreadable.' }, { status: 422 })
+    }
   }
 
   // Upload to Drive (non-fatal)
@@ -86,7 +157,7 @@ export async function POST(
     console.error('[reparse-cv] Drive upload failed (non-fatal):', err)
   }
 
-  // Parse with Claude Haiku
+  // Parse with Claude (text path)
   const parsed = await callClaudeJSON<{
     firstName: string | null
     lastName: string | null

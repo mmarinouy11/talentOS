@@ -1,18 +1,10 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
-import { writeFile, readFile, mkdtemp, readdir, rm } from 'fs/promises'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import { extractPdfText } from '@/lib/pdf-extract'
+import { extractPdfText, renderPdfToImages } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
 import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
 import { parseTextFeedback } from '@/lib/feedback-parser'
-
-
-const execFileAsync = promisify(execFile)
 
 const MIN_TEXT_LENGTH = 200
 const MAX_VISION_PAGES = 12
@@ -46,25 +38,7 @@ interface FeedbackParse {
 }
 
 async function renderPdfPages(buffer: Buffer): Promise<Buffer[]> {
-  const workDir = await mkdtemp(join(tmpdir(), 'pdf-render-'))
-  const inputPath = join(workDir, 'input.pdf')
-  const outputPrefix = join(workDir, 'page')
-  try {
-    await writeFile(inputPath, buffer)
-    await execFileAsync('pdftoppm', [
-      '-png', '-r', '150', '-f', '1', '-l', String(MAX_VISION_PAGES),
-      inputPath, outputPrefix,
-    ])
-    const files = (await readdir(workDir))
-      .filter((f) => f.startsWith('page') && f.endsWith('.png'))
-      .sort()
-    if (files.length > MAX_VISION_PAGES) {
-      console.warn(`[upload-feedback] PDF has more than ${MAX_VISION_PAGES} pages — only first ${MAX_VISION_PAGES} sent to vision model`)
-    }
-    return await Promise.all(files.map((f) => readFile(join(workDir, f))))
-  } finally {
-    await rm(workDir, { recursive: true, force: true }).catch(() => {})
-  }
+  return renderPdfToImages(buffer, MAX_VISION_PAGES)
 }
 
 async function parseVisionFeedback(pageImages: Buffer[]): Promise<FeedbackParse> {
