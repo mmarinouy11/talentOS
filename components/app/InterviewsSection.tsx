@@ -231,27 +231,23 @@ function ConfirmedDatePicker({ value, onChange, disabled }: { value: string; onC
   const date = parts[0]
   const time = (parts[1] ?? '09:00').slice(0, 5)
   function set(d: string, t: string) { onChange(d && t ? `${d}T${t}` : '') }
-  const isPast = value ? new Date(value) < new Date() : false
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => set(e.target.value, time)}
-          disabled={disabled}
-          className={`flex-1 ${isPast ? 'border-red-400' : ''}`}
-        />
-        <select
-          value={time}
-          onChange={(e) => set(date, e.target.value)}
-          disabled={disabled}
-          className={`border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white ${isPast ? 'border-red-400' : 'border-gray-200'} ${disabled ? 'bg-gray-50 text-gray-400' : ''}`}
-        >
-          {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
-      {isPast && <p className="text-xs text-red-600">Confirmed date cannot be in the past.</p>}
+    <div className="flex items-center gap-2">
+      <Input
+        type="date"
+        value={date}
+        onChange={(e) => set(e.target.value, time)}
+        disabled={disabled}
+        className="flex-1"
+      />
+      <select
+        value={time}
+        onChange={(e) => set(date, e.target.value)}
+        disabled={disabled}
+        className={`border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white border-gray-200 ${disabled ? 'bg-gray-50 text-gray-400' : ''}`}
+      >
+        {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
     </div>
   )
 }
@@ -918,10 +914,15 @@ function EditInterviewModal({
 }) {
   const [currentInterview, setCurrentInterview] = useState(interview)
   const [scheduledAt, setScheduledAt] = useState(() => {
-    if (!interview.scheduledAt) return ''
-    const d = new Date(interview.scheduledAt)
     const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    const toLocalDatetimeStr = (iso: string) => {
+      const d = new Date(iso)
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    }
+    if (interview.scheduledAt) return toLocalDatetimeStr(interview.scheduledAt)
+    // Pre-populate from first proposed slot when no confirmed date is set
+    if (interview.proposedSlots.length > 0) return toLocalDatetimeStr(interview.proposedSlots[0])
+    return ''
   })
   const [feedbackText, setFeedbackText] = useState(interview.feedbackText ?? '')
   const [durationMinutes, setDurationMinutes] = useState<number>(interview.durationMinutes ?? (interview.stage === 'SCREENING' || interview.stage === 'MANAGER_INTERVIEW' ? 30 : 60))
