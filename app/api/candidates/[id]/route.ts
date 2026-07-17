@@ -73,9 +73,18 @@ export async function PATCH(
   // Drop fields not in Candidate model
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
-  const candidate = await db.candidate.update({ where: { id }, data: { ...rest } })
 
-  return NextResponse.json(candidate)
+  try {
+    const candidate = await db.candidate.update({ where: { id }, data: { ...rest } })
+    return NextResponse.json(candidate)
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code
+    if (code === 'P2002') {
+      return NextResponse.json({ error: 'A candidate with this email address already exists.' }, { status: 409 })
+    }
+    console.error('[PATCH /api/candidates/[id]]', err)
+    return NextResponse.json({ error: 'Failed to update candidate.' }, { status: 500 })
+  }
 }
 
 export async function DELETE(
