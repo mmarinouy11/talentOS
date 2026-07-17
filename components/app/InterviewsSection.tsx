@@ -192,19 +192,15 @@ const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
 function SlotEntry({ value, onChange, onRemove, showRemove, timezone }: { value: string; onChange: (v: string) => void; onRemove: () => void; showRemove: boolean; timezone: string }) {
   const [date, time] = value ? value.split('T') : ['', '00:00']
   function set(d: string, t: string) { onChange(d && t ? `${d}T${t}` : '') }
-  const isPast = value ? new Date(zonedToUtcIso(value, timezone)) < new Date() : false
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <Input type="date" value={date} onChange={(e) => set(e.target.value, time)} className={`flex-1 ${isPast ? 'border-red-400' : ''}`} required />
-        <select value={time} onChange={(e) => set(date, e.target.value)} className={`border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white ${isPast ? 'border-red-400' : 'border-gray-200'}`}>
-          {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        {showRemove && (
-          <button type="button" onClick={onRemove} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
-        )}
-      </div>
-      {isPast && <p className="text-xs text-red-600">This time slot is in the past — please choose a future date and time.</p>}
+    <div className="flex items-center gap-2">
+      <Input type="date" value={date} onChange={(e) => set(e.target.value, time)} className="flex-1" required />
+      <select value={time} onChange={(e) => set(date, e.target.value)} className="border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white border-gray-200">
+        {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      {showRemove && (
+        <button type="button" onClick={onRemove} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+      )}
     </div>
   )
 }
@@ -566,8 +562,6 @@ function NextRoundModal({
     setError(null)
     const isCalendar = isScreening && schedulingMode === 'CALENDAR_LINK'
     if (!isCalendar) {
-      const hasPast = slots.filter(Boolean).some((s) => new Date(zonedToUtcIso(s, slotTimezone)) < new Date())
-      if (hasPast) { setError('One or more slots are in the past — please choose future times.'); setCreating(false); return }
     }
     try {
       const res = await fetch(`/api/candidate-positions/${candidatePositionId}/interviews`, {
@@ -761,8 +755,6 @@ function AddInterviewModal({
     setError(null)
     const isCalendar = isScreening && schedulingMode === 'CALENDAR_LINK'
     if (!isCalendar) {
-      const hasPast = slots.filter(Boolean).some((s) => new Date(zonedToUtcIso(s, slotTimezone)) < new Date())
-      if (hasPast) { setError('One or more slots are in the past — please choose future times.'); setSaving(false); return }
     }
     try {
       const res = await fetch(`/api/candidate-positions/${candidatePositionId}/interviews`, {
