@@ -1240,25 +1240,24 @@ function EditInterviewModal({
           )}
 
           {canShowFeedback && (currentInterview.feedbackSummary || previewResult) && currentInterview.feedbackParseMethod !== 'interviewer_form' && (
-            <>
-              <FeedbackParseResult
-                summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
-                strengths={previewResult?.strengths ?? currentInterview.feedbackStrengths}
-                concerns={previewResult?.concerns ?? currentInterview.feedbackConcerns}
-                aiScore={previewResult?.score ?? currentInterview.aiScore ?? null}
-                feedbackParseMethod={previewResult ? 'text' : currentInterview.feedbackParseMethod}
-              />
-              {currentInterview.feedbackPdfUrl && (
-                <a
-                  href={`https://drive.google.com/file/d/${currentInterview.feedbackPdfUrl}/view`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  View Feedback PDF ↗
-                </a>
-              )}
-            </>
+            <FeedbackParseResult
+              summary={previewResult?.summary ?? currentInterview.feedbackSummary ?? ''}
+              strengths={previewResult?.strengths ?? currentInterview.feedbackStrengths}
+              concerns={previewResult?.concerns ?? currentInterview.feedbackConcerns}
+              aiScore={previewResult?.score ?? currentInterview.aiScore ?? null}
+              feedbackParseMethod={previewResult ? 'text' : currentInterview.feedbackParseMethod}
+            />
+          )}
+
+          {canShowFeedback && currentInterview.feedbackPdfUrl && (
+            <a
+              href={`https://drive.google.com/file/d/${currentInterview.feedbackPdfUrl}/view`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-blue-600 hover:underline"
+            >
+              View Feedback PDF ↗
+            </a>
           )}
 
           {canShowFeedback && (
