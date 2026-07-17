@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import type { Stage } from '@prisma/client'
@@ -29,13 +28,17 @@ const STAGE_LABELS: Record<Stage, string> = {
   REJECTED: 'Rejected',
 }
 
-function getAllowedNextStages(current: Stage): Stage[] {
-  const terminalStages: Stage[] = ['HIRED', 'REJECTED']
-  if (terminalStages.includes(current)) return []
+function getNextStages(current: Stage): { primary: Stage[]; other: Stage[] } {
+  const currentIdx = STAGE_ORDER.indexOf(current)
+  const allStages: Stage[] = [...STAGE_ORDER, 'REJECTED']
 
-  const idx = STAGE_ORDER.indexOf(current)
-  const forward = STAGE_ORDER.slice(idx + 1)
-  return [...forward, 'REJECTED']
+  // Natural next: up to 2 stages forward (excluding current)
+  const primary = STAGE_ORDER.slice(currentIdx + 1, currentIdx + 3)
+
+  // Everything else except the current stage
+  const other = allStages.filter((s) => s !== current && !primary.includes(s))
+
+  return { primary, other }
 }
 
 interface MoveStageModalProps {
@@ -46,8 +49,9 @@ interface MoveStageModalProps {
 
 export function MoveStageModal({ candidatePositionId, currentStage, onClose }: MoveStageModalProps) {
   const router = useRouter()
-  const allowed = getAllowedNextStages(currentStage)
-  const [newStage, setNewStage] = useState<Stage>(allowed[0] ?? currentStage)
+  const { primary, other } = getNextStages(currentStage)
+  const defaultStage = primary[0] ?? other[0] ?? currentStage
+  const [newStage, setNewStage] = useState<Stage>(defaultStage)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -75,22 +79,29 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     onClose()
   }
 
-  if (allowed.length === 0) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Move Stage</h2>
-            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
-          </div>
-          <p className="text-sm text-gray-500">This candidate is already in a terminal stage ({STAGE_LABELS[currentStage]}).</p>
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={onClose}>Close</Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const StageOption = ({ stage, dim = false }: { stage: Stage; dim?: boolean }) => (
+    <label
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+        newStage === stage
+          ? 'border-[#8DF000] bg-[#8DF000]/10'
+          : dim
+          ? 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+          : 'border-gray-200 bg-white hover:bg-gray-50'
+      }`}
+    >
+      <input
+        type="radio"
+        name="newStage"
+        value={stage}
+        checked={newStage === stage}
+        onChange={() => setNewStage(stage)}
+        className="sr-only"
+      />
+      <span className={`text-sm font-medium ${dim ? 'text-gray-500' : 'text-gray-800'} ${stage === 'REJECTED' ? 'text-red-600' : ''}`}>
+        {STAGE_LABELS[stage]}
+      </span>
+    </label>
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -109,18 +120,24 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="newStage">New Stage *</Label>
-            <Select
-              id="newStage"
-              value={newStage}
-              onChange={(e) => setNewStage(e.target.value as Stage)}
-              required
-            >
-              {allowed.map((s) => (
-                <option key={s} value={s}>{STAGE_LABELS[s]}</option>
-              ))}
-            </Select>
+          <div className="space-y-1.5">
+            {primary.length > 0 && (
+              <>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Next Steps</p>
+                {primary.map((s) => <StageOption key={s} stage={s} />)}
+              </>
+            )}
+
+            {other.length > 0 && (
+              <>
+                <div className={`flex items-center gap-2 ${primary.length > 0 ? 'pt-2' : ''}`}>
+                  <div className="flex-1 border-t border-gray-100" />
+                  <p className="text-xs text-gray-400">Other stages</p>
+                  <div className="flex-1 border-t border-gray-100" />
+                </div>
+                {other.map((s) => <StageOption key={s} stage={s} dim />)}
+              </>
+            )}
           </div>
 
           <div>
@@ -136,7 +153,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
 
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || newStage === currentStage}>
               {loading ? 'Moving…' : 'Move Stage'}
             </Button>
           </div>

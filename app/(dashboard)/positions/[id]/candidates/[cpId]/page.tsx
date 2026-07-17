@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 import { SeniorityBadge } from '@/components/app/SeniorityBadge'
-import { StageBadge } from '@/components/app/StageBadge'
 import { SkillTags } from '@/components/app/SkillTags'
 import { FitScoreCard } from '@/components/app/FitScoreCard'
 import { InterviewsSection } from '@/components/app/InterviewsSection'
+import { CandidateInPositionHeader } from '@/components/app/CandidateInPositionHeader'
 
 export default async function CandidateInPositionPage({
   params,
@@ -56,7 +56,7 @@ export default async function CandidateInPositionPage({
             {candidate.firstName} {candidate.lastName}
           </h1>
           {candidate.seniority && <SeniorityBadge seniority={candidate.seniority} />}
-          <StageBadge stage={cp.stage} />
+          <CandidateInPositionHeader candidatePositionId={cp.id} stage={cp.stage} />
         </div>
         <p className="text-sm text-gray-500 mt-0.5">{position.title} · {position.client}</p>
       </div>
