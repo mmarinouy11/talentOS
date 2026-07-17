@@ -46,6 +46,7 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
           }
         })
         .join(' ')
+        .replace(/\0/g, '')
       resolve(text)
     })
     pdfParser.on('pdfParser_dataError', reject)
