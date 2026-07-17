@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { randomBytes } from 'crypto'
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
@@ -20,8 +21,13 @@ export async function GET(
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-  const vendor = await db.vendor.findUnique({ where: { id } })
+  let vendor = await db.vendor.findUnique({ where: { id } })
   if (!vendor) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Backfill missing portalToken for legacy vendor
+  if (!vendor.portalToken) {
+    vendor = await db.vendor.update({ where: { id }, data: { portalToken: randomBytes(32).toString('hex') } })
+  }
 
   return NextResponse.json(vendor)
 }

@@ -25,6 +25,22 @@ export async function GET(request: Request) {
     orderBy: { name: 'asc' },
   })
 
+  // Backfill missing portalTokens for legacy vendors
+  const missing = vendors.filter((v) => !v.portalToken)
+  if (missing.length > 0) {
+    await Promise.all(
+      missing.map((v) =>
+        db.vendor.update({ where: { id: v.id }, data: { portalToken: randomBytes(32).toString('hex') } })
+      )
+    )
+    // Re-fetch to return updated tokens
+    const updated = await db.vendor.findMany({
+      where: activeOnly ? { active: true } : {},
+      orderBy: { name: 'asc' },
+    })
+    return NextResponse.json(updated)
+  }
+
   return NextResponse.json(vendors)
 }
 
