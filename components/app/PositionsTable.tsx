@@ -187,7 +187,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
                 {sh('Status', '_statusOrder')}
                 {sh('Priority', '_priorityOrder')}
                 {sh('DGM', 'dgm', 'text-right')}
-                {sh('Recruiter', '_recruiterLabel')}
+                {sh('Lead Recruiter', '_recruiterLabel')}
                 {sh('Target', '_targetMs')}
                 {sh('Aging', '_agingMs', 'text-right')}
                 {sh('Candidates', '_candidates', 'text-right')}

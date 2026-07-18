@@ -361,7 +361,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
         {/* Recruiter */}
         {recruiters.length > 0 && (
           <div>
-            <Label htmlFor="recruiterId">Recruiter</Label>
+            <Label htmlFor="recruiterId">Lead Recruiter</Label>
             <Select
               id="recruiterId"
               name="recruiterId"

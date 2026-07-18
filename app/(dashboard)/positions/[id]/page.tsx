@@ -169,7 +169,7 @@ export default async function PositionDetailPage({
             <p className="text-sm text-gray-900 mt-0.5">{position.client}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recruiter</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lead Recruiter</p>
             <p className="text-sm text-gray-900 mt-0.5">{position.recruiter.name ?? position.recruiter.email}</p>
           </div>
           <div>
