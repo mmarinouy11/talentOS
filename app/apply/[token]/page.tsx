@@ -483,7 +483,7 @@ export default function ApplyPage() {
                 />
                 <span style={{ fontSize: 12, color: consentError ? '#e53e3e' : '#6b6560', lineHeight: 1.5, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
                   I have read and agree to the processing of my personal data as described in the Privacy Notice above.
-                  <span style={{ color: '#e53e3e', marginLeft: 3 }}>*</span>
+                  <span style={{ color: '#8CF000', marginLeft: 3 }}>*</span>
                 </span>
               </label>
               {consentError && (
