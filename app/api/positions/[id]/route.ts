@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { parseJDInBackground } from '@/lib/jd-parser'
 import { computePositionDGM } from '@/lib/dgm'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { resolveEmailTemplate } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-resolver'
 
 const CLOSED_DEFAULT_SUBJECT = 'Position update: {{positionTitle}}'
 const CLOSED_DEFAULT_HTML = `<p>Hi {{vendorContactName}},</p>\n<p>The <strong>{{positionTitle}}</strong> position has been closed and is no longer accepting submissions.</p>\n<p>Thank you for your partnership.</p>\n<p>Best,<br/>Tenarai LATAM</p>`

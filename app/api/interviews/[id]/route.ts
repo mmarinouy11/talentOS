@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { parseTextFeedback } from '@/lib/feedback-parser'
 import { sendEmail } from '@/lib/email'
-import { resolveEmailTemplate } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-resolver'
 
 const FEEDBACK_INVITE_DEFAULT_SUBJECT = 'Feedback needed: {{candidateName}} - {{interviewType}} - {{positionTitle}}'
 const FEEDBACK_INVITE_DEFAULT_HTML = `<p>Hi,</p>\n<p>Thank you for interviewing <strong>{{candidateName}}</strong> for the <strong>{{positionTitle}}</strong> position ({{interviewType}}).</p>\n<p>Please share your feedback using the link below. It only takes a few minutes and will help us make the best decision:</p>\n<p><a href="{{link}}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Submit Feedback</a></p>\n<p>This link is valid for 14 days and can only be used once.</p>\n<p>Best,<br/>{{recruiterName}} · Tenarai LATAM</p>`

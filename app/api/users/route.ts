@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { resolveEmailTemplate } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-resolver'
 
 const INVITE_DEFAULT_SUBJECT = "You've been invited to Tenarai TalentOS"
 const INVITE_DEFAULT_HTML = `<p>Hi {{userName}},</p>\n<p>You've been invited to join Tenarai TalentOS. Click the link below to set your password and get started:</p>\n<p><a href="{{inviteLink}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">Set Password</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`

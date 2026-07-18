@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { resolveEmailTemplate } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-resolver'
 
 const ASSIGNED_DEFAULT_SUBJECT = 'New position available: {{positionTitle}}'
 const ASSIGNED_DEFAULT_HTML = `<p>Hi {{vendorContactName}},</p>\n<p>You've been granted access to submit candidates for a new position: <strong>{{positionTitle}}</strong>.</p>\n<p><a href="{{portalLink}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Position &amp; Submit Candidates</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`

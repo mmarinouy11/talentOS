@@ -5,7 +5,7 @@ import { callClaudeJSON } from '@/lib/anthropic'
 import { uploadFileToDrive } from '@/lib/google'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { resolveEmailTemplate } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-resolver'
 
 const VENDOR_SUBMITTED_DEFAULT_SUBJECT = 'New candidate from {{vendorName}}: {{candidateName}} - {{positionTitle}}'
 const VENDOR_SUBMITTED_DEFAULT_HTML = `<p>Hi {{recruiterName}},</p>\n<p><strong>{{vendorName}}</strong> has submitted a new candidate, <strong>{{candidateName}}</strong>, for <strong>{{positionTitle}}</strong>.</p>\n<p><a href="{{link}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Candidate</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`

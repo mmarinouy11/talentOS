@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { resolveEmailTemplate } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-resolver'
 
 const FEEDBACK_NOTIF_DEFAULT_SUBJECT = 'Feedback received: {{candidateName}} — {{interviewType}}'
 const FEEDBACK_NOTIF_DEFAULT_HTML = `<p>Hi {{recruiterName}},</p>\n<p>Feedback has been submitted for <strong>{{candidateName}}</strong> ({{interviewType}}) for the <strong>{{positionTitle}}</strong> role.</p>\n<p><a href="{{link}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Feedback</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`
