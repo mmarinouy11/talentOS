@@ -63,7 +63,7 @@ export interface PositionRow {
   dgm: number | null
   dgmAtRisk: boolean
   recruiter: { name: string | null; email: string } | null
-  _count: { candidatePositions: number }
+  _count: { candidatePositions: number; positionVendors: number }
 }
 
 // Flat sort row — derived fields hoisted so useSortableData can compare them
@@ -71,6 +71,7 @@ interface SortRow extends PositionRow {
   _recruiterLabel: string
   _agingMs: number
   _candidates: number
+  _partners: number
   _targetMs: number
   _priorityOrder: number
   _statusOrder: number
@@ -111,6 +112,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
     _recruiterLabel: p.recruiter?.name ?? p.recruiter?.email ?? '',
     _agingMs: now - new Date(p.createdAt).getTime(),
     _candidates: p._count.candidatePositions,
+    _partners: p._count.positionVendors,
     _targetMs: p.target_date_asap ? -1 : p.target_date ? new Date(p.target_date).getTime() : Infinity,
     _priorityOrder: PRIORITY_ORDER[p.priority],
     _statusOrder: STATUS_ORDER[p.status],
@@ -189,6 +191,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
                 {sh('Target', '_targetMs')}
                 {sh('Aging', '_agingMs', 'text-right')}
                 {sh('Candidates', '_candidates', 'text-right')}
+                {sh('Partners', '_partners', 'text-right')}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -211,6 +214,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
                     <td className="px-4 py-3 text-gray-600 text-sm">{fmtTarget(p)}</td>
                     <td className="px-4 py-3 text-right font-medium text-gray-600">{days}d</td>
                     <td className="px-4 py-3 text-right text-gray-600">{p._count.candidatePositions}</td>
+                    <td className="px-4 py-3 text-right text-gray-600">{p._partners > 0 ? p._partners : '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Link href={`/positions/${p.id}/edit`} onClick={(e) => e.stopPropagation()}>

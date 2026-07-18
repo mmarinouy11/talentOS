@@ -27,7 +27,7 @@ export default async function PositionsPage() {
       dgm: true,
       dgmAtRisk: true,
       recruiter: { select: { id: true, name: true, email: true } },
-      _count: { select: { candidatePositions: true } },
+      _count: { select: { candidatePositions: true, positionVendors: true } },
     },
     orderBy: { createdAt: 'desc' },
   })
