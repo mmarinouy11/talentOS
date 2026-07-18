@@ -89,6 +89,8 @@ export default function VendorPortalPage() {
   const [parsing, setParsing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [consentError, setConsentError] = useState(false)
   const [rejectionReason, setRejectionReason] = useState<RejectionReason | null>(null)
   const [rejectionMessage, setRejectionMessage] = useState('')
   const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
@@ -136,6 +138,10 @@ export default function VendorPortalPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedPosition || !file) return
+    if (!consentChecked) {
+      setConsentError(true)
+      return
+    }
     setSubmitting(true)
     setSubmitError('')
     try {
@@ -173,6 +179,8 @@ export default function VendorPortalPage() {
     setCountry('')
     setDesiredCompensation('')
     setSubmitError('')
+    setConsentChecked(false)
+    setConsentError(false)
     setState('submit')
   }
 
@@ -556,6 +564,24 @@ export default function VendorPortalPage() {
             </div>
 
             {submitError && <p style={{ color: '#e53e3e', fontSize: 13, marginTop: 8 }}>{submitError}</p>}
+
+            {/* Consent checkbox */}
+            <div style={{ marginTop: 20, borderTop: '1px solid #f0ebe5', paddingTop: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={consentChecked}
+                  onChange={(e) => { setConsentChecked(e.target.checked); if (e.target.checked) setConsentError(false) }}
+                  style={{ marginTop: 2, width: 16, height: 16, accentColor: '#8CF000', flexShrink: 0, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 12, color: consentError ? '#e53e3e' : '#6b6560', lineHeight: 1.5, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+                  I confirm that this candidate has given their consent to share their personal data with Tenarai LATAM for recruitment evaluation purposes.
+                </span>
+              </label>
+              {consentError && (
+                <p style={{ color: '#e53e3e', fontSize: 12, marginTop: 4, marginLeft: 26 }}>You must confirm candidate consent before submitting.</p>
+              )}
+            </div>
 
             <button
               type="submit"

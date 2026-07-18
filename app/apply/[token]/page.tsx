@@ -94,6 +94,9 @@ export default function ApplyPage() {
   const [parsing, setParsing] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [answersErrors, setAnswersErrors] = useState<boolean[]>([])
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [consentError, setConsentError] = useState(false)
 
   const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
   const [rejectionMessage, setRejectionMessage] = useState('')
@@ -146,6 +149,11 @@ export default function ApplyPage() {
       const errors = answers.map((a) => !a.trim())
       setAnswersErrors(errors)
       if (errors.some(Boolean)) return
+    }
+
+    if (!consentChecked) {
+      setConsentError(true)
+      return
     }
 
     setState('submitting')
@@ -443,6 +451,44 @@ export default function ApplyPage() {
                 </div>
               </div>
             )}
+
+            {/* Privacy notice */}
+            <div style={{ marginTop: 24, borderTop: '1px solid #f0ebe5', paddingTop: 18 }}>
+              <button
+                type="button"
+                onClick={() => setPrivacyOpen((v) => !v)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b6560', fontSize: 13, fontWeight: 600, padding: 0, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Arial, "Open Sans", sans-serif' }}
+              >
+                <span style={{ color: '#8CF000', fontSize: 14 }}>{privacyOpen ? '▲' : '▼'}</span>
+                View Privacy Notice
+              </button>
+              {privacyOpen && (
+                <div style={{ marginTop: 12, background: '#f5f0eb', borderRadius: 10, padding: '14px 16px', fontSize: 12, color: '#4a4540', lineHeight: 1.7 }}>
+                  <strong style={{ display: 'block', marginBottom: 6, color: '#2F2C29' }}>Privacy Notice</strong>
+                  <p style={{ marginBottom: 8 }}>Tenarai LATAM collects and processes the personal data you provide (including your name, contact information, resume, and compensation expectations) for the purpose of evaluating your candidacy for the position you are applying for.</p>
+                  <p style={{ marginBottom: 8 }}>Your data may be shared with our client companies solely for recruitment purposes. We retain your data for up to 12 months after your application, after which it is deleted unless you are hired or you request earlier deletion.</p>
+                  <p>You have the right to access, correct, or request deletion of your personal data at any time by contacting <a href="mailto:privacy@tenarai.com" style={{ color: '#5a8a00' }}>privacy@tenarai.com</a>.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Consent checkbox */}
+            <div style={{ marginTop: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={consentChecked}
+                  onChange={(e) => { setConsentChecked(e.target.checked); if (e.target.checked) setConsentError(false) }}
+                  style={{ marginTop: 2, width: 16, height: 16, accentColor: '#8CF000', flexShrink: 0, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 12, color: consentError ? '#e53e3e' : '#6b6560', lineHeight: 1.5, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+                  I have read and agree to the processing of my personal data as described in the Privacy Notice above.
+                </span>
+              </label>
+              {consentError && (
+                <p style={{ color: '#e53e3e', fontSize: 12, marginTop: 4, marginLeft: 26 }}>You must agree to the privacy notice before submitting.</p>
+              )}
+            </div>
 
             {submitError && (
               <p style={{ color: '#e53e3e', fontSize: 13, marginTop: 16 }}>{submitError}</p>
