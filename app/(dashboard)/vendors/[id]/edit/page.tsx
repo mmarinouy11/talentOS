@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { VendorForm } from '@/components/app/VendorForm'
 import { VendorPortalLink } from '@/components/app/VendorPortalLink'
+import { VendorPositionAssignment } from '@/components/app/VendorPositionAssignment'
 
 export default async function EditVendorPage({
   params,
@@ -30,12 +31,6 @@ export default async function EditVendorPage({
         <h1 className="text-2xl font-semibold text-gray-900">Edit Partner</h1>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 max-w-2xl space-y-2">
-        <p className="text-sm font-medium text-gray-700">Partner Portal Link</p>
-        <p className="text-xs text-gray-500">Share this link with the partner so they can submit candidates directly.</p>
-        <VendorPortalLink vendorId={vendor.id} initialToken={vendor.portalToken} />
-      </div>
-
       <VendorForm
         mode="edit"
         defaultValues={{
@@ -48,6 +43,18 @@ export default async function EditVendorPage({
           active: vendor.active,
         }}
       />
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
+        <h2 className="text-base font-semibold text-gray-900 mb-1">Assigned Positions</h2>
+        <p className="text-xs text-gray-500 mb-4">Manage which open positions this partner can submit candidates for.</p>
+        <VendorPositionAssignment vendorId={vendor.id} />
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 max-w-2xl space-y-2">
+        <p className="text-sm font-medium text-gray-700">Partner Portal Link</p>
+        <p className="text-xs text-gray-500">Share this link with the partner so they can submit candidates directly.</p>
+        <VendorPortalLink vendorId={vendor.id} initialToken={vendor.portalToken} />
+      </div>
     </div>
   )
 }

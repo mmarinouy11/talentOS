@@ -54,6 +54,9 @@ export function VendorAssignment({ positionId, initialVendors }: VendorAssignmen
         if (data.emailSuccesses?.length > 0) {
           const names = (data.emailSuccesses as string[]).join(', ')
           setEmailSuccess(`Partner${data.emailSuccesses.length > 1 ? 's' : ''} assigned. A notification email has been sent to ${names}.`)
+        } else if (data.emailRemoveSuccesses?.length > 0) {
+          const names = (data.emailRemoveSuccesses as string[]).join(', ')
+          setEmailSuccess(`Partner removed. A notification email has been sent to ${names}.`)
         }
       }
     } finally {

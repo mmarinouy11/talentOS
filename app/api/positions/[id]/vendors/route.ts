@@ -69,6 +69,7 @@ export async function PATCH(
 
   const emailWarnings: string[] = []
   const emailSuccesses: string[] = []
+  const emailRemoveSuccesses: string[] = []
 
   // Remove unassigned vendors and notify them
   if (toRemove.length > 0) {
@@ -90,6 +91,7 @@ export async function PATCH(
             { vendorContactName: vendor.pocName ?? vendor.name, positionTitle: position.title, client: position.client }
           )
           await sendEmailViaSystemGmail({ to: vendor.pocEmail, subject, html })
+          emailRemoveSuccesses.push(vendor.name)
         } catch (err) {
           console.error(`[position-vendors] removal email failed for ${vendor.pocEmail}:`, err)
         }
@@ -168,5 +170,6 @@ export async function PATCH(
     vendors: updatedVendors.map((r) => r.vendor),
     emailError: emailWarnings.length > 0 ? emailWarnings.join(' | ') : null,
     emailSuccesses,
+    emailRemoveSuccesses,
   })
 }
