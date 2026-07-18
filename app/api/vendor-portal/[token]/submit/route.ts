@@ -134,32 +134,27 @@ export async function POST(
     // continue without Drive upload
   }
 
-  // Create or find candidate
-  let candidate = await db.candidate.findFirst({
-    where: { email: emailRaw, deletedAt: null },
+  // Create candidate (duplicate check above guarantees no existing record)
+  const createdCandidate = true
+  const candidate = await db.candidate.create({
+    data: {
+      firstName,
+      lastName,
+      email: emailRaw,
+      country: countryRaw,
+      desiredCompensation,
+      seniority: parsed.seniority ?? undefined,
+      yearsOfExperience: parsed.yearsOfExperience ?? null,
+      skills: parsed.skills ?? [],
+      languages: parsed.languages ?? [],
+      summary: parsed.summary ?? null,
+      cvDriveId: cvDriveId ?? null,
+      cvOriginalName: cvOriginalName ?? null,
+      sourcedByType: 'VENDOR',
+      sourcedByVendorId: vendor.id,
+      recruiterId: position.recruiterId,
+    },
   })
-  const createdCandidate = !candidate
-  if (!candidate) {
-    candidate = await db.candidate.create({
-      data: {
-        firstName,
-        lastName,
-        email: emailRaw,
-        country: countryRaw,
-        desiredCompensation,
-        seniority: parsed.seniority ?? undefined,
-        yearsOfExperience: parsed.yearsOfExperience ?? null,
-        skills: parsed.skills ?? [],
-        languages: parsed.languages ?? [],
-        summary: parsed.summary ?? null,
-        cvDriveId: cvDriveId ?? null,
-        cvOriginalName: cvOriginalName ?? null,
-        sourcedByType: 'VENDOR',
-        sourcedByVendorId: vendor.id,
-        recruiterId: position.recruiterId,
-      },
-    })
-  }
 
   // Create CandidatePosition
   const cp = await db.candidatePosition.create({
@@ -169,6 +164,24 @@ export async function POST(
       recruiterId: position.recruiterId,
     },
   })
+
+  // CHECK 1b — Location (before expensive fit scoring)
+  if (position.location && position.location.length > 0) {
+    const allowed = position.location.map((l) => l.trim().toLowerCase())
+    if (countryRaw && !allowed.includes(countryRaw.trim().toLowerCase())) {
+      await db.candidatePosition.delete({ where: { id: cp.id } })
+      if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
+      return NextResponse.json({
+        rejected: true,
+        reason: 'location',
+        message: 'This candidate\'s country does not match the requirements for this position.',
+        checks: [
+          { name: 'Eligibility Check', passed: true, detail: 'No prior submission found for this candidate.' },
+          { name: 'Location', passed: false, detail: `This position is only open to candidates from: ${position.location.join(', ')}.` },
+        ],
+      })
+    }
+  }
 
   // CHECK 2 — Fit score (synchronous)
   await scoreCandidateForPosition(cp.id)

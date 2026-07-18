@@ -178,6 +178,24 @@ export async function POST(
     },
   })
 
+  // CHECK 1b — Location (before expensive fit scoring)
+  if (position.location && position.location.length > 0) {
+    const allowed = position.location.map((l) => l.trim().toLowerCase())
+    if (countryRaw && !allowed.includes(countryRaw.trim().toLowerCase())) {
+      await db.candidatePosition.delete({ where: { id: cp.id } })
+      if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
+      return NextResponse.json({
+        rejected: true,
+        reason: 'location',
+        message: 'This position is not open to candidates from your country.',
+        checks: [
+          { name: 'Eligibility Check', passed: true, detail: 'No prior application found for this position.' },
+          { name: 'Location', passed: false, detail: `This position is only open to candidates from: ${position.location.join(', ')}.` },
+        ],
+      })
+    }
+  }
+
   // CHECK 2 — Fit score (synchronous)
   await scoreCandidateForPosition(cp.id)
   const scored = await db.candidatePosition.findUnique({ where: { id: cp.id } })
