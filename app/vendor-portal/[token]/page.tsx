@@ -26,10 +26,22 @@ interface Position {
   budgetMonthly: number | null
 }
 
+interface Submission {
+  id: string
+  firstName: string
+  lastInitial: string
+  positionTitle: string
+  stage: string
+  isActive: boolean
+  latestInterview: { label: string; status: string } | null
+  submittedAt: string
+}
+
 interface VendorData {
   vendorId: string
   vendorName: string
   positions: Position[]
+  submissions: Submission[]
 }
 
 type PageState = 'loading' | 'invalid' | 'list' | 'submit' | 'success' | 'rejected'
@@ -81,6 +93,7 @@ export default function VendorPortalPage() {
   const [rejectionMessage, setRejectionMessage] = useState('')
   const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
   const [expandedJD, setExpandedJD] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<'positions' | 'submissions'>('positions')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -282,75 +295,151 @@ export default function VendorPortalPage() {
   }
 
   const openPositions = data.positions.filter((p) => p.status === 'OPEN')
+  const submissions = data.submissions ?? []
 
   // ─── List ───
   if (state === 'list') {
+    const tabStyle = (tab: 'positions' | 'submissions'): React.CSSProperties => ({
+      padding: '10px 20px',
+      fontSize: 14,
+      fontWeight: 600,
+      border: 'none',
+      borderRadius: 10,
+      cursor: 'pointer',
+      fontFamily: 'Arial, "Open Sans", sans-serif',
+      background: activeTab === tab ? '#2F2C29' : 'transparent',
+      color: activeTab === tab ? '#8CF000' : '#6b6560',
+      transition: 'all 0.15s',
+    })
+
     return (
       <div style={{ minHeight: '100vh', background: '#F5F0EB', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
         <BrandHeader />
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 16px 60px' }}>
-          <div style={{ marginBottom: 28 }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 16px 60px' }}>
+          <div style={{ marginBottom: 24 }}>
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9a9490', marginBottom: 6 }}>Partner Portal</p>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: '#2F2C29', marginBottom: 6 }}>{data.vendorName}</h1>
-            <div style={{ height: 3, width: 40, background: '#8CF000', borderRadius: 2, marginBottom: 10 }} />
-            <p style={{ fontSize: 14, color: '#6b6560' }}>Submit candidates for open positions below.</p>
+            <div style={{ height: 3, width: 40, background: '#8CF000', borderRadius: 2 }} />
           </div>
 
-          {openPositions.length === 0 ? (
-            <div style={{ background: '#fff', borderRadius: 20, padding: '40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-              <p style={{ color: '#9a9490', fontSize: 14 }}>No open positions are currently assigned to you. Check back later or contact your Tenarai contact.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {openPositions.map((pos) => {
-                const jdText = pos.jdRaw || pos.jdSummary
-                const jdOpen = expandedJD.has(pos.id)
-                return (
-                  <div key={pos.id} style={{ background: '#fff', borderRadius: 20, padding: '24px 28px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#2F2C29', marginBottom: 4 }}>{pos.title}</h2>
-                        <p style={{ fontSize: 13, color: '#9a9490', marginBottom: 8 }}>Tenarai</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {pos.budgetMonthly != null && (
-                            <span style={{ background: '#f0fde0', border: '1px solid #c4f060', borderRadius: 999, padding: '3px 10px', fontSize: 12, color: '#3a6600', fontWeight: 500 }}>
-                              Up to ${pos.budgetMonthly.toLocaleString()}/month
-                            </span>
-                          )}
-                          {pos.location.map((loc) => (
-                            <span key={loc} style={{ background: '#F5F0EB', border: '1px solid #e5e0da', borderRadius: 999, padding: '3px 10px', fontSize: 12, color: '#5a5550', fontWeight: 500 }}>{loc}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => startSubmit(pos)}
-                        style={{ flexShrink: 0, background: '#8CF000', color: '#000', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Arial, "Open Sans", sans-serif', whiteSpace: 'nowrap' }}
-                        onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = '#7ada00' }}
-                        onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = '#8CF000' }}
-                      >
-                        Submit Candidate
-                      </button>
-                    </div>
-                    {jdText && (
-                      <div style={{ marginTop: 14, borderTop: '1px solid #f0ebe5', paddingTop: 12 }}>
-                        <button
-                          onClick={() => toggleJD(pos.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2F2C29', fontSize: 13, fontWeight: 600, padding: 0, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Arial, "Open Sans", sans-serif' }}
-                        >
-                          <span style={{ color: '#8CF000', fontSize: 14 }}>{jdOpen ? '▲' : '▼'}</span>
-                          {jdOpen ? 'Hide job description' : 'View job description'}
-                        </button>
-                        {jdOpen && (
-                          <div style={{ marginTop: 10, fontSize: 14, color: '#4a4540', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: 260, overflowY: 'auto' }}>
-                            {jdText}
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: '#e8e3dd', borderRadius: 12, padding: 4, width: 'fit-content' }}>
+            <button style={tabStyle('positions')} onClick={() => setActiveTab('positions')}>
+              Open Positions {openPositions.length > 0 && <span style={{ marginLeft: 4, background: activeTab === 'positions' ? '#8CF000' : '#d5d0ca', color: activeTab === 'positions' ? '#000' : '#6b6560', borderRadius: 999, padding: '1px 7px', fontSize: 11 }}>{openPositions.length}</span>}
+            </button>
+            <button style={tabStyle('submissions')} onClick={() => setActiveTab('submissions')}>
+              My Submissions {submissions.length > 0 && <span style={{ marginLeft: 4, background: activeTab === 'submissions' ? '#8CF000' : '#d5d0ca', color: activeTab === 'submissions' ? '#000' : '#6b6560', borderRadius: 999, padding: '1px 7px', fontSize: 11 }}>{submissions.length}</span>}
+            </button>
+          </div>
+
+          {/* ── Tab: Open Positions ── */}
+          {activeTab === 'positions' && (
+            openPositions.length === 0 ? (
+              <div style={{ background: '#fff', borderRadius: 20, padding: '40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                <p style={{ color: '#9a9490', fontSize: 14 }}>No open positions are currently assigned to you. Check back later or contact your Tenarai contact.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {openPositions.map((pos) => {
+                  const jdText = pos.jdRaw || pos.jdSummary
+                  const jdOpen = expandedJD.has(pos.id)
+                  return (
+                    <div key={pos.id} style={{ background: '#fff', borderRadius: 20, padding: '24px 28px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <h2 style={{ fontSize: 17, fontWeight: 700, color: '#2F2C29', marginBottom: 4 }}>{pos.title}</h2>
+                          <p style={{ fontSize: 13, color: '#9a9490', marginBottom: 8 }}>Tenarai</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {pos.budgetMonthly != null && (
+                              <span style={{ background: '#f0fde0', border: '1px solid #c4f060', borderRadius: 999, padding: '3px 10px', fontSize: 12, color: '#3a6600', fontWeight: 500 }}>
+                                Up to ${pos.budgetMonthly.toLocaleString()}/month
+                              </span>
+                            )}
+                            {pos.location.map((loc) => (
+                              <span key={loc} style={{ background: '#F5F0EB', border: '1px solid #e5e0da', borderRadius: 999, padding: '3px 10px', fontSize: 12, color: '#5a5550', fontWeight: 500 }}>{loc}</span>
+                            ))}
                           </div>
-                        )}
+                        </div>
+                        <button
+                          onClick={() => startSubmit(pos)}
+                          style={{ flexShrink: 0, background: '#8CF000', color: '#000', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Arial, "Open Sans", sans-serif', whiteSpace: 'nowrap' }}
+                          onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = '#7ada00' }}
+                          onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = '#8CF000' }}
+                        >
+                          Submit Candidate
+                        </button>
                       </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                      {jdText && (
+                        <div style={{ marginTop: 14, borderTop: '1px solid #f0ebe5', paddingTop: 12 }}>
+                          <button
+                            onClick={() => toggleJD(pos.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2F2C29', fontSize: 13, fontWeight: 600, padding: 0, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Arial, "Open Sans", sans-serif' }}
+                          >
+                            <span style={{ color: '#8CF000', fontSize: 14 }}>{jdOpen ? '▲' : '▼'}</span>
+                            {jdOpen ? 'Hide job description' : 'View job description'}
+                          </button>
+                          {jdOpen && (
+                            <div style={{ marginTop: 10, fontSize: 14, color: '#4a4540', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: 260, overflowY: 'auto' }}>
+                              {jdText}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          )}
+
+          {/* ── Tab: My Submissions ── */}
+          {activeTab === 'submissions' && (
+            submissions.length === 0 ? (
+              <div style={{ background: '#fff', borderRadius: 20, padding: '40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                <p style={{ color: '#9a9490', fontSize: 14 }}>No candidates submitted yet. Switch to Open Positions to submit your first candidate.</p>
+              </div>
+            ) : (
+              <div style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f5f0eb', borderBottom: '1px solid #e8e3dd' }}>
+                      {['Candidate', 'Position', 'Stage', 'Status', 'Latest Round', 'Submitted'].map((h) => (
+                        <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9a9490' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {submissions.map((s, i) => (
+                      <tr key={s.id} style={{ borderBottom: i < submissions.length - 1 ? '1px solid #f0ebe5' : 'none' }}>
+                        <td style={{ padding: '14px 16px', fontWeight: 600, color: '#2F2C29' }}>
+                          {s.firstName} {s.lastInitial}.
+                        </td>
+                        <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.positionTitle}</td>
+                        <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.stage}</td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <span style={{
+                            background: s.isActive ? '#f0fde0' : '#fff5f5',
+                            color: s.isActive ? '#3a6600' : '#b91c1c',
+                            border: `1px solid ${s.isActive ? '#c4f060' : '#fca5a5'}`,
+                            borderRadius: 999, padding: '3px 9px', fontSize: 11, fontWeight: 600,
+                          }}>
+                            {s.isActive ? 'Active' : 'Not Moving Forward'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 16px', color: '#6b6560' }}>
+                          {s.latestInterview ? (
+                            <span>{s.latestInterview.label} · {s.latestInterview.status}</span>
+                          ) : '—'}
+                        </td>
+                        <td style={{ padding: '14px 16px', color: '#9a9490', whiteSpace: 'nowrap' }}>
+                          {new Date(s.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
         </div>
       </div>
