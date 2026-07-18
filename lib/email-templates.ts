@@ -1,29 +1,5 @@
-import { db } from '@/lib/db'
-
 const COMPANY_NAME = 'Tenarai'
 const SIGNATURE_NAME = 'Tenarai LATAM'
-
-export async function resolveEmailTemplate(
-  key: string,
-  defaultSubject: string,
-  defaultHtml: string,
-  variables: Record<string, string>
-): Promise<{ subject: string; html: string }> {
-  let subject = defaultSubject
-  let html = defaultHtml
-  try {
-    const override = await db.systemEmailTemplate.findUnique({ where: { key } })
-    if (override?.subject) subject = override.subject
-    if (override?.htmlBody) html = override.htmlBody
-  } catch (err) {
-    console.error(`[resolveEmailTemplate] DB lookup failed for key ${key}:`, err)
-  }
-  for (const [varName, value] of Object.entries(variables)) {
-    subject = subject.replaceAll(`{{${varName}}}`, value)
-    html = html.replaceAll(`{{${varName}}}`, value)
-  }
-  return { subject, html }
-}
 
 export const DEFAULT_SCHEDULING_TEMPLATE = `<p>Hi {{candidateName}},</p>
 <p>Thank you for your interest in the <strong>{{positionTitle}}</strong> role at <strong>{{clientName}}</strong>. We'd love to schedule a screening call with you.</p>
