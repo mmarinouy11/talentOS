@@ -7,6 +7,7 @@ import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
 import { directCandidateSubmittedEmail, directReturningCandidateEmail } from '@/lib/email-templates'
 import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
+import { locationAllowed } from '@/lib/location'
 
 const CV_PARSE_SYSTEM = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -180,8 +181,7 @@ export async function POST(
 
   // CHECK 1b — Location (before expensive fit scoring)
   if (position.location && position.location.length > 0) {
-    const allowed = position.location.map((l) => l.trim().toLowerCase())
-    if (countryRaw && !allowed.includes(countryRaw.trim().toLowerCase())) {
+    if (countryRaw && !locationAllowed(position.location, countryRaw)) {
       await db.candidatePosition.delete({ where: { id: cp.id } })
       if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
       return NextResponse.json({
