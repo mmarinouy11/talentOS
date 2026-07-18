@@ -145,6 +145,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
 
   const [sortKey, setSortKey] = useState<SortKey>('stage')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [search, setSearch] = useState('')
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -241,11 +242,18 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
   }
 
   const { activeRows, inactiveRows } = useMemo(() => {
-    const active = rows.filter((cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED')
-    const inactive = rows.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN')
+    const q = search.trim().toLowerCase()
+    const match = (cp: CandidatePosition) => {
+      if (!q) return true
+      const name = `${cp.candidate.firstName} ${cp.candidate.lastName}`.toLowerCase()
+      const country = (cp.candidate.country ?? '').toLowerCase()
+      return name.includes(q) || country.includes(q)
+    }
+    const active = rows.filter((cp) => (cp.status === 'ACTIVE' || cp.status === 'HIRED') && match(cp))
+    const inactive = rows.filter((cp) => (cp.status === 'REJECTED' || cp.status === 'WITHDRAWN') && match(cp))
     return { activeRows: sortRows(active), inactiveRows: sortRows(inactive) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, sortKey, sortDir, liveScores])
+  }, [rows, sortKey, sortDir, liveScores, search])
 
   function fitCell(cp: CandidatePosition) {
     if (liveScores[cp.id] != null) {
@@ -339,30 +347,59 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         <Button size="sm" onClick={() => setShowModal(true)}>Add Candidate</Button>
       </div>
 
+      {/* Search */}
+      {rows.length > 0 && (
+        <div className="px-4 py-3 border-b border-gray-100">
+          <div className="relative max-w-xs">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search candidates..."
+              className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] focus:border-transparent"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-400">No candidates yet.</div>
+      ) : activeRows.length === 0 && inactiveRows.length === 0 ? (
+        <div className="py-12 text-center text-sm text-gray-400">No candidates match your search.</div>
       ) : (
         <div>
           {/* Active group */}
-          <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Active ({activeRows.length})
-            </span>
-          </div>
-          {activeRows.length === 0 ? (
-            <div className="px-6 py-4 text-sm text-gray-400">No active candidates.</div>
-          ) : (
-            <table className="w-full text-sm">
-              {thead}
-              <tbody className="divide-y divide-gray-50">
-                {activeRows.map(renderRow)}
-              </tbody>
-            </table>
+          {activeRows.length > 0 && (
+            <>
+              <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Active ({activeRows.length})
+                </span>
+              </div>
+              <table className="w-full text-sm">
+                {thead}
+                <tbody className="divide-y divide-gray-50">
+                  {activeRows.map(renderRow)}
+                </tbody>
+              </table>
+            </>
           )}
 
           {/* Not Moving Forward group */}
           {inactiveRows.length > 0 && (
-            <div className="border-t border-gray-200">
+            <div className={activeRows.length > 0 ? 'border-t border-gray-200' : ''}>
               <button
                 className="w-full px-6 py-2 bg-gray-50 flex items-center gap-2 hover:bg-gray-100 transition-colors text-left"
                 onClick={() => setInactiveExpanded((v) => !v)}
