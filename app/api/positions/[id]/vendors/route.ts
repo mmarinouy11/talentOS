@@ -3,7 +3,12 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { vendorPositionAssignedEmail, vendorRemovedFromPositionEmail } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-templates'
+
+const ASSIGNED_DEFAULT_SUBJECT = 'New position available: {{positionTitle}}'
+const ASSIGNED_DEFAULT_HTML = `<p>Hi {{vendorContactName}},</p>\n<p>You've been granted access to submit candidates for a new position: <strong>{{positionTitle}}</strong>.</p>\n<p><a href="{{portalLink}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Position &amp; Submit Candidates</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`
+const REMOVED_DEFAULT_SUBJECT = 'Position update: {{positionTitle}}'
+const REMOVED_DEFAULT_HTML = `<p>Hi {{vendorContactName}},</p>\n<p>You have been removed from the sourcing list for <strong>{{positionTitle}}</strong>. Please stop submitting candidates for this position.</p>\n<p>Best,<br/>Tenarai LATAM</p>`
 
 const patchSchema = z.object({
   vendorIds: z.array(z.string()),
@@ -78,11 +83,12 @@ export async function PATCH(
       for (const vendor of removedVendors) {
         if (!vendor.pocEmail) continue
         try {
-          const { subject, html } = vendorRemovedFromPositionEmail({
-            vendorContactName: vendor.pocName ?? vendor.name,
-            positionTitle: position.title,
-            client: position.client,
-          })
+          const { subject, html } = await resolveEmailTemplate(
+            'TEMPLATE_VENDOR_REMOVED',
+            REMOVED_DEFAULT_SUBJECT,
+            REMOVED_DEFAULT_HTML,
+            { vendorContactName: vendor.pocName ?? vendor.name, positionTitle: position.title, client: position.client }
+          )
           await sendEmailViaSystemGmail({ to: vendor.pocEmail, subject, html })
         } catch (err) {
           console.error(`[position-vendors] removal email failed for ${vendor.pocEmail}:`, err)
@@ -130,12 +136,17 @@ export async function PATCH(
       }
 
       try {
-        const { subject, html } = vendorPositionAssignedEmail({
-          vendorContactName: vendor.pocName ?? vendor.name,
-          positionTitle: position.title,
-          client: position.client,
-          portalLink: `${baseUrl}/vendor-portal/${vendor.portalToken}`,
-        })
+        const { subject, html } = await resolveEmailTemplate(
+          'TEMPLATE_VENDOR_ASSIGNED',
+          ASSIGNED_DEFAULT_SUBJECT,
+          ASSIGNED_DEFAULT_HTML,
+          {
+            vendorContactName: vendor.pocName ?? vendor.name,
+            positionTitle: position.title,
+            client: position.client,
+            portalLink: `${baseUrl}/vendor-portal/${vendor.portalToken}`,
+          }
+        )
         console.log(`[position-vendors] sending assignment email to ${vendor.pocEmail}`)
         await sendEmailViaSystemGmail({ to: vendor.pocEmail, subject, html })
         console.log(`[position-vendors] email sent successfully to ${vendor.pocEmail}`)

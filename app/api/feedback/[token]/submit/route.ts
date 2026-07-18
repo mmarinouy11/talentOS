@@ -2,7 +2,10 @@ import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { feedbackSubmittedNotificationEmail } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-templates'
+
+const FEEDBACK_NOTIF_DEFAULT_SUBJECT = 'Feedback received: {{candidateName}} — {{interviewType}}'
+const FEEDBACK_NOTIF_DEFAULT_HTML = `<p>Hi {{recruiterName}},</p>\n<p>Feedback has been submitted for <strong>{{candidateName}}</strong> ({{interviewType}}) for the <strong>{{positionTitle}}</strong> role.</p>\n<p><a href="{{link}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Feedback</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`
 
 const submitSchema = z.object({
   overallScore: z.number().int().min(1).max(5),
@@ -84,14 +87,18 @@ export async function POST(
         const scoreLabel = `${overallScore}/5 ${'★'.repeat(overallScore)}${'☆'.repeat(5 - overallScore)}`
         const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
         const link = `${baseUrl}/positions/${cp.position.id}/candidates/${interview.candidatePositionId}?openInterview=${interview.id}`
-        const { subject, html } = feedbackSubmittedNotificationEmail({
-          recruiterName: recruiter.name ?? recruiter.email,
-          candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
-          positionTitle: cp.position.title,
-          interviewType: INTERVIEW_TYPE_LABELS[interview.stage] ?? interview.stage,
-          scoreLabel,
-          link,
-        })
+        const { subject, html } = await resolveEmailTemplate(
+          'TEMPLATE_FEEDBACK_NOTIFICATION',
+          FEEDBACK_NOTIF_DEFAULT_SUBJECT,
+          FEEDBACK_NOTIF_DEFAULT_HTML,
+          {
+            recruiterName: recruiter.name ?? recruiter.email,
+            candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
+            positionTitle: cp.position.title,
+            interviewType: INTERVIEW_TYPE_LABELS[interview.stage] ?? interview.stage,
+            link,
+          }
+        )
         sendEmailViaSystemGmail({ to: recruiter.email, subject, html })
           .catch((err) => console.error('[feedback submit] Failed to send notification:', err))
       }

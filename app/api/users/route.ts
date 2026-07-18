@@ -4,7 +4,10 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { randomBytes } from 'crypto'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { userInvitationEmail } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-templates'
+
+const INVITE_DEFAULT_SUBJECT = "You've been invited to Tenarai TalentOS"
+const INVITE_DEFAULT_HTML = `<p>Hi {{userName}},</p>\n<p>You've been invited to join Tenarai TalentOS. Click the link below to set your password and get started:</p>\n<p><a href="{{inviteLink}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">Set Password</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`
 import type { Role } from '@prisma/client'
 
 async function requireAdmin() {
@@ -74,7 +77,12 @@ export async function POST(request: Request) {
 
   const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? ''
   const inviteLink = `${baseUrl}/invite/${invitationToken}`
-  const { subject, html } = userInvitationEmail({ userName: name, inviteLink })
+  const { subject, html } = await resolveEmailTemplate(
+    'TEMPLATE_USER_INVITATION',
+    INVITE_DEFAULT_SUBJECT,
+    INVITE_DEFAULT_HTML,
+    { userName: name, inviteLink }
+  )
 
   sendEmailViaSystemGmail({ to: email, subject, html })
     .catch((err) => console.error('[create-user] Failed to send invitation email:', err))

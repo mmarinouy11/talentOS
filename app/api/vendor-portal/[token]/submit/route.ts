@@ -5,7 +5,10 @@ import { callClaudeJSON } from '@/lib/anthropic'
 import { uploadFileToDrive } from '@/lib/google'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
-import { vendorCandidateSubmittedEmail } from '@/lib/email-templates'
+import { resolveEmailTemplate } from '@/lib/email-templates'
+
+const VENDOR_SUBMITTED_DEFAULT_SUBJECT = 'New candidate from {{vendorName}}: {{candidateName}} - {{positionTitle}}'
+const VENDOR_SUBMITTED_DEFAULT_HTML = `<p>Hi {{recruiterName}},</p>\n<p><strong>{{vendorName}}</strong> has submitted a new candidate, <strong>{{candidateName}}</strong>, for <strong>{{positionTitle}}</strong>.</p>\n<p><a href="{{link}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Candidate</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`
 import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 
 const CV_PARSE_SYSTEM = `You are a CV parser. Extract structured information from the CV text provided.
@@ -214,13 +217,18 @@ export async function POST(
   const baseUrl = process.env.NEXTAUTH_URL ?? ''
   const candidateName = `${firstName} ${lastName}`
   try {
-    const { subject, html } = vendorCandidateSubmittedEmail({
-      recruiterName: position.recruiter.name ?? position.recruiter.email,
-      candidateName,
-      positionTitle: position.title,
-      vendorName: vendor.name,
-      link: `${baseUrl}/candidates/${candidate.id}`,
-    })
+    const { subject, html } = await resolveEmailTemplate(
+      'TEMPLATE_VENDOR_CANDIDATE_SUBMITTED',
+      VENDOR_SUBMITTED_DEFAULT_SUBJECT,
+      VENDOR_SUBMITTED_DEFAULT_HTML,
+      {
+        recruiterName: position.recruiter.name ?? position.recruiter.email,
+        candidateName,
+        positionTitle: position.title,
+        vendorName: vendor.name,
+        link: `${baseUrl}/candidates/${candidate.id}`,
+      }
+    )
     await sendEmailViaSystemGmail({ to: position.recruiter.email, subject, html })
   } catch (err) {
     console.error('[vendor-portal] Failed to notify recruiter:', err)
