@@ -467,7 +467,7 @@ export default function ApplyPage() {
                   <strong style={{ display: 'block', marginBottom: 6, color: '#2F2C29' }}>Privacy Notice</strong>
                   <p style={{ marginBottom: 8 }}>Tenarai LATAM collects and processes the personal data you provide (including your name, contact information, resume, and compensation expectations) for the purpose of evaluating your candidacy for the position you are applying for.</p>
                   <p style={{ marginBottom: 8 }}>Your data may be shared with our client companies solely for recruitment purposes. We retain your data for up to 12 months after your application, after which it is deleted unless you are hired or you request earlier deletion.</p>
-                  <p>You have the right to access, correct, or request deletion of your personal data at any time by contacting <a href="mailto:privacy@tenarai.com" style={{ color: '#5a8a00' }}>privacy@tenarai.com</a>.</p>
+                  <p>You have the right to access, correct, or request deletion of your personal data at any time by contacting <a href="mailto:hr.latam@tenarai.com" style={{ color: '#5a8a00' }}>hr.latam@tenarai.com</a>.</p>
                 </div>
               )}
             </div>
@@ -483,10 +483,11 @@ export default function ApplyPage() {
                 />
                 <span style={{ fontSize: 12, color: consentError ? '#e53e3e' : '#6b6560', lineHeight: 1.5, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
                   I have read and agree to the processing of my personal data as described in the Privacy Notice above.
+                  <span style={{ color: '#e53e3e', marginLeft: 3 }}>*</span>
                 </span>
               </label>
               {consentError && (
-                <p style={{ color: '#e53e3e', fontSize: 12, marginTop: 4, marginLeft: 26 }}>You must agree to the privacy notice before submitting.</p>
+                <p style={{ color: '#e53e3e', fontSize: 12, marginTop: 4, marginLeft: 26 }}>You must accept the privacy notice to continue.</p>
               )}
             </div>
 

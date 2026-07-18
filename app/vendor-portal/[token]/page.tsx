@@ -576,10 +576,11 @@ export default function VendorPortalPage() {
                 />
                 <span style={{ fontSize: 12, color: consentError ? '#e53e3e' : '#6b6560', lineHeight: 1.5, fontFamily: 'Arial, "Open Sans", sans-serif' }}>
                   I confirm that this candidate has given their consent to share their personal data with Tenarai LATAM for recruitment evaluation purposes.
+                  <span style={{ color: '#e53e3e', marginLeft: 3 }}>*</span>
                 </span>
               </label>
               {consentError && (
-                <p style={{ color: '#e53e3e', fontSize: 12, marginTop: 4, marginLeft: 26 }}>You must confirm candidate consent before submitting.</p>
+                <p style={{ color: '#e53e3e', fontSize: 12, marginTop: 4, marginLeft: 26 }}>You must confirm candidate consent to continue.</p>
               )}
             </div>
 
