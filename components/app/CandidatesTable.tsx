@@ -123,6 +123,8 @@ function TrashIcon() {
 
 export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) {
   const [search, setSearch] = useState('')
+  const [filterCountry, setFilterCountry] = useState('')
+  const [filterSource, setFilterSource] = useState('')
   const [rows, setRows] = useState(candidates)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey | undefined>(undefined)
@@ -144,6 +146,16 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
     finally { setDeleting(null) }
   }
 
+  const uniqueCountries = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of rows) { if (c.country) set.add(c.country) }
+    return [...set].sort()
+  }, [rows])
+
+  const filtersActive = !!(filterCountry || filterSource)
+
+  function clearFilters() { setFilterCountry(''); setFilterSource('') }
+
   const sortRows: SortRow[] = useMemo(() => rows.map((c) => ({
     ...c,
     _name: `${c.firstName} ${c.lastName}`,
@@ -154,15 +166,20 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
 
   // Filter first, then sort
   const filtered = useMemo(() => sortRows.filter((c) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      c.firstName.toLowerCase().includes(q) ||
-      c.lastName.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
-      c.skills.some((s) => s.toLowerCase().includes(q))
-    )
-  }), [sortRows, search])
+    if (search) {
+      const q = search.toLowerCase()
+      const matchesSearch = (
+        c.firstName.toLowerCase().includes(q) ||
+        c.lastName.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        c.skills.some((s) => s.toLowerCase().includes(q))
+      )
+      if (!matchesSearch) return false
+    }
+    if (filterCountry && c.country !== filterCountry) return false
+    if (filterSource && c.sourcedByType !== filterSource) return false
+    return true
+  }), [sortRows, search, filterCountry, filterSource])
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
@@ -185,7 +202,30 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
 
   return (
     <div className="space-y-4">
-      <Input placeholder="Search by name, email, or skill…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input placeholder="Search by name, email, or skill…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+
+        {uniqueCountries.length > 1 && (
+          <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="h-9 py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+            <option value="">All Countries</option>
+            {uniqueCountries.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+
+        <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="h-9 py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+          <option value="">All Sources</option>
+          <option value="RECRUITER">Internal Recruiter</option>
+          <option value="VENDOR">Partner</option>
+          <option value="DIRECT">Direct Application</option>
+          <option value="OTHER">Other</option>
+        </select>
+
+        {(filtersActive || search) && (
+          <button onClick={() => { clearFilters(); setSearch('') }} className="text-xs text-gray-500 hover:text-gray-800 underline whitespace-nowrap">
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {sorted.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">

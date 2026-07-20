@@ -18,6 +18,17 @@ const STAGE_LABELS: Record<Stage, string> = {
   REJECTED: 'Rejected',
 }
 
+const STAGE_FILTER_LABELS: Record<Stage, string> = {
+  APPLIED: 'Applied',
+  SCREENING: 'Screening',
+  TECHNICAL_INTERVIEW: 'Technical Interview',
+  MANAGER_INTERVIEW: 'Manager Interview',
+  CLIENT_INTERVIEW: 'Client Interview',
+  OFFER: 'Offer',
+  HIRED: 'Hired',
+  REJECTED: 'Rejected',
+}
+
 // Lower number = more advanced stage = sorts first in ascending order
 const STAGE_ORDER: Record<string, number> = {
   HIRED: 0,
@@ -146,6 +157,10 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
   const [sortKey, setSortKey] = useState<SortKey>('stage')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [search, setSearch] = useState('')
+  const [filterCountry, setFilterCountry] = useState('')
+  const [filterStage, setFilterStage] = useState('')
+  const [filterRoundStatus, setFilterRoundStatus] = useState('')
+  const [filterMinScore, setFilterMinScore] = useState('')
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -241,19 +256,54 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
     })
   }
 
+  const uniqueCountries = useMemo(() => {
+    const set = new Set<string>()
+    for (const cp of rows) { if (cp.candidate.country) set.add(cp.candidate.country) }
+    return [...set].sort()
+  }, [rows])
+
+  const uniqueStages = useMemo(() => {
+    const order: Stage[] = ['APPLIED','SCREENING','TECHNICAL_INTERVIEW','MANAGER_INTERVIEW','CLIENT_INTERVIEW','OFFER','HIRED','REJECTED']
+    const set = new Set(rows.map((cp) => cp.stage))
+    return order.filter((s) => set.has(s))
+  }, [rows])
+
+  const uniqueRoundStatuses = useMemo(() => {
+    const order = ['PENDING','AWAITING_SCHEDULE','SCHEDULED','COMPLETED','CANCELLED','NO_ROUND']
+    const set = new Set(rows.map((cp) => cp.latestInterviewStatus ?? 'NO_ROUND'))
+    return order.filter((s) => set.has(s))
+  }, [rows])
+
+  const minScore = filterMinScore !== '' ? parseFloat(filterMinScore) : null
+
+  const filtersActive = !!(filterCountry || filterStage || filterRoundStatus || filterMinScore)
+
+  function clearFilters() {
+    setFilterCountry(''); setFilterStage(''); setFilterRoundStatus(''); setFilterMinScore('')
+  }
+
   const { activeRows, inactiveRows } = useMemo(() => {
     const q = search.trim().toLowerCase()
     const match = (cp: CandidatePosition) => {
-      if (!q) return true
-      const name = `${cp.candidate.firstName} ${cp.candidate.lastName}`.toLowerCase()
-      const country = (cp.candidate.country ?? '').toLowerCase()
-      return name.includes(q) || country.includes(q)
+      if (q) {
+        const name = `${cp.candidate.firstName} ${cp.candidate.lastName}`.toLowerCase()
+        const country = (cp.candidate.country ?? '').toLowerCase()
+        if (!name.includes(q) && !country.includes(q)) return false
+      }
+      if (filterCountry && cp.candidate.country !== filterCountry) return false
+      if (filterStage && cp.stage !== filterStage) return false
+      if (filterRoundStatus) {
+        const status = cp.latestInterviewStatus ?? 'NO_ROUND'
+        if (status !== filterRoundStatus) return false
+      }
+      if (minScore !== null && (cp.fitScore == null || cp.fitScore < minScore)) return false
+      return true
     }
     const active = rows.filter((cp) => (cp.status === 'ACTIVE' || cp.status === 'HIRED') && match(cp))
     const inactive = rows.filter((cp) => (cp.status === 'REJECTED' || cp.status === 'WITHDRAWN') && match(cp))
     return { activeRows: sortRows(active), inactiveRows: sortRows(inactive) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, sortKey, sortDir, liveScores, search])
+  }, [rows, sortKey, sortDir, liveScores, search, filterCountry, filterStage, filterRoundStatus, minScore])
 
   function fitCell(cp: CandidatePosition) {
     if (liveScores[cp.id] != null) {
@@ -347,27 +397,73 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         <Button size="sm" onClick={() => setShowModal(true)}>Add Candidate</Button>
       </div>
 
-      {/* Search */}
+      {/* Search + Filters */}
       {rows.length > 0 && (
-        <div className="px-4 py-3 border-b border-gray-100">
-          <div className="relative max-w-xs">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search candidates..."
-              className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] focus:border-transparent"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                aria-label="Clear search"
-              >
-                ×
+        <div className="px-4 py-3 border-b border-gray-100 space-y-2">
+          {/* Search row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search candidates..."
+                className="pl-9 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] focus:border-transparent w-44"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="Clear search">×</button>
+              )}
+            </div>
+
+            {/* Country */}
+            {uniqueCountries.length > 1 && (
+              <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+                <option value="">All Countries</option>
+                {uniqueCountries.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+
+            {/* Stage */}
+            {uniqueStages.length > 1 && (
+              <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className="py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+                <option value="">All Stages</option>
+                {uniqueStages.map((s) => <option key={s} value={s}>{STAGE_FILTER_LABELS[s]}</option>)}
+              </select>
+            )}
+
+            {/* Round Status */}
+            {uniqueRoundStatuses.length > 1 && (
+              <select value={filterRoundStatus} onChange={(e) => setFilterRoundStatus(e.target.value)} className="py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+                <option value="">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="AWAITING_SCHEDULE">Awaiting Schedule</option>
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="NO_ROUND">No Round</option>
+              </select>
+            )}
+
+            {/* Min Fit Score */}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-500 whitespace-nowrap">Min score</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={filterMinScore}
+                onChange={(e) => setFilterMinScore(e.target.value)}
+                placeholder="0–100"
+                className="w-16 py-1.5 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+              />
+            </div>
+
+            {(filtersActive || search) && (
+              <button onClick={() => { clearFilters(); setSearch('') }} className="text-xs text-gray-500 hover:text-gray-800 underline whitespace-nowrap">
+                Clear all
               </button>
             )}
           </div>
@@ -385,7 +481,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
             <>
               <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Active ({activeRows.length})
+                  Active ({activeRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED').length}` : ''})
                 </span>
               </div>
               <table className="w-full text-sm">
@@ -409,7 +505,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
                   : <ChevronUp size={14} className="text-gray-400 shrink-0 rotate-180" />
                 }
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Not Moving Forward ({inactiveRows.length})
+                  Not Moving Forward ({inactiveRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN').length}` : ''})
                 </span>
               </button>
               {inactiveExpanded && (

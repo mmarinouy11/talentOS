@@ -31,9 +31,6 @@ export function SystemGmailSection({ connectedEmail, toast }: { connectedEmail: 
         <p className="text-xs text-gray-500 mt-0.5">
           This Gmail account sends internal system notifications (e.g. feedback alerts) to recruiters. Separate from personal Gmail connections.
         </p>
-        <p className="text-xs text-amber-600 mt-1">
-          If the Gmail connection expires after 7 days, the Google OAuth app may be in <strong>Testing</strong> mode. An administrator must publish the OAuth app in Google Cloud Console to keep tokens valid indefinitely.
-        </p>
       </div>
 
       {toast === 'connected' && (
