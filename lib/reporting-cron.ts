@@ -116,7 +116,14 @@ export async function runReportingCron() {
   }
 }
 
+let cronStarted = false
+
 export function startReportingCron() {
+  if (cronStarted) {
+    console.log('[reporting-cron] Already started, skipping duplicate registration')
+    return
+  }
+  cronStarted = true
   cron.schedule(CRON_SCHEDULE, runReportingCron)
   console.log(`[reporting-cron] Scheduled at ${CRON_SCHEDULE} UTC (≈08:00 Montevideo)`)
 }
