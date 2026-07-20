@@ -634,7 +634,7 @@ function NextRoundModal({
           {isScreening && schedulingMode === 'CALENDAR_LINK' ? (
             hasCalendarLink ? (
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
-                <p className="font-medium truncate">{userProfile!.calendarLink}</p>
+                <p className="font-medium break-all">{userProfile!.calendarLink}</p>
                 <p className="text-xs text-blue-500 mt-0.5">Candidate will receive this link.</p>
               </div>
             ) : (
@@ -1118,7 +1118,7 @@ function EditInterviewModal({
         <form onSubmit={submit} className="space-y-4">
           {currentInterview.calendarLinkUsed ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
-              Calendar link: <span className="font-medium">{currentInterview.calendarLinkUsed}</span>
+              Calendar link: <span className="font-medium break-all">{currentInterview.calendarLinkUsed}</span>
             </div>
           ) : currentInterview.proposedSlots.length > 0 ? (
             <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600 space-y-1.5">
@@ -1414,7 +1414,7 @@ export function InterviewsSection({
                     )}
                   </div>
                   {interview.calendarLinkUsed && (
-                    <p className="text-xs text-blue-600 mt-1 truncate">Calendar link: {interview.calendarLinkUsed}</p>
+                    <p className="text-xs text-blue-600 mt-1 break-all">Calendar link: {interview.calendarLinkUsed}</p>
                   )}
                   {interview.proposedSlots.length > 0 && (
                     <p className="text-xs text-gray-500 mt-1">Slots: {interview.proposedSlots.map(formatSlot).join(' · ')}</p>

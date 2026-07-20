@@ -23,6 +23,21 @@ function buildRawEmail({ from, to, subject, html }: { from: string; to: string; 
   return Buffer.from(raw).toString('base64url')
 }
 
+export class GmailTokenExpiredError extends Error {
+  constructor() {
+    super('Gmail connection expired — please reconnect at Profile → Gmail Connection.')
+    this.name = 'GmailTokenExpiredError'
+  }
+}
+
+function isInvalidGrant(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as Record<string, unknown>
+  if (e.code === 'invalid_grant') return true
+  const msg = String(e.message ?? '')
+  return msg.includes('invalid_grant') || msg.includes('Token has been expired or revoked')
+}
+
 export async function sendEmailViaGmail(
   userId: string,
   { to, subject, html }: { to: string; subject: string; html: string },
@@ -60,7 +75,23 @@ export async function sendEmailViaGmail(
   const raw = buildRawEmail({ from, to, subject, html })
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
-  await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+  try {
+    await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+  } catch (err) {
+    if (isInvalidGrant(err)) {
+      await db.user.update({
+        where: { id: userId },
+        data: {
+          gmailAccessToken: null,
+          gmailRefreshToken: null,
+          gmailTokenExpiry: null,
+          gmailConnectedEmail: null,
+        },
+      })
+      throw new GmailTokenExpiredError()
+    }
+    throw err
+  }
 
   return from
 }
@@ -139,7 +170,7 @@ export async function sendEmail({
   interviewId?: string
   sentById?: string
   userId?: string
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; gmailExpired?: boolean }> {
   if (!userId) {
     return { success: false, error: 'No sender specified — a Gmail account is required to send emails.' }
   }
@@ -164,10 +195,13 @@ export async function sendEmail({
     })
     return { success: true }
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err)
+    const isExpired = err instanceof GmailTokenExpiredError
+    const errorMsg = isExpired
+      ? 'Your Gmail connection has expired and needs to be reconnected. Please go to Profile → Gmail Connection and reconnect your account.'
+      : (err instanceof Error ? err.message : String(err))
     await db.emailLog.create({
       data: { to, subject, template, status: 'failed', errorMsg, candidateId, candidatePositionId, interviewId, sentById },
     })
-    return { success: false, error: errorMsg }
+    return { success: false, error: errorMsg, gmailExpired: isExpired }
   }
 }

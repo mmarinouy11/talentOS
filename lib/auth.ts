@@ -3,7 +3,29 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
+import { google } from 'googleapis'
 import type { Role } from '@prisma/client'
+
+async function clearGmailTokensIfExpired(userId: string, refreshToken: string) {
+  try {
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GMAIL_OAUTH_CLIENT_ID,
+      process.env.GMAIL_OAUTH_CLIENT_SECRET,
+      `${process.env.NEXTAUTH_URL}/api/auth/gmail/callback`,
+    )
+    oauth2Client.setCredentials({ refresh_token: refreshToken })
+    await oauth2Client.getAccessToken()
+  } catch (err: unknown) {
+    const msg = String((err as Record<string, unknown>)?.message ?? '')
+    const code = String((err as Record<string, unknown>)?.code ?? '')
+    if (code === 'invalid_grant' || msg.includes('invalid_grant') || msg.includes('Token has been expired or revoked')) {
+      await db.user.update({
+        where: { id: userId },
+        data: { gmailAccessToken: null, gmailRefreshToken: null, gmailTokenExpiry: null, gmailConnectedEmail: null },
+      })
+    }
+  }
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -31,6 +53,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.passwordHash,
         )
         if (!valid) return null
+
+        if (user.gmailRefreshToken) {
+          clearGmailTokensIfExpired(user.id, user.gmailRefreshToken).catch(() => {})
+        }
 
         return { id: user.id, email: user.email, name: user.name, role: user.role }
       },

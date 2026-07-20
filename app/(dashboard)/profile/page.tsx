@@ -223,6 +223,9 @@ export default function ProfilePage() {
             <p className="text-xs text-gray-500 mt-0.5">
               Connect your Gmail account to send candidate emails from your own address.
             </p>
+            <p className="text-xs text-amber-600 mt-1">
+              If your Gmail connection expires after 7 days, the Google OAuth app may be in <strong>Testing</strong> mode. Contact your administrator to publish the OAuth app in Google Cloud Console.
+            </p>
           </div>
 
           {gmailToast && (
