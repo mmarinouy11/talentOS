@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { callClaudeJSON, anthropicErrorResponse } from '@/lib/anthropic'
 
 const POSITION_INSIGHTS_SYSTEM_PROMPT = `You are a recruiting intelligence analyst. You'll receive feedback data from multiple candidate interviews for a single job position. Identify patterns across candidates — not just individual assessments — to help the team understand systemic issues with this position's pipeline.
 
@@ -86,7 +86,7 @@ Identify patterns across these candidates.`
     parsed = await callClaudeJSON<InsightsParse>(prompt, 'SMART', POSITION_INSIGHTS_SYSTEM_PROMPT)
   } catch (err) {
     console.error('[generate-insights] Claude error:', err)
-    return NextResponse.json({ error: 'AI analysis failed' }, { status: 500 })
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'AI analysis failed' }, { status: 500 })
   }
 
   const updated = await db.position.update({

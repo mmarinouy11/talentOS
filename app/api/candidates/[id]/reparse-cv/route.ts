@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { extractPdfText, renderPdfToImages } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
-import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
+import { callClaudeJSON, getAnthropic, MODELS, anthropicErrorResponse } from '@/lib/anthropic'
 
 const SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -137,7 +137,7 @@ export async function POST(
       return NextResponse.json({ candidate, parsed: visionParsed })
     } catch (err) {
       console.error('[reparse-cv] Vision parsing failed:', err)
-      return NextResponse.json({ error: 'Could not parse this PDF. The file may be corrupt or unreadable.' }, { status: 422 })
+      return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Could not parse this PDF. The file may be corrupt or unreadable.' }, { status: 422 })
     }
   }
 
@@ -158,7 +158,7 @@ export async function POST(
   }
 
   // Parse with Claude (text path)
-  const parsed = await callClaudeJSON<{
+  let parsed: {
     firstName: string | null
     lastName: string | null
     email: string | null
@@ -173,12 +173,17 @@ export async function POST(
     strengths: string[]
     risks: string[]
     currentCompensation: number | null
-  }>(
-    `Parse this CV and return the structured JSON:\n\n${text.slice(0, 8000)}`,
-    'FAST',
-    SYSTEM_PROMPT
-  )
-
+  }
+  try {
+    parsed = await callClaudeJSON<typeof parsed>(
+      `Parse this CV and return the structured JSON:\n\n${text.slice(0, 8000)}`,
+      'FAST',
+      SYSTEM_PROMPT
+    )
+  } catch (err) {
+    console.error('[reparse-cv] Claude text parsing failed:', err)
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Failed to parse CV' }, { status: 500 })
+  }
   // Update candidate with all parsed fields
   const candidate = await db.candidate.update({
     where: { id },

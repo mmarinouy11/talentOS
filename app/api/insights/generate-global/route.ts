@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { callClaudeJSON, anthropicErrorResponse } from '@/lib/anthropic'
 
 const GLOBAL_INSIGHTS_SYSTEM_PROMPT = `You are a recruiting intelligence analyst. You'll receive feedback data from interviews across multiple positions and clients. Identify systemic patterns — skill gaps, recurring bottlenecks, cross-position trends — to help the team understand what's driving or limiting pipeline conversion org-wide.
 
@@ -74,7 +74,7 @@ Identify systemic cross-position patterns.`
     parsed = await callClaudeJSON<GlobalInsightsParse>(prompt, 'SMART', GLOBAL_INSIGHTS_SYSTEM_PROMPT)
   } catch (err) {
     console.error('[generate-global-insights] Claude error:', err)
-    return NextResponse.json({ error: 'AI analysis failed' }, { status: 500 })
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'AI analysis failed' }, { status: 500 })
   }
 
   // Keep only one global insights row

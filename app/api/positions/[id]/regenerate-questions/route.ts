@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { callClaudeJSON, anthropicErrorResponse } from '@/lib/anthropic'
 
 export async function POST(
   _request: Request,
@@ -33,8 +33,8 @@ ${position.description.slice(0, 4000)}`
       return NextResponse.json({ error: 'Failed to generate questions.' }, { status: 500 })
     }
     screeningQuestions = raw.slice(0, 3).map(String)
-  } catch {
-    return NextResponse.json({ error: 'AI generation failed.' }, { status: 500 })
+  } catch (err) {
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'AI generation failed.' }, { status: 500 })
   }
 
   const updated = await db.position.update({

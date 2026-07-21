@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { extractPdfText, renderPdfToImages } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
-import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
+import { callClaudeJSON, getAnthropic, MODELS, anthropicErrorResponse } from '@/lib/anthropic'
 import { parseTextFeedback } from '@/lib/feedback-parser'
 
 const MIN_TEXT_LENGTH = 200
@@ -136,7 +136,7 @@ export async function POST(
         parseMethod = 'vision'
       } catch (err) {
         console.error('[upload-feedback] Vision parsing error:', err)
-        return NextResponse.json({ error: `AI vision parsing failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
+        return anthropicErrorResponse(err) ?? NextResponse.json({ error: `AI vision parsing failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
       }
     } else {
       try {
@@ -144,7 +144,7 @@ export async function POST(
         parseMethod = 'text'
       } catch (err) {
         console.error('[upload-feedback] Claude text parsing error:', err)
-        return NextResponse.json({ error: `AI parsing failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
+        return anthropicErrorResponse(err) ?? NextResponse.json({ error: `AI parsing failed: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 })
       }
     }
 
@@ -166,6 +166,6 @@ export async function POST(
     return NextResponse.json(updated)
   } catch (err) {
     console.error('[upload-feedback] Unhandled error:', err)
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 })
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: err instanceof Error ? err.message : 'Internal server error' }, { status: 500 })
   }
 }

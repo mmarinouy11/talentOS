@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { uploadFileToDrive } from '@/lib/google'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { callClaudeJSON, anthropicErrorResponse } from '@/lib/anthropic'
 import { extractPdfText } from '@/lib/pdf-extract'
 
 const SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
@@ -108,6 +108,6 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     console.error('CV upload error:', err)
-    return NextResponse.json({ error: 'Failed to process CV' }, { status: 500 })
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Failed to process CV' }, { status: 500 })
   }
 }

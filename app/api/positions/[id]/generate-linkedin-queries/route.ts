@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { callClaudeJSON, anthropicErrorResponse } from '@/lib/anthropic'
 
 const LINKEDIN_QUERY_PROMPT = `Given a job position's required skills, seniority level, and location requirements, generate 2-3 LinkedIn X-ray search query strings a recruiter could paste into Google or LinkedIn search to find matching candidate profiles.
 
@@ -38,7 +38,7 @@ Location: ${position.location.join(', ') || 'not specified'}`
     if (!Array.isArray(queries)) queries = []
   } catch (err) {
     console.error('[generate-linkedin-queries] Claude error:', err)
-    return NextResponse.json({ error: 'AI generation failed' }, { status: 500 })
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'AI generation failed' }, { status: 500 })
   }
 
   await db.position.update({

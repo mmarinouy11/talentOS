@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { callClaudeJSON, anthropicErrorResponse } from '@/lib/anthropic'
 import { NextResponse } from 'next/server'
 
 interface CandidateParsed {
@@ -22,10 +22,11 @@ export async function POST(request: Request) {
   const { cvText } = await request.json()
   if (!cvText) return NextResponse.json({ error: 'cvText is required' }, { status: 400 })
 
-  const result = await callClaudeJSON<CandidateParsed>(
-    `Extract structured data from this CV:\n\n${cvText}`,
-    'FAST',
-    `You are a CV parser. Extract the following fields as JSON:
+  try {
+    const result = await callClaudeJSON<CandidateParsed>(
+      `Extract structured data from this CV:\n\n${cvText}`,
+      'FAST',
+      `You are a CV parser. Extract the following fields as JSON:
 {
   "firstName": string,
   "lastName": string,
@@ -38,7 +39,10 @@ export async function POST(request: Request) {
   "yearsOfExperience": number | null,
   "summary": string
 }`,
-  )
-
-  return NextResponse.json(result)
+    )
+    return NextResponse.json(result)
+  } catch (err) {
+    console.error('[parse-cv] Claude error:', err)
+    return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Failed to parse CV' }, { status: 500 })
+  }
 }
