@@ -130,8 +130,12 @@ export default async function PositionDetailPage({
   })
 
   const days = aging(position.createdAt)
+  const totalCandidates = position.candidatePositions.length
   const activeCandidates = position.candidatePositions.filter(
-    (cp) => cp.status === 'ACTIVE'
+    (cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED'
+  ).length
+  const notMovingForward = position.candidatePositions.filter(
+    (cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN'
   ).length
 
   return (
@@ -285,8 +289,17 @@ export default async function PositionDetailPage({
           <p className="text-3xl font-semibold mt-0.5 text-gray-900">{days}d</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-4 py-3">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Candidates</p>
-          <p className="text-3xl font-semibold mt-0.5 text-gray-900">{position.candidatePositions.length}</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Candidates</p>
+          <div className="flex items-baseline gap-3 mt-0.5 flex-wrap">
+            <span className="text-3xl font-semibold text-gray-900">{totalCandidates}</span>
+            <span className="text-sm text-gray-400">total</span>
+            <span className="text-gray-200">|</span>
+            <span className="text-lg font-semibold text-green-600">{activeCandidates}</span>
+            <span className="text-sm text-gray-400">active</span>
+            <span className="text-gray-200">|</span>
+            <span className="text-lg font-semibold text-gray-400">{notMovingForward}</span>
+            <span className="text-sm text-gray-400">not moving forward</span>
+          </div>
         </div>
       </div>
 
