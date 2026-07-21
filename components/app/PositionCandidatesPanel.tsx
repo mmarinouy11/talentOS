@@ -117,7 +117,7 @@ const STAGE_ORDER: Record<string, number> = {
 }
 
 type SortDir = 'asc' | 'desc'
-type SortKey = 'name' | 'email' | 'seniority' | 'stage' | 'fitScore'
+type SortKey = 'name' | 'email' | 'seniority' | 'stage' | 'fitScore' | 'dateAdded'
 
 function SortableHeader({
   label,
@@ -202,6 +202,7 @@ interface CandidatePosition {
   stage: Stage
   status: CandidateStatus
   fitScore: number | null
+  createdAt: string
   latestInterviewStatus?: string | null
   latestInterviewDecision?: string | null
   compensationOutOfRange?: boolean
@@ -318,6 +319,9 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
       } else if (sortKey === 'fitScore') {
         av = liveScores[a.id] ?? a.fitScore ?? -1
         bv = liveScores[b.id] ?? b.fitScore ?? -1
+      } else if (sortKey === 'dateAdded') {
+        av = new Date(a.createdAt).getTime()
+        bv = new Date(b.createdAt).getTime()
       }
 
       if (av == null) return 1
@@ -432,6 +436,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
           )}
         </td>
         <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
+        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(cp.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
         <td className="px-4 py-3 text-right">
           <button
             onClick={(e) => { e.stopPropagation(); handleRemove(cp.id, `${cp.candidate.firstName} ${cp.candidate.lastName}`) }}
@@ -457,6 +462,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         {sh('Stage', 'stage')}
         <th className="px-4 py-3 text-left font-medium text-gray-600">Round Status</th>
         {sh('Fit', 'fitScore', 'text-right')}
+        {sh('Date Added', 'dateAdded')}
         <th className="px-4 py-3" />
       </tr>
     </thead>

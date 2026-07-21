@@ -25,6 +25,7 @@ export interface ConfirmResult {
     id: string
     stage: 'APPLIED'
     fitScore: null
+    createdAt: string
     candidate: {
       id: string
       firstName: string
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
               id: cp.id,
               stage: 'APPLIED',
               fitScore: null,
+              createdAt: cp.createdAt.toISOString(),
               candidate: {
                 id: candidate.id,
                 firstName: candidate.firstName,

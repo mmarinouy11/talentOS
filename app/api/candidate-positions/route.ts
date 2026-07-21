@@ -42,7 +42,9 @@ export async function POST(request: Request) {
       notes,
       recruiterId: resolvedRecruiterId,
     },
-    include: {
+    select: {
+      id: true,
+      createdAt: true,
       candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true } },
     },
   })

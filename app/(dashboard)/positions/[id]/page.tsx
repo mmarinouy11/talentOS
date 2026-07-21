@@ -311,6 +311,7 @@ export default async function PositionDetailPage({
           stage: cp.stage,
           status: cp.status,
           fitScore: cp.fitScore,
+          createdAt: cp.createdAt.toISOString(),
           latestInterviewStatus: pickLatestInterview(cp.interviews)?.status ?? null,
           latestInterviewDecision: pickLatestInterview(cp.interviews)?.decision ?? null,
           compensationOutOfRange:

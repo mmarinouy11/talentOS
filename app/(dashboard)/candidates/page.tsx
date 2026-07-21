@@ -53,6 +53,7 @@ export default async function CandidatesPage() {
     country: c.country,
     seniority: c.seniority,
     skills: c.skills,
+    createdAt: c.createdAt.toISOString(),
     _count: { candidatePositions: c.candidatePositions.filter((cp) => cp.stage !== 'HIRED' && cp.stage !== 'REJECTED').length },
     sourcedByType: c.sourcedByType,
     sourcedByOther: c.sourcedByOther,

@@ -72,6 +72,7 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
         stage: 'APPLIED',
         status: 'ACTIVE',
         fitScore: null,
+        createdAt: cp.createdAt ?? new Date().toISOString(),
         candidate: cp.candidate,
       })
     } else {

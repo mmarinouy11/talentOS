@@ -155,6 +155,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
       stage: 'APPLIED',
       status: 'ACTIVE',
       fitScore: null,
+      createdAt: cp.createdAt ?? new Date().toISOString(),
       candidate: {
         id: candidate.id,
         firstName: candidate.firstName,

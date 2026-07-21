@@ -13,6 +13,7 @@ export interface NewCandidatePosition {
   stage: 'APPLIED'
   status: 'ACTIVE'
   fitScore: null
+  createdAt: string
   compensationOutOfRange?: boolean
   candidate: {
     id: string

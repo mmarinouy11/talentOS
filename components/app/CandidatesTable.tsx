@@ -51,6 +51,7 @@ export interface CandidateRow {
   country: string | null
   seniority: Seniority | null
   skills: string[]
+  createdAt: string
   _count: { candidatePositions: number }
   sourcedByType: SourceType | null
   sourcedByOther: string | null
@@ -63,6 +64,7 @@ interface SortRow extends CandidateRow {
   _sourceLabel: string
   _seniorityOrder: number
   _openPositions: number
+  _createdAt: number
 }
 
 const SENIORITY_ORDER: Record<Seniority, number> = { JUNIOR: 0, MID: 1, SENIOR: 2, STAFF: 3, PRINCIPAL: 4 }
@@ -127,8 +129,8 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
   const [filterSource, setFilterSource] = useState('')
   const [rows, setRows] = useState(candidates)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey | undefined>(undefined)
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [sortKey, setSortKey] = useState<SortKey>('_createdAt')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -162,6 +164,7 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
     _sourceLabel: sourceLabel(c),
     _seniorityOrder: c.seniority != null ? SENIORITY_ORDER[c.seniority] : -1,
     _openPositions: c._count.candidatePositions,
+    _createdAt: new Date(c.createdAt).getTime(),
   })), [rows])
 
   // Filter first, then sort
@@ -182,7 +185,6 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
   }), [sortRows, search, filterCountry, filterSource])
 
   const sorted = useMemo(() => {
-    if (!sortKey) return filtered
     return [...filtered].sort((a, b) => {
       const av = a[sortKey], bv = b[sortKey]
       if (av == null) return 1
@@ -246,6 +248,7 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Skills</th>
                 {sh('Source', '_sourceLabel')}
                 {sh('Open Positions', '_openPositions', 'text-right')}
+                {sh('Date Added', '_createdAt')}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -273,6 +276,7 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
                   <td className="px-4 py-3"><SkillTags tags={c.skills} max={3} /></td>
                   <td className="px-4 py-3"><SourceCell row={c} /></td>
                   <td className="px-4 py-3 text-right text-gray-600">{c._count.candidatePositions}</td>
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
                       <Link href={`/candidates/${c.id}/edit`} onClick={(e) => e.stopPropagation()}>
