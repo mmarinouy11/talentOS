@@ -411,7 +411,12 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
             <span className="ml-1.5 text-red-600" title="Compensation out of range">💰</span>
           )}
         </td>
-        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(cp.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{(() => {
+          const d = new Date(cp.createdAt)
+          const days = Math.floor((Date.now() - d.getTime()) / 86_400_000)
+          const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          return days === 0 ? 'Today' : `${label} (${days}d)`
+        })()}</td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.country ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>
         <td className="px-4 py-3">
