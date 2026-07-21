@@ -411,7 +411,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
             <span className="ml-1.5 text-red-600" title="Compensation out of range">💰</span>
           )}
         </td>
-        <td className="px-4 py-3 text-gray-600">{cp.candidate.email}</td>
+        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(cp.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.country ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>
         <td className="px-4 py-3">
@@ -436,7 +436,6 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
           )}
         </td>
         <td className="px-4 py-3 text-right">{fitCell(cp)}</td>
-        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(cp.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
         <td className="px-4 py-3 text-right">
           <button
             onClick={(e) => { e.stopPropagation(); handleRemove(cp.id, `${cp.candidate.firstName} ${cp.candidate.lastName}`) }}
@@ -456,13 +455,12 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
     <thead>
       <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
         {sh('Name', 'name')}
-        {sh('Email', 'email')}
+        {sh('Date Added', 'dateAdded')}
         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Country</th>
         {sh('Seniority', 'seniority')}
         {sh('Stage', 'stage')}
         <th className="px-4 py-3 text-left font-medium text-gray-600">Round Status</th>
         {sh('Fit', 'fitScore', 'text-right')}
-        {sh('Date Added', 'dateAdded')}
         <th className="px-4 py-3" />
       </tr>
     </thead>
