@@ -1,11 +1,86 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddCandidateToPositionModal } from './AddCandidateToPositionModal'
 import type { Stage, CandidateStatus } from '@prisma/client'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+
+function MultiSelectDropdown({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string
+  options: { value: string; label: string }[]
+  selected: Set<string>
+  onChange: (next: Set<string>) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  function toggle(value: string) {
+    const next = new Set(selected)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    onChange(next)
+  }
+
+  const count = selected.size
+  const buttonLabel = count === 0 ? label : count === 1 ? `${label}: ${options.find((o) => selected.has(o.value))?.label ?? ''}` : `${label} (${count})`
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1.5 py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white whitespace-nowrap transition-colors ${count > 0 ? 'border-[#8DF000] text-gray-900' : 'border-gray-200 text-gray-600'}`}
+      >
+        {buttonLabel}
+        <svg className={`h-3.5 w-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 left-0 min-w-[180px] bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+          {options.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2.5 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={selected.has(opt.value)}
+                onChange={() => toggle(opt.value)}
+                className="h-3.5 w-3.5 rounded accent-[#8DF000]"
+              />
+              {opt.label}
+            </label>
+          ))}
+          {count > 0 && (
+            <div className="border-t border-gray-100 mt-1 pt-1 px-3 pb-0.5">
+              <button
+                type="button"
+                onClick={() => onChange(new Set())}
+                className="text-xs text-gray-400 hover:text-gray-700 underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const STAGE_LABELS: Record<Stage, string> = {
   APPLIED: 'Applied',
@@ -157,9 +232,9 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
   const [sortKey, setSortKey] = useState<SortKey>('stage')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [search, setSearch] = useState('')
-  const [filterCountry, setFilterCountry] = useState('')
-  const [filterStage, setFilterStage] = useState('')
-  const [filterRoundStatus, setFilterRoundStatus] = useState('')
+  const [filterCountry, setFilterCountry] = useState<Set<string>>(new Set())
+  const [filterStage, setFilterStage] = useState<Set<string>>(new Set())
+  const [filterRoundStatus, setFilterRoundStatus] = useState<Set<string>>(new Set())
   const [filterMinScore, setFilterMinScore] = useState('')
 
   function toggleSort(key: SortKey) {
@@ -276,10 +351,10 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
 
   const minScore = filterMinScore !== '' ? parseFloat(filterMinScore) : null
 
-  const filtersActive = !!(filterCountry || filterStage || filterRoundStatus || filterMinScore)
+  const filtersActive = filterCountry.size > 0 || filterStage.size > 0 || filterRoundStatus.size > 0 || filterMinScore !== ''
 
   function clearFilters() {
-    setFilterCountry(''); setFilterStage(''); setFilterRoundStatus(''); setFilterMinScore('')
+    setFilterCountry(new Set()); setFilterStage(new Set()); setFilterRoundStatus(new Set()); setFilterMinScore('')
   }
 
   const { activeRows, inactiveRows } = useMemo(() => {
@@ -290,11 +365,11 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         const country = (cp.candidate.country ?? '').toLowerCase()
         if (!name.includes(q) && !country.includes(q)) return false
       }
-      if (filterCountry && cp.candidate.country !== filterCountry) return false
-      if (filterStage && cp.stage !== filterStage) return false
-      if (filterRoundStatus) {
+      if (filterCountry.size > 0 && !filterCountry.has(cp.candidate.country ?? '')) return false
+      if (filterStage.size > 0 && !filterStage.has(cp.stage)) return false
+      if (filterRoundStatus.size > 0) {
         const status = cp.latestInterviewStatus ?? 'NO_ROUND'
-        if (status !== filterRoundStatus) return false
+        if (!filterRoundStatus.has(status)) return false
       }
       if (minScore !== null && (cp.fitScore == null || cp.fitScore < minScore)) return false
       return true
@@ -303,7 +378,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
     const inactive = rows.filter((cp) => (cp.status === 'REJECTED' || cp.status === 'WITHDRAWN') && match(cp))
     return { activeRows: sortRows(active), inactiveRows: sortRows(inactive) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, sortKey, sortDir, liveScores, search, filterCountry, filterStage, filterRoundStatus, minScore])
+  }, [rows, sortKey, sortDir, liveScores, search, filterCountry, filterStage, filterRoundStatus, minScore, filtersActive])
 
   function fitCell(cp: CandidatePosition) {
     if (liveScores[cp.id] != null) {
@@ -420,31 +495,35 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
 
             {/* Country */}
             {uniqueCountries.length > 1 && (
-              <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
-                <option value="">All Countries</option>
-                {uniqueCountries.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <MultiSelectDropdown
+                label="Country"
+                options={uniqueCountries.map((c) => ({ value: c, label: c }))}
+                selected={filterCountry}
+                onChange={setFilterCountry}
+              />
             )}
 
             {/* Stage */}
             {uniqueStages.length > 1 && (
-              <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} className="py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
-                <option value="">All Stages</option>
-                {uniqueStages.map((s) => <option key={s} value={s}>{STAGE_FILTER_LABELS[s]}</option>)}
-              </select>
+              <MultiSelectDropdown
+                label="Stage"
+                options={uniqueStages.map((s) => ({ value: s, label: STAGE_FILTER_LABELS[s] }))}
+                selected={filterStage}
+                onChange={setFilterStage}
+              />
             )}
 
             {/* Round Status */}
             {uniqueRoundStatuses.length > 1 && (
-              <select value={filterRoundStatus} onChange={(e) => setFilterRoundStatus(e.target.value)} className="py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
-                <option value="">All Statuses</option>
-                <option value="PENDING">Pending</option>
-                <option value="AWAITING_SCHEDULE">Awaiting Schedule</option>
-                <option value="SCHEDULED">Scheduled</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-                <option value="NO_ROUND">No Round</option>
-              </select>
+              <MultiSelectDropdown
+                label="Round Status"
+                options={uniqueRoundStatuses.map((s) => ({
+                  value: s,
+                  label: s === 'NO_ROUND' ? 'No Round' : (ROUND_STATUS_LABELS[s as InterviewStatus] ?? s),
+                }))}
+                selected={filterRoundStatus}
+                onChange={setFilterRoundStatus}
+              />
             )}
 
             {/* Min Fit Score */}
