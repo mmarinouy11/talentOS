@@ -2,6 +2,20 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
+function countWorkingDays(from: Date, to: Date): number {
+  let count = 0
+  const cur = new Date(from)
+  cur.setHours(0, 0, 0, 0)
+  const end = new Date(to)
+  end.setHours(23, 59, 59, 999)
+  while (cur <= end) {
+    const day = cur.getDay()
+    if (day !== 0 && day !== 6) count++
+    cur.setDate(cur.getDate() + 1)
+  }
+  return Math.max(count, 1)
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,11 +33,12 @@ export async function GET(req: NextRequest) {
   toDate.setHours(23, 59, 59, 999)
 
   const period = { gte: fromDate, lte: toDate }
+  const workingDays = countWorkingDays(fromDate, toDate)
 
   try {
-  // Load all active recruiters
+  // Fix 1: only RECRUITER role users
   const recruiters = await db.user.findMany({
-    where: { active: true },
+    where: { active: true, role: 'RECRUITER' },
     select: { id: true, name: true, email: true, role: true },
     orderBy: { name: 'asc' },
   })
@@ -35,7 +50,6 @@ export async function GET(req: NextRequest) {
     JOIN "Candidate" c ON c.id = cp."candidateId"
     WHERE cp."createdAt" >= ${fromDate} AND cp."createdAt" <= ${toDate}
   `
-  // Group manually: { recruiterId -> { RECRUITER: n, DIRECT: n, VENDOR: n } }
   const cpByRecruiterMap = new Map<string, { RECRUITER: number; DIRECT: number; VENDOR: number; OTHER: number }>()
   for (const cp of cpRaw) {
     if (!cp.recruiterId) continue
@@ -45,25 +59,24 @@ export async function GET(req: NextRequest) {
     if (t in entry) entry[t as keyof typeof entry]++
   }
 
-  // Average fit score per recruiter (all time for sourced candidates)
+  // Fix 7: avgFitScore filtered by period
   const fitScoresRaw = await db.$queryRaw<{ recruiterId: string; avg_fit: number | null }[]>`
     SELECT "recruiterId", AVG("fitScore") as avg_fit
     FROM "CandidatePosition"
     WHERE "recruiterId" IS NOT NULL AND "fitScore" IS NOT NULL
+      AND "createdAt" >= ${fromDate} AND "createdAt" <= ${toDate}
     GROUP BY "recruiterId"
   `
   const fitScoreMap = new Map(fitScoresRaw.map((r) => [r.recruiterId, r.avg_fit != null ? Math.round(r.avg_fit * 10) / 10 : null]))
 
-  // Interview rounds created in period (join through candidatePosition.recruiterId)
-  const interviewsCreated = await db.interview.findMany({
-    where: { createdAt: period },
-    select: {
-      id: true,
-      status: true,
-      decision: true,
-      candidatePosition: { select: { recruiterId: true } },
-    },
-  })
+  // Fix 2: interviews scheduled in period (scheduledAt in period, status SCHEDULED|COMPLETED)
+  const interviewsInPeriod = await db.$queryRaw<{ recruiterId: string; stage: string; decision: string | null }[]>`
+    SELECT cp."recruiterId", i."stage", i."decision"
+    FROM "Interview" i
+    JOIN "CandidatePosition" cp ON cp.id = i."candidatePositionId"
+    WHERE i."scheduledAt" >= ${fromDate} AND i."scheduledAt" <= ${toDate}
+      AND i."status" IN ('SCHEDULED', 'COMPLETED')
+  `
 
   // Stage advances in period
   const stageAdvancesRaw = await db.$queryRaw<{ movedById: string; cnt: bigint }[]>`
@@ -77,14 +90,10 @@ export async function GET(req: NextRequest) {
   // Positions breakdown per recruiter (for detail view)
   const cpForPositions = await db.candidatePosition.findMany({
     where: { createdAt: period },
-    select: {
-      recruiterId: true,
-      fitScore: true,
-      positionId: true,
-    },
+    select: { recruiterId: true, fitScore: true, positionId: true },
   })
 
-  // Load position info for the positionIds in cpForPositions
+  // Load position info
   const positionIds = [...new Set(cpForPositions.map((c) => c.positionId))]
   const positionsInfo = positionIds.length > 0 ? await db.position.findMany({
     where: { id: { in: positionIds } },
@@ -92,12 +101,36 @@ export async function GET(req: NextRequest) {
   }) : []
   const positionMap = new Map(positionsInfo.map((p) => [p.id, p]))
 
-  // Daily sourcing activity last 30 days (for timeline — always last 30d regardless of filter)
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  // Fix 4: active positions per recruiter (current snapshot, no period filter)
+  const activePositionsRaw = await db.$queryRaw<{ recruiterId: string; cnt: bigint }[]>`
+    SELECT "recruiterId", COUNT(DISTINCT "positionId") as cnt
+    FROM "CandidatePosition"
+    WHERE "status" = 'ACTIVE'
+    GROUP BY "recruiterId"
+  `
+  const activePositionsMap = new Map(activePositionsRaw.map((r) => [r.recruiterId, Number(r.cnt)]))
 
+  // Fix 5: avg days from CandidatePosition.createdAt to first Interview.scheduledAt
+  const avgDaysRaw = await db.$queryRaw<{ recruiterId: string; avg_days: number | null }[]>`
+    SELECT cp."recruiterId", AVG(
+      EXTRACT(EPOCH FROM (first_interview."scheduledAt" - cp."createdAt")) / 86400.0
+    ) as avg_days
+    FROM "CandidatePosition" cp
+    JOIN LATERAL (
+      SELECT i."scheduledAt"
+      FROM "Interview" i
+      WHERE i."candidatePositionId" = cp.id AND i."scheduledAt" IS NOT NULL
+      ORDER BY i."scheduledAt" ASC
+      LIMIT 1
+    ) first_interview ON true
+    WHERE cp."createdAt" >= ${fromDate} AND cp."createdAt" <= ${toDate}
+    GROUP BY cp."recruiterId"
+  `
+  const avgDaysMap = new Map(avgDaysRaw.map((r) => [r.recruiterId, r.avg_days != null ? Math.round(r.avg_days * 10) / 10 : null]))
+
+  // Fix 6: dailySourcing uses period dates
   const dailySourcing = await db.candidatePosition.findMany({
-    where: { createdAt: { gte: thirtyDaysAgo } },
+    where: { createdAt: period },
     select: { recruiterId: true, createdAt: true },
   })
 
@@ -111,10 +144,15 @@ export async function GET(req: NextRequest) {
     const partner = sourcing.VENDOR
     const totalSourced = manual + direct + partner + sourcing.OTHER
 
-    // Interview metrics
-    const myInterviews = interviewsCreated.filter((i) => i.candidatePosition.recruiterId === rid)
-    const roundsCreated = myInterviews.length
-    const scheduled = myInterviews.filter((i) => i.status === 'SCHEDULED' || i.status === 'COMPLETED').length
+    // Fix 2: single interviews scheduled metric
+    const myInterviews = interviewsInPeriod.filter((i) => i.recruiterId === rid)
+    const interviewsScheduled = myInterviews.length
+
+    // Fix 3: daily screening effort
+    const screeningCount = myInterviews.filter((i) => i.stage === 'SCREENING').length
+    const screeningHrsPerDay = Math.round((screeningCount * 30 / 60 / workingDays) * 10) / 10
+
+    // Decisions
     const advances = myInterviews.filter((i) => i.decision === 'ADVANCE').length
     const rejects = myInterviews.filter((i) => i.decision === 'REJECT').length
     const totalDecisions = advances + rejects
@@ -123,8 +161,14 @@ export async function GET(req: NextRequest) {
     // Stage advances
     const stageAdvanceCount = stageAdvanceMap.get(rid) ?? 0
 
-    // Avg fit score
+    // Avg fit score (period-filtered)
     const avgFitScore = fitScoreMap.get(rid) != null ? Math.round(fitScoreMap.get(rid)! * 10) / 10 : null
+
+    // Fix 4: active positions
+    const activePositions = activePositionsMap.get(rid) ?? 0
+
+    // Fix 5: avg days to first interview
+    const avgDaysToFirstInterview = avgDaysMap.get(rid) ?? null
 
     // Positions breakdown
     const posMap = new Map<string, { id: string; title: string; client: string; count: number; totalFit: number; fitCount: number }>()
@@ -141,7 +185,7 @@ export async function GET(req: NextRequest) {
       avgFitScore: p.fitCount > 0 ? Math.round(p.totalFit / p.fitCount * 10) / 10 : null,
     }))
 
-    // Daily sourcing (last 30d)
+    // Fix 6: daily sourcing uses period
     const daily = dailySourcing
       .filter((d) => d.recruiterId === rid)
       .map((d) => d.createdAt.toISOString().slice(0, 10))
@@ -153,9 +197,13 @@ export async function GET(req: NextRequest) {
       email: recruiter.email,
       role: recruiter.role,
       manual, direct, partner, totalSourced,
-      roundsCreated, scheduled, advances, rejects, advanceRate,
+      interviewsScheduled,
+      screeningHrsPerDay,
+      advances, rejects, advanceRate,
       stageAdvances: stageAdvanceCount,
       avgFitScore,
+      activePositions,
+      avgDaysToFirstInterview,
       positions,
       dailySourcing: daily,
     }
