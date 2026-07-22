@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
 
   const period = { gte: fromDate, lte: toDate }
 
+  try {
   // Load all active recruiters
   const recruiters = await db.user.findMany({
     where: { active: true },
@@ -28,28 +29,30 @@ export async function GET(req: NextRequest) {
   })
 
   // Sourcing: candidate positions added in period by recruiter, with candidate sourcedByType
-  const cpRaw = await db.candidatePosition.findMany({
-    where: { createdAt: period, recruiterId: { not: undefined } },
-    select: { recruiterId: true, candidate: { select: { sourcedByType: true } } },
-  })
+  const cpRaw = await db.$queryRaw<{ recruiterId: string; sourcedByType: string | null }[]>`
+    SELECT cp."recruiterId", c."sourcedByType"
+    FROM "CandidatePosition" cp
+    JOIN "Candidate" c ON c.id = cp."candidateId"
+    WHERE cp."createdAt" >= ${fromDate} AND cp."createdAt" <= ${toDate}
+  `
   // Group manually: { recruiterId -> { RECRUITER: n, DIRECT: n, VENDOR: n } }
   const cpByRecruiterMap = new Map<string, { RECRUITER: number; DIRECT: number; VENDOR: number; OTHER: number }>()
   for (const cp of cpRaw) {
     if (!cp.recruiterId) continue
     if (!cpByRecruiterMap.has(cp.recruiterId)) cpByRecruiterMap.set(cp.recruiterId, { RECRUITER: 0, DIRECT: 0, VENDOR: 0, OTHER: 0 })
     const entry = cpByRecruiterMap.get(cp.recruiterId)!
-    const t = cp.candidate.sourcedByType ?? 'OTHER'
+    const t = cp.sourcedByType ?? 'OTHER'
     if (t in entry) entry[t as keyof typeof entry]++
   }
 
   // Average fit score per recruiter (all time for sourced candidates)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fitScoresRaw = await (db.candidatePosition.groupBy as any)({
-    by: ['recruiterId'],
-    where: { recruiterId: { not: null }, fitScore: { not: null } },
-    _avg: { fitScore: true },
-  })
-  const fitScores = fitScoresRaw as { recruiterId: string | null; _avg: { fitScore: number | null } }[]
+  const fitScoresRaw = await db.$queryRaw<{ recruiterId: string; avg_fit: number | null }[]>`
+    SELECT "recruiterId", AVG("fitScore") as avg_fit
+    FROM "CandidatePosition"
+    WHERE "recruiterId" IS NOT NULL AND "fitScore" IS NOT NULL
+    GROUP BY "recruiterId"
+  `
+  const fitScoreMap = new Map(fitScoresRaw.map((r) => [r.recruiterId, r.avg_fit != null ? Math.round(r.avg_fit * 10) / 10 : null]))
 
   // Interview rounds created in period (join through candidatePosition.recruiterId)
   const interviewsCreated = await db.interview.findMany({
@@ -63,17 +66,17 @@ export async function GET(req: NextRequest) {
   })
 
   // Stage advances in period
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stageAdvancesRaw = await (db.stageHistory.groupBy as any)({
-    by: ['movedById'],
-    where: { movedAt: period, movedById: { not: null } },
-    _count: { id: true },
-  })
-  const stageAdvances = stageAdvancesRaw as { movedById: string | null; _count: { id: number } }[]
+  const stageAdvancesRaw = await db.$queryRaw<{ movedById: string; cnt: bigint }[]>`
+    SELECT "movedById", COUNT(*) as cnt
+    FROM "StageHistory"
+    WHERE "movedAt" >= ${fromDate} AND "movedAt" <= ${toDate}
+    GROUP BY "movedById"
+  `
+  const stageAdvanceMap = new Map(stageAdvancesRaw.map((r) => [r.movedById, Number(r.cnt)]))
 
   // Positions breakdown per recruiter (for detail view)
   const cpForPositions = await db.candidatePosition.findMany({
-    where: { recruiterId: { not: undefined }, createdAt: period },
+    where: { createdAt: period },
     select: {
       recruiterId: true,
       fitScore: true,
@@ -83,10 +86,10 @@ export async function GET(req: NextRequest) {
 
   // Load position info for the positionIds in cpForPositions
   const positionIds = [...new Set(cpForPositions.map((c) => c.positionId))]
-  const positionsInfo = await db.position.findMany({
+  const positionsInfo = positionIds.length > 0 ? await db.position.findMany({
     where: { id: { in: positionIds } },
     select: { id: true, title: true, client: true },
-  })
+  }) : []
   const positionMap = new Map(positionsInfo.map((p) => [p.id, p]))
 
   // Daily sourcing activity last 30 days (for timeline — always last 30d regardless of filter)
@@ -94,13 +97,9 @@ export async function GET(req: NextRequest) {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
   const dailySourcing = await db.candidatePosition.findMany({
-    where: { createdAt: { gte: thirtyDaysAgo }, recruiterId: { not: undefined } },
+    where: { createdAt: { gte: thirtyDaysAgo } },
     select: { recruiterId: true, createdAt: true },
   })
-
-  // Build recruiter metrics
-  const fitScoreMap = new Map(fitScores.filter((f) => f.recruiterId != null).map((f) => [f.recruiterId as string, f._avg.fitScore]))
-  const stageAdvanceMap = new Map(stageAdvances.filter((s) => s.movedById != null).map((s) => [s.movedById as string, s._count.id]))
 
   const metrics = recruiters.map((recruiter) => {
     const rid = recruiter.id
@@ -163,4 +162,8 @@ export async function GET(req: NextRequest) {
   })
 
   return NextResponse.json({ metrics, from: fromDate.toISOString(), to: toDate.toISOString() })
+  } catch (err) {
+    console.error('[recruiter-performance] Error:', err)
+    return NextResponse.json({ error: 'Failed to load recruiter performance data' }, { status: 500 })
+  }
 }
