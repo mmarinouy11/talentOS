@@ -15,24 +15,22 @@ interface RecruiterMetrics {
   manual: number
   direct: number
   partner: number
-  totalSourced: number
   interviewsScheduled: number
   screeningHrsPerDay: number
   advances: number
   rejects: number
   advanceRate: number | null
-  stageAdvances: number
   avgFitScore: number | null
   activePositions: number
-  avgDaysToFirstInterview: number | null
+  daysToScreeningDone: number | null
   positions: { id: string; title: string; client: string; count: number; avgFitScore: number | null }[]
   dailySourcing: Record<string, number>
 }
 
 type SortKey = keyof Pick<RecruiterMetrics,
-  'totalSourced' | 'manual' | 'direct' | 'partner' | 'interviewsScheduled' |
-  'screeningHrsPerDay' | 'advances' | 'rejects' | 'advanceRate' | 'stageAdvances' |
-  'avgFitScore' | 'activePositions' | 'avgDaysToFirstInterview'
+  'manual' | 'direct' | 'partner' | 'activePositions' | 'interviewsScheduled' |
+  'screeningHrsPerDay' | 'daysToScreeningDone' | 'advances' | 'rejects' |
+  'advanceRate' | 'avgFitScore'
 > | 'name'
 
 function getDateRange(period: Period, customFrom: string, customTo: string): { from: string; to: string } {
@@ -62,16 +60,24 @@ function getDateRange(period: Period, customFrom: string, customTo: string): { f
 }
 
 function SortableHeader({
-  label, col, sortKey, sortDir, onSort, className = 'text-right',
+  label, col, sortKey, sortDir, onSort, className = 'text-right', tooltip,
 }: {
   label: string; col: SortKey; sortKey: SortKey; sortDir: 'asc' | 'desc'
-  onSort: (k: SortKey) => void; className?: string
+  onSort: (k: SortKey) => void; className?: string; tooltip?: string
 }) {
   const active = sortKey === col
   return (
     <th onClick={() => onSort(col)} className={`${className} px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:bg-gray-100 whitespace-nowrap`}>
       <span className="inline-flex items-center gap-1 justify-end w-full">
         {label}
+        {tooltip && (
+          <span className="relative group/tip">
+            <span className="text-gray-300 cursor-help">ⓘ</span>
+            <span className="absolute bottom-full right-0 mb-1.5 w-48 bg-gray-800 text-white text-xs rounded px-2 py-1.5 leading-snug opacity-0 group-hover/tip:opacity-100 pointer-events-none z-20 whitespace-normal font-normal normal-case tracking-normal">
+              {tooltip}
+            </span>
+          </span>
+        )}
         {active ? sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} /> : <ChevronsUpDown size={12} className="text-gray-300" />}
       </span>
     </th>
@@ -123,7 +129,7 @@ export default function RecruiterPerformancePage() {
   const [metrics, setMetrics] = useState<RecruiterMetrics[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('totalSourced')
+  const [sortKey, setSortKey] = useState<SortKey>('manual')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [expanded, setExpanded] = useState<string | null>(null)
 
@@ -169,17 +175,15 @@ export default function RecruiterPerformancePage() {
       manual: acc.manual + r.manual,
       direct: acc.direct + r.direct,
       partner: acc.partner + r.partner,
-      totalSourced: acc.totalSourced + r.totalSourced,
+      activePositions: acc.activePositions + r.activePositions,
       interviewsScheduled: acc.interviewsScheduled + r.interviewsScheduled,
       advances: acc.advances + r.advances,
       rejects: acc.rejects + r.rejects,
-      stageAdvances: acc.stageAdvances + r.stageAdvances,
-      activePositions: acc.activePositions + r.activePositions,
-    }), { manual: 0, direct: 0, partner: 0, totalSourced: 0, interviewsScheduled: 0, advances: 0, rejects: 0, stageAdvances: 0, activePositions: 0 })
+    }), { manual: 0, direct: 0, partner: 0, activePositions: 0, interviewsScheduled: 0, advances: 0, rejects: 0 })
   }, [metrics])
 
-  const sh = (label: string, col: SortKey, className?: string) => (
-    <SortableHeader label={label} col={col} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className={className} />
+  const sh = (label: string, col: SortKey, tooltip?: string) => (
+    <SortableHeader label={label} col={col} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} tooltip={tooltip} />
   )
 
   const PERIODS: { value: Period; label: string }[] = [
@@ -189,6 +193,10 @@ export default function RecruiterPerformancePage() {
     { value: '90d', label: 'Last 90 days' },
     { value: 'custom', label: 'Custom' },
   ]
+
+  // columns: Recruiter | Active Pos. | Manual | Direct | Partner | Int. Scheduled | Daily Screen. | Days to Screen. | Advances | Rejects | Adv% | Avg Fit | [expand]
+  // = 13 columns
+  const DECISION_TOOLTIP = 'Based on screening stage decisions only'
 
   return (
     <div className="space-y-6">
@@ -226,7 +234,6 @@ export default function RecruiterPerformancePage() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-
       {loading && <p className="text-sm text-gray-400">Loading…</p>}
 
       {!loading && metrics && (
@@ -236,29 +243,22 @@ export default function RecruiterPerformancePage() {
               <thead>
                 <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
                   <SortableHeader label="Recruiter" col="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:bg-gray-100 whitespace-nowrap" />
+                  {sh('Active Pos.', 'activePositions')}
                   {sh('Manual', 'manual')}
                   {sh('Direct', 'direct')}
                   {sh('Partner', 'partner')}
-                  {sh('Total', 'totalSourced')}
-                  {sh('Active Pos.', 'activePositions')}
-                  {sh('Interviews Scheduled', 'interviewsScheduled')}
-                  <th className="text-right px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap cursor-default select-none">
-                    <span className="inline-flex items-center gap-1 justify-end w-full group relative">
-                      Daily Screen. Effort
-                      <span className="text-gray-300 cursor-help" title="Estimated based on 30 min per screening call conducted.">ⓘ</span>
-                    </span>
-                  </th>
-                  {sh('Advances', 'advances')}
-                  {sh('Rejects', 'rejects')}
-                  {sh('Adv %', 'advanceRate')}
-                  {sh('Stage Moves', 'stageAdvances')}
-                  {sh('Avg Fit', 'avgFitScore')}
-                  {sh('Days to 1st Itvw', 'avgDaysToFirstInterview')}
+                  {sh('Int. Scheduled', 'interviewsScheduled')}
+                  {sh('Daily Screen. Effort', 'screeningHrsPerDay', 'Estimated based on 30 min per screening call conducted.')}
+                  {sh('Days to Screen.', 'daysToScreeningDone', 'Average days from candidate added to screening completed.')}
+                  {sh('Advances', 'advances', DECISION_TOOLTIP)}
+                  {sh('Rejects', 'rejects', DECISION_TOOLTIP)}
+                  {sh('Adv %', 'advanceRate', DECISION_TOOLTIP)}
+                  {sh('Avg Fit', 'avgFitScore', 'Average fit score of manually sourced candidates only.')}
                   <th className="px-3 py-3" />
                 </tr>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th colSpan={6} className="px-3 py-1 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">Sourcing</th>
-                  <th colSpan={5} className="px-3 py-1 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">Pipeline Activity</th>
+                  <th colSpan={5} className="px-3 py-1 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">Sourcing</th>
+                  <th colSpan={4} className="px-3 py-1 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">Pipeline Activity</th>
                   <th colSpan={3} className="px-3 py-1 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">Quality</th>
                   <th />
                 </tr>
@@ -275,28 +275,25 @@ export default function RecruiterPerformancePage() {
                         <div>{r.name ?? r.email}</div>
                         {r.name && <div className="text-xs text-gray-400">{r.email}</div>}
                       </td>
-                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.manual)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.activePositions)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-semibold text-gray-900">{fmt(r.manual)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.direct)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.partner)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums font-semibold text-gray-900">{fmt(r.totalSourced)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.activePositions)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.interviewsScheduled)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-gray-700">{r.screeningHrsPerDay > 0 ? `${r.screeningHrsPerDay} hrs/day` : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">{r.daysToScreeningDone != null ? `${r.daysToScreeningDone}d` : <span className="text-gray-300">—</span>}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-green-700">{fmt(r.advances)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-red-600">{fmt(r.rejects)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.advanceRate, '%')}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.stageAdvances)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-gray-700">{fmt(r.avgFitScore)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-gray-700">{r.avgDaysToFirstInterview != null ? `${r.avgDaysToFirstInterview}d` : <span className="text-gray-300">—</span>}</td>
                       <td className="px-3 py-3 text-gray-400">
                         {expanded === r.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </td>
                     </tr>
                     {expanded === r.id && (
                       <tr key={`${r.id}-detail`}>
-                        <td colSpan={16} className="px-4 py-4 bg-gray-50 border-b border-gray-100">
+                        <td colSpan={13} className="px-4 py-4 bg-gray-50 border-b border-gray-100">
                           <div className="space-y-4">
-                            {/* Positions breakdown */}
                             {r.positions.length > 0 ? (
                               <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Positions worked on (this period)</p>
@@ -326,8 +323,6 @@ export default function RecruiterPerformancePage() {
                             ) : (
                               <p className="text-sm text-gray-400">No candidates added to positions in this period.</p>
                             )}
-
-                            {/* Activity timeline */}
                             <div>
                               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sourcing activity — selected period</p>
                               <MiniBarChart data={r.dailySourcing} from={from} to={to} />
@@ -343,12 +338,12 @@ export default function RecruiterPerformancePage() {
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-gray-900">
                     <td className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Totals</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{totals.activePositions}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{totals.manual}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{totals.direct}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{totals.partner}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{totals.totalSourced}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{totals.activePositions}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{totals.interviewsScheduled}</td>
+                    <td className="px-3 py-3" />
                     <td className="px-3 py-3" />
                     <td className="px-3 py-3 text-right tabular-nums text-green-700">{totals.advances}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-red-600">{totals.rejects}</td>
@@ -357,8 +352,6 @@ export default function RecruiterPerformancePage() {
                         ? `${Math.round((totals.advances / (totals.advances + totals.rejects)) * 100)}%`
                         : '—'}
                     </td>
-                    <td className="px-3 py-3 text-right tabular-nums">{totals.stageAdvances}</td>
-                    <td className="px-3 py-3" />
                     <td className="px-3 py-3" />
                     <td className="px-3 py-3" />
                   </tr>
@@ -369,7 +362,7 @@ export default function RecruiterPerformancePage() {
         </div>
       )}
 
-      {!loading && metrics && metrics.every((r) => r.totalSourced === 0 && r.interviewsScheduled === 0) && (
+      {!loading && metrics && metrics.every((r) => r.manual === 0 && r.interviewsScheduled === 0) && (
         <p className="text-sm text-gray-400 text-center py-8">No recruiter activity recorded for this period.</p>
       )}
     </div>
