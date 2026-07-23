@@ -62,6 +62,13 @@ export async function POST(request: Request) {
       text = result.value
     }
 
+    const extractedText = text
+    console.log('[cv-upload] Extracted text length:', extractedText.length)
+    console.log('[cv-upload] Extracted text preview:', extractedText.substring(0, 200))
+    if (extractedText.length < 100) {
+      console.warn('[cv-upload] WARNING: Very short text extracted — may be image-based PDF or extraction failed')
+    }
+
     if (!text.trim()) {
       return NextResponse.json({ error: 'Could not extract text from file' }, { status: 422 })
     }
@@ -100,6 +107,8 @@ export async function POST(request: Request) {
       'FAST',
       SYSTEM_PROMPT
     )
+
+    console.log('[cv-upload] Claude parsed result:', JSON.stringify(parsed))
 
     return NextResponse.json({
       driveFileId,
