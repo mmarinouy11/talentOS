@@ -2,34 +2,12 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { renderTenoraiCv, type CvExperienceEntry, type CvEducationEntry } from '@/lib/templates/tenarai-cv'
+import { downloadFileFromDrive } from '@/lib/google'
+import { parseCvFromBuffer } from '@/lib/cv-parser'
 
 function normalizeSkill(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
-
-const NO_EXPERIENCE_HTML = (candidateId: string) => `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<title>Tenarai CV — Missing Experience</title>
-<style>
-  body { margin: 0; background: #000; color: #fff; font-family: Arial, Helvetica, sans-serif;
-         display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-  .box { max-width: 480px; padding: 48px 40px; background: #1a1a1a; border-radius: 8px; }
-  h1 { font-size: 18px; font-weight: 700; margin: 0 0 12px; color: #fff; }
-  p { font-size: 14px; color: #8a8480; line-height: 1.6; margin: 0 0 24px; }
-  a { color: #8CF000; text-decoration: none; font-weight: 600; }
-  a:hover { text-decoration: underline; }
-</style>
-</head>
-<body>
-<div class="box">
-  <h1>Experience data missing</h1>
-  <p>This candidate&#39;s experience hasn&#39;t been parsed yet. Go to the candidate&#39;s profile and re-upload their CV to generate the Tenarai CV.</p>
-  <a href="/candidates/${candidateId}/edit">→ Go to candidate profile</a>
-</div>
-</body>
-</html>`
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -44,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         select: {
           id: true, firstName: true, lastName: true, summary: true,
           skills: true, languages: true, seniority: true, yearsOfExperience: true,
-          cvExperience: true, cvEducation: true,
+          cvExperience: true, cvEducation: true, cvDriveId: true,
         },
       },
       position: {
@@ -56,14 +34,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { candidate, position } = cp
 
-  const experience: CvExperienceEntry[] = Array.isArray(candidate.cvExperience) && candidate.cvExperience.length > 0
+  let experience: CvExperienceEntry[] = Array.isArray(candidate.cvExperience) && candidate.cvExperience.length > 0
     ? (candidate.cvExperience as unknown as CvExperienceEntry[])
     : []
+  let education: CvEducationEntry[] = Array.isArray(candidate.cvEducation)
+    ? (candidate.cvEducation as unknown as CvEducationEntry[])
+    : []
+  let skills = candidate.skills
 
-  if (experience.length === 0) {
-    return new NextResponse(NO_EXPERIENCE_HTML(candidate.id), {
-      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
-    })
+  if (experience.length === 0 && candidate.cvDriveId) {
+    try {
+      const buffer = await downloadFileFromDrive(candidate.cvDriveId)
+      const parsed = await parseCvFromBuffer(buffer)
+
+      const existingLower = new Set(skills.map((s) => s.toLowerCase()))
+      const newSkills = (parsed.skills ?? []).filter((s) => !existingLower.has(s.toLowerCase()))
+      const mergedSkills = newSkills.length > 0 ? [...skills, ...newSkills] : skills
+
+      const data: Record<string, unknown> = {}
+      if (Array.isArray(parsed.experience) && parsed.experience.length > 0) data.cvExperience = parsed.experience
+      if (Array.isArray(parsed.education) && parsed.education.length > 0) data.cvEducation = parsed.education
+      if (newSkills.length > 0) data.skills = mergedSkills
+
+      if (Object.keys(data).length > 0) {
+        await db.candidate.update({ where: { id: candidate.id }, data })
+      }
+
+      if (Array.isArray(parsed.experience)) experience = parsed.experience
+      if (Array.isArray(parsed.education)) education = parsed.education
+      skills = mergedSkills
+    } catch (err) {
+      console.error(`[tenarai-cv] On-demand parse failed for candidate ${candidate.id}:`, err)
+    }
   }
 
   const anonymizedName = `${candidate.firstName} ${candidate.lastName.charAt(0).toUpperCase()}.`
@@ -74,7 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   ].map(normalizeSkill)
 
   const matchingSkillSet = new Set(
-    candidate.skills
+    skills
       .filter((skill) => {
         const norm = normalizeSkill(skill)
         return positionSkillsNorm.some((ps) => ps.includes(norm) || norm.includes(ps))
@@ -86,17 +88,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     ? candidate.seniority.charAt(0) + candidate.seniority.slice(1).toLowerCase()
     : null
 
-  const education: CvEducationEntry[] = Array.isArray(candidate.cvEducation)
-    ? (candidate.cvEducation as unknown as CvEducationEntry[])
-    : []
-
   const html = renderTenoraiCv({
     anonymizedName,
     positionTitle: position.title,
     seniority: seniorityLabel,
     yearsOfExperience: candidate.yearsOfExperience,
     summary: candidate.summary,
-    skills: candidate.skills,
+    skills,
     matchingSkillSet,
     languages: candidate.languages,
     experience,
