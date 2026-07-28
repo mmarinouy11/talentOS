@@ -266,6 +266,8 @@ model Candidate {
   summary               String?     @db.Text
   strengths             String[]
   risks                 String[]
+  cvExperience          Json?
+  cvEducation           Json?
   sourcedByType         SourceType?
   sourcedByUserId       String?
   sourcedByVendorId     String?

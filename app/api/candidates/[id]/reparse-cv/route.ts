@@ -21,7 +21,9 @@ Return ONLY valid JSON with these exact fields:
   "summary": string or null,
   "strengths": array of strings,
   "risks": array of strings,
-  "currentCompensation": number or null
+  "currentCompensation": number or null,
+  "experience": array of objects with shape { "title": string, "company": string, "startDate": string, "endDate": string, "bullets": string[] } — one entry per job, bullets are key achievements/responsibilities (2-4 per role), dates like "Jan 2021" or "2019",
+  "education": array of objects with shape { "degree": string, "institution": string, "year": string or null } — one entry per qualification
 }
 Rules:
 - Skills should be specific technologies, not soft skills
@@ -31,6 +33,7 @@ Rules:
 - strengths: 2-4 notable positives visible from the CV
 - risks: 1-3 potential concerns visible from the CV (gaps, short tenures, etc.)
 - currentCompensation: monthly USD amount if stated, else null
+- "experience" and "education" must be arrays (empty array [] if not found)
 - No markdown, no explanation, only the JSON object`
 
 export async function POST(
@@ -130,6 +133,8 @@ export async function POST(
           strengths: visionParsed.strengths ?? [],
           risks: visionParsed.risks ?? [],
           ...(visionParsed.currentCompensation !== undefined ? { currentCompensation: visionParsed.currentCompensation } : {}),
+          ...(Array.isArray(visionParsed.experience) && visionParsed.experience.length > 0 ? { cvExperience: visionParsed.experience } : {}),
+          ...(Array.isArray(visionParsed.education) && visionParsed.education.length > 0 ? { cvEducation: visionParsed.education } : {}),
           cvDriveId,
           cvOriginalName,
         },
@@ -173,6 +178,8 @@ export async function POST(
     strengths: string[]
     risks: string[]
     currentCompensation: number | null
+    experience: { title: string; company: string; startDate: string; endDate: string; bullets: string[] }[]
+    education: { degree: string; institution: string; year?: string }[]
   }
   try {
     parsed = await callClaudeJSON<typeof parsed>(
@@ -200,6 +207,8 @@ export async function POST(
       strengths: parsed.strengths ?? [],
       risks: parsed.risks ?? [],
       ...(parsed.currentCompensation !== undefined ? { currentCompensation: parsed.currentCompensation } : {}),
+      ...(Array.isArray(parsed.experience) && parsed.experience.length > 0 ? { cvExperience: parsed.experience } : {}),
+      ...(Array.isArray(parsed.education) && parsed.education.length > 0 ? { cvEducation: parsed.education } : {}),
       cvDriveId,
       cvOriginalName,
     },

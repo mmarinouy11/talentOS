@@ -76,6 +76,8 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
   const [cvDriveId, setCvDriveId] = useState(defaultValues.cvDriveId ?? '')
   const [cvOriginalName, setCvOriginalName] = useState(defaultValues.cvOriginalName ?? '')
   const [cvBanner, setCvBanner] = useState(false)
+  const [cvExperience, setCvExperience] = useState<ParsedCV['experience']>(undefined)
+  const [cvEducation, setCvEducation] = useState<ParsedCV['education']>(undefined)
   const [minimumManuallyEdited, setMinimumManuallyEdited] = useState(
     defaultValues.minimumCompensation != null && defaultValues.minimumCompensation !== defaultValues.desiredCompensation
   )
@@ -159,6 +161,8 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
     }))
     if (parsed.skills.length) setSkills(parsed.skills)
     if (parsed.languages.length) setLanguages(parsed.languages)
+    if (parsed.experience?.length) setCvExperience(parsed.experience)
+    if (parsed.education?.length) setCvEducation(parsed.education)
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -182,6 +186,8 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
       notes: fields.notes || null,
       cvDriveId: cvDriveId || undefined,
       cvOriginalName: cvOriginalName || undefined,
+      cvExperience: cvExperience ?? undefined,
+      cvEducation: cvEducation ?? undefined,
       recruiterId: fields.recruiterId || null,
       sourcedByType: fields.sourcedByType || null,
       sourcedByUserId: fields.sourcedByType === 'RECRUITER' ? fields.sourcedByUserId || null : null,

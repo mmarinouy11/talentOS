@@ -17,6 +17,8 @@ const candidateSchema = z.object({
   notes: z.string().optional().nullable(),
   cvDriveId: z.string().optional().nullable(),
   cvOriginalName: z.string().optional().nullable(),
+  cvExperience: z.array(z.any()).optional().nullable(),
+  cvEducation: z.array(z.any()).optional().nullable(),
   desiredCompensation: z.number().optional().nullable(),
   minimumCompensation: z.number().optional().nullable(),
   sourcedByType: z.enum(['RECRUITER', 'VENDOR', 'OTHER']).optional().nullable(),
@@ -103,12 +105,15 @@ export async function POST(request: Request) {
   const sessionUser = session.user as { id?: string }
   const recruiterId = rest.recruiterId ?? sessionUser.id
   if (!recruiterId) return NextResponse.json({ error: 'recruiterId is required' }, { status: 400 })
+  const { cvExperience, cvEducation, ...coreRest } = rest
   const candidate = await db.candidate.create({
     data: {
-      ...rest,
-      cvDriveId: rest.cvDriveId ?? null,
-      cvOriginalName: rest.cvOriginalName ?? null,
+      ...coreRest,
+      cvDriveId: coreRest.cvDriveId ?? null,
+      cvOriginalName: coreRest.cvOriginalName ?? null,
       recruiterId,
+      ...(Array.isArray(cvExperience) && cvExperience.length > 0 ? { cvExperience } : {}),
+      ...(Array.isArray(cvEducation) && cvEducation.length > 0 ? { cvEducation } : {}),
     },
   })
 

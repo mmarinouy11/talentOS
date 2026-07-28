@@ -15,6 +15,8 @@ export interface ParsedCV {
   skills: string[]
   languages: string[]
   summary: string | null
+  experience?: { title: string; company: string; startDate: string; endDate: string; bullets: string[] }[]
+  education?: { degree: string; institution: string; year?: string }[]
 }
 
 interface CVUploadProps {

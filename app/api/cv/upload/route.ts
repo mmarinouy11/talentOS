@@ -17,13 +17,16 @@ Return ONLY valid JSON with these exact fields:
   "yearsOfExperience": number or null,
   "skills": array of strings,
   "languages": array of strings — SPOKEN/WRITTEN human languages only (e.g. "English", "Spanish", "Portuguese"). NOT programming languages. Infer from CV content, education, or location if not explicitly stated,
-  "summary": string or null
+  "summary": string or null,
+  "experience": array of objects with shape { "title": string, "company": string, "startDate": string, "endDate": string, "bullets": string[] } — one entry per job, bullets are key achievements/responsibilities (2-4 per role), dates like "Jan 2021" or "2019",
+  "education": array of objects with shape { "degree": string, "institution": string, "year": string or null } — one entry per qualification
 }
 Rules:
 - Skills should be specific technologies, not soft skills
 - Seniority: 0-2 years = JUNIOR, 2-5 = MID, 5-8 = SENIOR, 8-12 = STAFF, 12+ = PRINCIPAL
 - Return null for fields you cannot determine, never guess email or phone
 - "languages" must only contain human spoken languages, never programming languages or frameworks
+- "experience" and "education" must be arrays (empty array [] if not found)
 - No markdown, no explanation, only the JSON object`
 
 type ParsedCV = {
@@ -38,6 +41,8 @@ type ParsedCV = {
   skills: string[]
   languages: string[]
   summary: string | null
+  experience: { title: string; company: string; startDate: string; endDate: string; bullets: string[] }[]
+  education: { degree: string; institution: string; year?: string }[]
 }
 
 // Detects Type3/custom-glyph garbage: >60% of whitespace tokens are single chars
