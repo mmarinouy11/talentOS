@@ -124,14 +124,29 @@ export default async function CandidateInPositionPage({
             <Link href={`/candidates/${candidate.id}/edit`}>
               <Button variant="outline" size="sm">Edit Candidate</Button>
             </Link>
-            <a href={`/api/candidate-positions/${cp.id}/tenarai-cv`} target="_blank" rel="noopener noreferrer">
-              <button className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-md border border-[#8CF000] text-[#8CF000] hover:bg-[#8CF000]/10 transition-colors whitespace-nowrap">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            {Array.isArray(candidate.cvExperience) && (candidate.cvExperience as unknown[]).length > 0 ? (
+              <a href={`/api/candidate-positions/${cp.id}/tenarai-cv`} target="_blank" rel="noopener noreferrer">
+                <button className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-md border border-[#8CF000] text-[#8CF000] hover:bg-[#8CF000]/10 transition-colors whitespace-nowrap">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Tenarai CV
+                </button>
+              </a>
+            ) : (
+              <div className="inline-flex items-start gap-1.5 px-3 py-1.5 rounded-md bg-amber-50 border border-amber-200 max-w-xs">
+                <svg className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                 </svg>
-                Tenarai CV
-              </button>
-            </a>
+                <span className="text-xs text-amber-700">
+                  CV sin experiencia parseada.{' '}
+                  <Link href={`/candidates/${candidate.id}/edit`} className="font-medium underline underline-offset-2">
+                    Subí el CV nuevamente
+                  </Link>{' '}
+                  para generar el CV Tenarai.
+                </span>
+              </div>
+            )}
             <Link href={`/positions/${positionId}`}>
               <Button variant="ghost" size="sm">← Back to Position</Button>
             </Link>

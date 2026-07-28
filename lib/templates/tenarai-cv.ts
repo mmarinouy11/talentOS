@@ -26,6 +26,9 @@ const SKILL_CATEGORY_MAP: Record<string, SkillCategory> = {
   django: 'Frameworks', flask: 'Frameworks', spring: 'Frameworks', 'express.js': 'Frameworks',
   react: 'Frameworks', 'next.js': 'Frameworks', fastapi: 'Frameworks', rails: 'Frameworks',
   laravel: 'Frameworks', angular: 'Frameworks', vue: 'Frameworks', graphql: 'Frameworks',
+  'spring boot': 'Frameworks', 'spring data': 'Frameworks', 'spring security': 'Frameworks',
+  'spring test': 'Frameworks', junit: 'Frameworks', 'junit 5': 'Frameworks', mockito: 'Frameworks',
+  hibernate: 'Frameworks',
   // Cloud & DevOps
   aws: 'Cloud & DevOps', azure: 'Cloud & DevOps', gcp: 'Cloud & DevOps',
   'ci/cd': 'Cloud & DevOps', git: 'Cloud & DevOps', terraform: 'Cloud & DevOps',
@@ -33,6 +36,7 @@ const SKILL_CATEGORY_MAP: Record<string, SkillCategory> = {
   'docker compose': 'Cloud & DevOps', helm: 'Cloud & DevOps', linux: 'Cloud & DevOps',
   'kubernetes operators': 'Cloud & DevOps', prometheus: 'Cloud & DevOps', grafana: 'Cloud & DevOps',
   datadog: 'Cloud & DevOps', nginx: 'Cloud & DevOps', 'observability tools': 'Cloud & DevOps',
+  microservices: 'Cloud & DevOps', maven: 'Cloud & DevOps',
   // AI & Data
   'llm automation': 'AI & Data', 'ai-assisted scripting': 'AI & Data',
   postgresql: 'AI & Data', mongodb: 'AI & Data', mysql: 'AI & Data',
@@ -48,7 +52,13 @@ const SKILL_CATEGORY_MAP: Record<string, SkillCategory> = {
 const CATEGORY_ORDER: SkillCategory[] = ['Languages', 'Frameworks', 'Cloud & DevOps', 'AI & Data', 'Soft Skills', 'Other']
 
 export function categorizeSkill(skill: string): SkillCategory {
-  return SKILL_CATEGORY_MAP[skill.toLowerCase()] ?? 'Other'
+  const lower = skill.toLowerCase()
+  if (SKILL_CATEGORY_MAP[lower]) return SKILL_CATEGORY_MAP[lower]
+  // Substring fallback: check if any map key is contained in the skill or vice-versa
+  for (const [key, cat] of Object.entries(SKILL_CATEGORY_MAP)) {
+    if (lower.includes(key) || key.includes(lower)) return cat
+  }
+  return 'Other'
 }
 
 export interface CvExperienceEntry {
