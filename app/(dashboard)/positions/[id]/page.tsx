@@ -30,7 +30,7 @@ const INTERVIEW_STAGE_ORDER: Record<string, number> = {
 }
 
 function pickLatestInterview(
-  interviews: { status: string; decision: string | null; stage: string }[]
+  interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null }[]
 ) {
   if (!interviews.length) return null
   // If any round has decision=REJECT, show that one (decisive round).
@@ -79,7 +79,7 @@ export default async function PositionDetailPage({
         where: { candidate: { deletedAt: null } },
         include: {
           candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true, minimumCompensation: true } },
-          interviews: { select: { status: true, decision: true, stage: true } },
+          interviews: { select: { status: true, decision: true, stage: true, scheduledAt: true } },
         },
         orderBy: { createdAt: 'desc' },
       },
@@ -314,6 +314,7 @@ export default async function PositionDetailPage({
           createdAt: cp.createdAt.toISOString(),
           latestInterviewStatus: pickLatestInterview(cp.interviews)?.status ?? null,
           latestInterviewDecision: pickLatestInterview(cp.interviews)?.decision ?? null,
+          latestInterviewScheduledAt: pickLatestInterview(cp.interviews)?.scheduledAt?.toISOString() ?? null,
           compensationOutOfRange:
             cp.candidate.minimumCompensation != null && position.internalCostBudget != null
               ? cp.candidate.minimumCompensation > hourlyToMonthly(position.internalCostBudget, hoursBaseline)

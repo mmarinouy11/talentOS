@@ -205,6 +205,7 @@ interface CandidatePosition {
   createdAt: string
   latestInterviewStatus?: string | null
   latestInterviewDecision?: string | null
+  latestInterviewScheduledAt?: string | null
   compensationOutOfRange?: boolean
   candidate: {
     id: string
@@ -426,16 +427,26 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
         </td>
         <td className="px-4 py-3">
           {cp.latestInterviewStatus ? (
-            <span className="inline-flex items-center gap-1.5 flex-wrap">
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROUND_STATUS_COLORS[cp.latestInterviewStatus as InterviewStatus] ?? 'bg-gray-100 text-gray-700'}`}>
-                {ROUND_STATUS_LABELS[cp.latestInterviewStatus as InterviewStatus] ?? cp.latestInterviewStatus}
+            <div className="flex flex-col gap-0.5">
+              <span className="inline-flex items-center gap-1.5 flex-wrap">
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ROUND_STATUS_COLORS[cp.latestInterviewStatus as InterviewStatus] ?? 'bg-gray-100 text-gray-700'}`}>
+                  {ROUND_STATUS_LABELS[cp.latestInterviewStatus as InterviewStatus] ?? cp.latestInterviewStatus}
+                </span>
+                {cp.latestInterviewDecision && (
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DECISION_COLORS[cp.latestInterviewDecision as InterviewDecision] ?? 'bg-gray-100 text-gray-700'}`}>
+                    {DECISION_LABELS[cp.latestInterviewDecision as InterviewDecision] ?? cp.latestInterviewDecision}
+                  </span>
+                )}
               </span>
-              {cp.latestInterviewDecision && (
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DECISION_COLORS[cp.latestInterviewDecision as InterviewDecision] ?? 'bg-gray-100 text-gray-700'}`}>
-                  {DECISION_LABELS[cp.latestInterviewDecision as InterviewDecision] ?? cp.latestInterviewDecision}
+              {cp.latestInterviewStatus === 'SCHEDULED' && cp.latestInterviewScheduledAt && (
+                <span className="text-xs text-gray-400">
+                  {new Date(cp.latestInterviewScheduledAt).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                    timeZone: 'UTC', timeZoneName: 'short',
+                  })}
                 </span>
               )}
-            </span>
+            </div>
           ) : (
             <span className="text-gray-400">—</span>
           )}
