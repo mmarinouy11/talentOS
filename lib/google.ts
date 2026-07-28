@@ -43,3 +43,12 @@ export async function makeFilePublic(fileId: string): Promise<void> {
     supportsAllDrives: true,
   })
 }
+
+export async function downloadFileFromDrive(fileId: string): Promise<Buffer> {
+  const drive = getDriveClient()
+  const response = await drive.files.get(
+    { fileId, alt: 'media', supportsAllDrives: true },
+    { responseType: 'arraybuffer' }
+  )
+  return Buffer.from(response.data as ArrayBuffer)
+}

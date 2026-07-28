@@ -139,11 +139,11 @@ export default async function CandidateInPositionPage({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                 </svg>
                 <span className="text-xs text-amber-700">
-                  CV sin experiencia parseada.{' '}
+                  Experience not yet parsed for this CV.{' '}
                   <Link href={`/candidates/${candidate.id}/edit`} className="font-medium underline underline-offset-2">
-                    Subí el CV nuevamente
+                    Re-upload the CV
                   </Link>{' '}
-                  para generar el CV Tenarai.
+                  to generate the Tenarai CV.
                 </span>
               </div>
             )}

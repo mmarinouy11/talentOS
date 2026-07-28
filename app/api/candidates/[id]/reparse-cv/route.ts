@@ -1,40 +1,9 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
-import { extractPdfText, renderPdfToImages } from '@/lib/pdf-extract'
 import { uploadFileToDrive } from '@/lib/google'
-import { callClaudeJSON, getAnthropic, MODELS, anthropicErrorResponse } from '@/lib/anthropic'
-
-const SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
-Return ONLY valid JSON with these exact fields:
-{
-  "firstName": string or null,
-  "lastName": string or null,
-  "email": string or null,
-  "phone": string or null,
-  "country": string or null,
-  "linkedinUrl": string or null,
-  "seniority": one of "JUNIOR"|"MID"|"SENIOR"|"STAFF"|"PRINCIPAL" or null,
-  "yearsOfExperience": number or null,
-  "skills": array of strings,
-  "languages": array of strings — spoken/written human languages only,
-  "summary": string or null,
-  "strengths": array of strings,
-  "risks": array of strings,
-  "currentCompensation": number or null,
-  "experience": array of objects with shape { "title": string, "company": string, "startDate": string, "endDate": string, "bullets": string[] } — one entry per job, bullets are key achievements/responsibilities (2-4 per role), dates like "Jan 2021" or "2019",
-  "education": array of objects with shape { "degree": string, "institution": string, "year": string or null } — one entry per qualification
-}
-Rules:
-- Skills should be specific technologies, not soft skills
-- Seniority: 0-2 years = JUNIOR, 2-5 = MID, 5-8 = SENIOR, 8-12 = STAFF, 12+ = PRINCIPAL
-- Return null for fields you cannot determine, never guess email or phone
-- languages must only contain human spoken languages, never programming languages
-- strengths: 2-4 notable positives visible from the CV
-- risks: 1-3 potential concerns visible from the CV (gaps, short tenures, etc.)
-- currentCompensation: monthly USD amount if stated, else null
-- "experience" and "education" must be arrays (empty array [] if not found)
-- No markdown, no explanation, only the JSON object`
+import { anthropicErrorResponse } from '@/lib/anthropic'
+import { parseCvFromBuffer } from '@/lib/cv-parser'
 
 export async function POST(
   request: Request,
@@ -61,91 +30,6 @@ export async function POST(
 
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  // Step 1: Try text extraction
-  let text = ''
-  try {
-    text = await extractPdfText(buffer)
-  } catch (err) {
-    console.warn('[reparse-cv] Text extraction failed, will try vision fallback:', err)
-  }
-
-  const MIN_TEXT_LENGTH = 100
-  const useVision = text.trim().length < MIN_TEXT_LENGTH
-
-  // Step 2: Vision fallback for image-based PDFs
-  if (useVision) {
-    console.log(`[reparse-cv] Text too short (${text.trim().length} chars) — using vision fallback`)
-    let pageImages: Buffer[]
-    try {
-      pageImages = await renderPdfToImages(buffer, 6)
-    } catch (err) {
-      console.error('[reparse-cv] Vision render failed:', err)
-      return NextResponse.json({ error: 'Could not extract text from this PDF. Ensure it is a valid PDF or try a text-based PDF.' }, { status: 422 })
-    }
-    if (pageImages.length === 0) {
-      return NextResponse.json({ error: 'Could not render PDF pages for extraction.' }, { status: 422 })
-    }
-
-    // Use vision model to extract CV text
-    const anthropic = getAnthropic()
-    const imageBlocks = pageImages.map((buf) => ({
-      type: 'image' as const,
-      source: { type: 'base64' as const, media_type: 'image/png' as const, data: buf.toString('base64') },
-    }))
-    try {
-      const response = await anthropic.messages.create({
-        model: MODELS.SMART,
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: [{
-          role: 'user',
-          content: [...imageBlocks, { type: 'text', text: 'Parse this CV from the images and return the structured JSON.' }],
-        }],
-      })
-      const block = response.content[0]
-      if (block.type !== 'text') throw new Error('Unexpected vision response type')
-      const clean = block.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-      const visionParsed = JSON.parse(clean)
-
-      // Upload to Drive (non-fatal)
-      let cvDriveId: string | null = null
-      let cvOriginalName: string | null = file.name
-      try {
-        const { fileId, fileName } = await uploadFileToDrive(buffer, `${Date.now()}_${file.name}`, file.type, process.env.GOOGLE_DRIVE_FOLDER_ID!)
-        cvDriveId = fileId
-        cvOriginalName = fileName
-      } catch (err) {
-        console.error('[reparse-cv] Drive upload failed (non-fatal):', err)
-      }
-
-      const candidate = await db.candidate.update({
-        where: { id },
-        data: {
-          ...(visionParsed.firstName ? { firstName: visionParsed.firstName } : {}),
-          ...(visionParsed.lastName ? { lastName: visionParsed.lastName } : {}),
-          ...(visionParsed.phone !== undefined ? { phone: visionParsed.phone } : {}),
-          ...(visionParsed.country !== undefined ? { country: visionParsed.country } : {}),
-          ...(visionParsed.seniority ? { seniority: visionParsed.seniority } : {}),
-          ...(visionParsed.yearsOfExperience !== undefined ? { yearsOfExperience: visionParsed.yearsOfExperience } : {}),
-          skills: visionParsed.skills ?? [],
-          languages: visionParsed.languages ?? [],
-          summary: visionParsed.summary ?? null,
-          strengths: visionParsed.strengths ?? [],
-          risks: visionParsed.risks ?? [],
-          ...(visionParsed.currentCompensation !== undefined ? { currentCompensation: visionParsed.currentCompensation } : {}),
-          ...(Array.isArray(visionParsed.experience) && visionParsed.experience.length > 0 ? { cvExperience: visionParsed.experience } : {}),
-          ...(Array.isArray(visionParsed.education) && visionParsed.education.length > 0 ? { cvEducation: visionParsed.education } : {}),
-          cvDriveId,
-          cvOriginalName,
-        },
-      })
-      return NextResponse.json({ candidate, parsed: visionParsed })
-    } catch (err) {
-      console.error('[reparse-cv] Vision parsing failed:', err)
-      return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Could not parse this PDF. The file may be corrupt or unreadable.' }, { status: 422 })
-    }
-  }
-
   // Upload to Drive (non-fatal)
   let cvDriveId: string | null = null
   let cvOriginalName: string | null = file.name
@@ -162,36 +46,14 @@ export async function POST(
     console.error('[reparse-cv] Drive upload failed (non-fatal):', err)
   }
 
-  // Parse with Claude (text path)
-  let parsed: {
-    firstName: string | null
-    lastName: string | null
-    email: string | null
-    phone: string | null
-    country: string | null
-    linkedinUrl: string | null
-    seniority: 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL' | null
-    yearsOfExperience: number | null
-    skills: string[]
-    languages: string[]
-    summary: string | null
-    strengths: string[]
-    risks: string[]
-    currentCompensation: number | null
-    experience: { title: string; company: string; startDate: string; endDate: string; bullets: string[] }[]
-    education: { degree: string; institution: string; year?: string }[]
-  }
+  let parsed: Awaited<ReturnType<typeof parseCvFromBuffer>>
   try {
-    parsed = await callClaudeJSON<typeof parsed>(
-      `Parse this CV and return the structured JSON:\n\n${text.slice(0, 8000)}`,
-      'FAST',
-      SYSTEM_PROMPT
-    )
+    parsed = await parseCvFromBuffer(buffer)
   } catch (err) {
-    console.error('[reparse-cv] Claude text parsing failed:', err)
+    console.error('[reparse-cv] Parsing failed:', err)
     return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Failed to parse CV' }, { status: 500 })
   }
-  // Update candidate with all parsed fields
+
   const candidate = await db.candidate.update({
     where: { id },
     data: {

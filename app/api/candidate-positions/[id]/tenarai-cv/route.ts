@@ -25,8 +25,8 @@ const NO_EXPERIENCE_HTML = (candidateId: string) => `<!DOCTYPE html>
 <body>
 <div class="box">
   <h1>Experience data missing</h1>
-  <p>Este candidato todavía no tiene el detalle de experiencia cargado. Volvé a la ficha del candidato y subí su CV para generar el CV Tenarai.</p>
-  <a href="/candidates/${candidateId}/edit">→ Ir a la ficha del candidato</a>
+  <p>This candidate&#39;s experience hasn&#39;t been parsed yet. Go to the candidate&#39;s profile and re-upload their CV to generate the Tenarai CV.</p>
+  <a href="/candidates/${candidateId}/edit">→ Go to candidate profile</a>
 </div>
 </body>
 </html>`
