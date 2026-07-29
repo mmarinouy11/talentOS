@@ -2,6 +2,7 @@ import cron from 'node-cron'
 import { db } from './db'
 import { sendEmailViaSystemGmail } from './email'
 import type { Stage, InterviewDecision } from '@prisma/client'
+import { isCandidateInactive } from './candidate-status'
 
 // Railway containers run UTC. 11:00 UTC = 08:00 Montevideo (UTC-3, no DST in winter;
 // UTC-2 in summer — adjust schedule seasonally if needed, or use a timezone-aware cron lib).
@@ -164,7 +165,7 @@ function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): 
   const allCPs = position.candidatePositions
   const total = allCPs.length
   // Active = not rejected or withdrawn from pipeline
-  const activeCPs = allCPs.filter((cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED')
+  const activeCPs = allCPs.filter((cp) => !isCandidateInactive(cp))
   const notMovingForward = total - activeCPs.length
 
   const tdLabel = 'padding:4px 12px 4px 0;color:#6b7280;vertical-align:top;'

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
+import { isCandidateInactive } from '@/lib/candidate-status'
 
 export async function GET(
   _request: Request,
@@ -96,7 +97,7 @@ export async function GET(
       lastInitial: cp.candidate.lastName?.[0] ?? '',
       positionTitle: cp.position.title,
       stage: STAGE_LABELS[cp.stage] ?? cp.stage,
-      isActive: cp.status === 'ACTIVE' || cp.status === 'HIRED',
+      isActive: !isCandidateInactive(cp),
       latestInterview: cp.interviews[0]
         ? { label: cp.interviews[0].roundLabel, status: INTERVIEW_STATUS_LABELS[cp.interviews[0].status] ?? cp.interviews[0].status }
         : null,

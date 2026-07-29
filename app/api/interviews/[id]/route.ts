@@ -208,12 +208,30 @@ export async function PATCH(
     include: { decidedBy: { select: { name: true, email: true } } },
   })
 
-  // Sync CandidatePosition.status when a terminal decision is recorded
-  if (decision === 'REJECT') {
+  // Sync CandidatePosition when a terminal decision is recorded — REJECT and
+  // HOLD both move the candidate out of the active pipeline; must update
+  // stage AND status together, and log to StageHistory for auditability.
+  if (decision === 'REJECT' || decision === 'HOLD') {
+    const targetStage = decision === 'REJECT' ? 'REJECTED' : 'WITHDRAWN'
+    const currentCp = await db.candidatePosition.findUnique({
+      where: { id: existing.candidatePositionId },
+      select: { stage: true },
+    })
     await db.candidatePosition.update({
       where: { id: existing.candidatePositionId },
-      data: { status: 'REJECTED' },
+      data: { status: targetStage, stage: targetStage, stageEnteredAt: new Date() },
     })
+    if (currentCp) {
+      await db.stageHistory.create({
+        data: {
+          candidatePositionId: existing.candidatePositionId,
+          fromStage: currentCp.stage,
+          toStage: targetStage,
+          movedById: (session.user as { id?: string }).id ?? '',
+          notes: decisionNotes ?? (decision === 'REJECT' ? 'Rejected via interview decision' : 'Put on hold via interview decision'),
+        },
+      })
+    }
   }
 
   return NextResponse.json(interview)

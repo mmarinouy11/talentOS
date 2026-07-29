@@ -13,6 +13,7 @@ import { FunnelChart } from '@/components/app/FunnelChart'
 import { VelocityTable } from '@/components/app/VelocityTable'
 import { PositionInsights } from '@/components/app/PositionInsights'
 import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
+import { isCandidateInactive } from '@/lib/candidate-status'
 import { VendorAssignment } from '@/components/app/VendorAssignment'
 import { ApplicationPortalLink } from '@/components/app/ApplicationPortalLink'
 import type { Role } from '@prisma/client'
@@ -132,10 +133,10 @@ export default async function PositionDetailPage({
   const days = aging(position.createdAt)
   const totalCandidates = position.candidatePositions.length
   const activeCandidates = position.candidatePositions.filter(
-    (cp) => cp.stage !== 'REJECTED' && cp.stage !== 'WITHDRAWN'
+    (cp) => !isCandidateInactive(cp)
   ).length
   const notMovingForward = position.candidatePositions.filter(
-    (cp) => cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN'
+    (cp) => isCandidateInactive(cp)
   ).length
 
   return (
