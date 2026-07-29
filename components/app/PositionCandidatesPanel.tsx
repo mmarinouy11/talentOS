@@ -383,8 +383,11 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
       if (minScore !== null && (cp.fitScore == null || cp.fitScore < minScore)) return false
       return true
     }
-    const active = rows.filter((cp) => cp.stage !== 'REJECTED' && cp.stage !== 'WITHDRAWN' && match(cp))
-    const inactive = rows.filter((cp) => (cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN') && match(cp))
+    const isInactive = (cp: CandidatePosition) =>
+      cp.status === 'REJECTED' || cp.status === 'WITHDRAWN' ||
+      cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN'
+    const active = rows.filter((cp) => !isInactive(cp) && match(cp))
+    const inactive = rows.filter((cp) => isInactive(cp) && match(cp))
     return { activeRows: sortRows(active), inactiveRows: sortRows(inactive) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, sortKey, sortDir, liveScores, search, filterCountry, filterStage, filterRoundStatus, minScore, filtersActive])
@@ -584,7 +587,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
             <>
               <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Active ({activeRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.stage !== 'REJECTED' && cp.stage !== 'WITHDRAWN').length}` : ''})
+                  Active ({activeRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status !== 'REJECTED' && cp.status !== 'WITHDRAWN' && cp.stage !== 'REJECTED' && cp.stage !== 'WITHDRAWN').length}` : ''})
                 </span>
               </div>
               <table className="w-full text-sm">
@@ -609,7 +612,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
                   : <ChevronUp size={14} className="text-gray-400 shrink-0 rotate-180" />
                 }
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Not Moving Forward For Now ({inactiveRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN').length}` : ''})
+                  Not Moving Forward For Now ({inactiveRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN' || cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN').length}` : ''})
                 </span>
               </button>
               {inactiveExpanded && (
