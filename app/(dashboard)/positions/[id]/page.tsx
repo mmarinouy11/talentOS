@@ -116,7 +116,7 @@ export default async function PositionDetailPage({
 
   const STAGE_ORDER: Record<string, number> = {
     HIRED: 0, OFFER: 1, CLIENT_INTERVIEW: 2, MANAGER_INTERVIEW: 3,
-    TECHNICAL_INTERVIEW: 4, SCREENING: 5, APPLIED: 6, REJECTED: 7,
+    TECHNICAL_INTERVIEW: 4, SCREENING: 5, APPLIED: 6, REJECTED: 7, WITHDRAWN: 8,
   }
   // Sort: most advanced stage first (HIRED→REJECTED), then fitScore desc (nulls last)
   const sortedCandidatePositions = [...position.candidatePositions].sort((a, b) => {
@@ -132,10 +132,10 @@ export default async function PositionDetailPage({
   const days = aging(position.createdAt)
   const totalCandidates = position.candidatePositions.length
   const activeCandidates = position.candidatePositions.filter(
-    (cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED'
+    (cp) => cp.stage !== 'REJECTED' && cp.stage !== 'WITHDRAWN'
   ).length
   const notMovingForward = position.candidatePositions.filter(
-    (cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN'
+    (cp) => cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN'
   ).length
 
   return (

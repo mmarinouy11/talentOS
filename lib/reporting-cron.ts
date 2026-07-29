@@ -20,6 +20,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   OFFER: 'Offer',
   HIRED: 'Hired',
   REJECTED: 'Rejected',
+  WITHDRAWN: 'On Hold',
 }
 
 const DECISION_LABELS: Record<InterviewDecision, string> = {

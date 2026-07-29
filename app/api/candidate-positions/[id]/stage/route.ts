@@ -4,11 +4,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 const schema = z.object({
-  newStage: z.enum(['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED', 'REJECTED']).optional(),
-  action: z.enum(['on_hold']).optional(),
+  newStage: z.enum(['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN']),
   notes: z.string().optional().nullable(),
-}).refine((d) => d.newStage !== undefined || d.action !== undefined, {
-  message: 'Either newStage or action is required',
 })
 
 export async function PATCH(
@@ -29,38 +26,29 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { newStage, action, notes } = parsed.data
+  const { newStage, notes } = parsed.data
   const userId = (session.user as { id?: string }).id!
 
-  let updated
-  if (action === 'on_hold') {
-    updated = await db.candidatePosition.update({
-      where: { id },
-      data: { status: 'WITHDRAWN' },
-    })
-  } else {
-    const stage = newStage!
-    const statusUpdate =
-      stage === 'HIRED' ? { status: 'HIRED' as const } :
-      stage === 'REJECTED' ? { status: 'REJECTED' as const } :
-      cp.status === 'WITHDRAWN' ? { status: 'ACTIVE' as const } :
-      {}
+  const statusUpdate =
+    newStage === 'HIRED' ? { status: 'HIRED' as const } :
+    newStage === 'REJECTED' ? { status: 'REJECTED' as const } :
+    newStage === 'WITHDRAWN' ? { status: 'WITHDRAWN' as const } :
+    { status: 'ACTIVE' as const }
 
-    updated = await db.candidatePosition.update({
-      where: { id },
-      data: { stage, stageEnteredAt: new Date(), ...statusUpdate },
-    })
+  const updated = await db.candidatePosition.update({
+    where: { id },
+    data: { stage: newStage, stageEnteredAt: new Date(), ...statusUpdate },
+  })
 
-    await db.stageHistory.create({
-      data: {
-        candidatePositionId: id,
-        fromStage: cp.stage,
-        toStage: stage,
-        movedById: userId,
-        notes,
-      },
-    })
-  }
+  await db.stageHistory.create({
+    data: {
+      candidatePositionId: id,
+      fromStage: cp.stage,
+      toStage: newStage,
+      movedById: userId,
+      notes,
+    },
+  })
 
   return NextResponse.json(updated)
 }

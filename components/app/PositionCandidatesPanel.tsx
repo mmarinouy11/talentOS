@@ -91,6 +91,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   OFFER: 'Offer',
   HIRED: 'Hired',
   REJECTED: 'Rejected',
+  WITHDRAWN: 'On Hold',
 }
 
 const STAGE_FILTER_LABELS: Record<Stage, string> = {
@@ -102,6 +103,7 @@ const STAGE_FILTER_LABELS: Record<Stage, string> = {
   OFFER: 'Offer',
   HIRED: 'Hired',
   REJECTED: 'Rejected',
+  WITHDRAWN: 'On Hold',
 }
 
 // Lower number = more advanced stage = sorts first in ascending order
@@ -114,6 +116,7 @@ const STAGE_ORDER: Record<string, number> = {
   SCREENING: 5,
   APPLIED: 6,
   REJECTED: 7,
+  WITHDRAWN: 8,
 }
 
 type SortDir = 'asc' | 'desc'
@@ -344,7 +347,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
   }, [rows])
 
   const uniqueStages = useMemo(() => {
-    const order: Stage[] = ['APPLIED','SCREENING','TECHNICAL_INTERVIEW','MANAGER_INTERVIEW','CLIENT_INTERVIEW','OFFER','HIRED','REJECTED']
+    const order: Stage[] = ['APPLIED','SCREENING','TECHNICAL_INTERVIEW','MANAGER_INTERVIEW','CLIENT_INTERVIEW','OFFER','HIRED','REJECTED','WITHDRAWN']
     const set = new Set(rows.map((cp) => cp.stage))
     return order.filter((s) => set.has(s))
   }, [rows])
@@ -380,8 +383,8 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
       if (minScore !== null && (cp.fitScore == null || cp.fitScore < minScore)) return false
       return true
     }
-    const active = rows.filter((cp) => (cp.status === 'ACTIVE' || cp.status === 'HIRED') && match(cp))
-    const inactive = rows.filter((cp) => (cp.status === 'REJECTED' || cp.status === 'WITHDRAWN') && match(cp))
+    const active = rows.filter((cp) => cp.stage !== 'REJECTED' && cp.stage !== 'WITHDRAWN' && match(cp))
+    const inactive = rows.filter((cp) => (cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN') && match(cp))
     return { activeRows: sortRows(active), inactiveRows: sortRows(inactive) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, sortKey, sortDir, liveScores, search, filterCountry, filterStage, filterRoundStatus, minScore, filtersActive])
@@ -581,7 +584,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
             <>
               <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Active ({activeRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status === 'ACTIVE' || cp.status === 'HIRED').length}` : ''})
+                  Active ({activeRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.stage !== 'REJECTED' && cp.stage !== 'WITHDRAWN').length}` : ''})
                 </span>
               </div>
               <table className="w-full text-sm">
@@ -606,7 +609,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
                   : <ChevronUp size={14} className="text-gray-400 shrink-0 rotate-180" />
                 }
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Not Moving Forward For Now ({inactiveRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN').length}` : ''})
+                  Not Moving Forward For Now ({inactiveRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.stage === 'REJECTED' || cp.stage === 'WITHDRAWN').length}` : ''})
                 </span>
               </button>
               {inactiveExpanded && (

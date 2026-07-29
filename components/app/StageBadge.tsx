@@ -9,6 +9,7 @@ const config: Record<Stage, { label: string; className: string }> = {
   OFFER: { label: 'Offer', className: 'bg-yellow-100 text-yellow-700' },
   HIRED: { label: 'Hired', className: 'bg-green-100 text-green-700' },
   REJECTED: { label: 'Rejected', className: 'bg-red-100 text-red-700' },
+  WITHDRAWN: { label: 'On Hold', className: 'bg-amber-100 text-amber-700' },
 }
 
 export function StageBadge({ stage }: { stage: Stage }) {

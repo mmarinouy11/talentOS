@@ -44,6 +44,7 @@ enum Stage {
   OFFER
   HIRED
   REJECTED
+  WITHDRAWN
 }
 
 enum SchedulingMode {

@@ -25,11 +25,10 @@ const STAGE_LABELS: Record<Stage, string> = {
   OFFER: 'Offer',
   HIRED: 'Hired',
   REJECTED: 'Rejected',
+  WITHDRAWN: 'On Hold',
 }
 
-// Sentinel value for the On Hold option (not a real Stage)
-const ON_HOLD = 'ON_HOLD' as const
-type SelectionValue = Stage | typeof ON_HOLD
+type SelectionValue = Stage
 
 interface MoveStageModalProps {
   candidatePositionId: string
@@ -40,7 +39,9 @@ interface MoveStageModalProps {
 export function MoveStageModal({ candidatePositionId, currentStage, onClose }: MoveStageModalProps) {
   const router = useRouter()
   const [selected, setSelected] = useState<SelectionValue>(
-    ACTIVE_STAGES[ACTIVE_STAGES.indexOf(currentStage) + 1] ?? 'HIRED'
+    ACTIVE_STAGES.includes(currentStage)
+      ? (ACTIVE_STAGES[ACTIVE_STAGES.indexOf(currentStage) + 1] ?? 'HIRED')
+      : 'HIRED'
   )
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -51,10 +52,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     setLoading(true)
     setError('')
 
-    const body =
-      selected === ON_HOLD
-        ? { action: 'on_hold', notes: notes || null }
-        : { newStage: selected, notes: notes || null }
+    const body = { newStage: selected, notes: notes || null }
 
     const res = await fetch(`/api/candidate-positions/${candidatePositionId}/stage`, {
       method: 'PATCH',
@@ -138,7 +136,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
             </div>
 
             <Option value="HIRED" label="Hired" colorClass="text-green-700" />
-            <Option value={ON_HOLD} label="On Hold" colorClass="text-amber-600" />
+            <Option value="WITHDRAWN" label="On Hold" colorClass="text-amber-600" />
             <Option value="REJECTED" label="Rejected" colorClass="text-red-600" />
           </div>
 
@@ -156,7 +154,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Saving…' : selected === ON_HOLD ? 'Put On Hold' : 'Move Stage'}
+              {loading ? 'Saving…' : selected === 'WITHDRAWN' ? 'Put On Hold' : 'Move Stage'}
             </Button>
           </div>
         </form>
