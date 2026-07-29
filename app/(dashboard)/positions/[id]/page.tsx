@@ -270,18 +270,6 @@ export default async function PositionDetailPage({
         )}
       </div>
 
-      {/* JD Intelligence */}
-      <JDIntelligence
-        positionId={id}
-        jdParsed={position.jdParsed}
-        jdSummary={position.jdSummary}
-        jdSkills={position.jdSkills}
-        jdSeniority={position.jdSeniority}
-        jdLanguages={position.jdLanguages}
-        linkedinSearchQueries={position.linkedinSearchQueries}
-        coreSkills={position.coreSkills}
-      />
-
       {/* Metrics */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-4 py-3">
@@ -331,6 +319,18 @@ export default async function PositionDetailPage({
         }))}
         activeCandidates={activeCandidates}
         currentUserId={currentUserId}
+      />
+
+      {/* JD Intelligence */}
+      <JDIntelligence
+        positionId={id}
+        jdParsed={position.jdParsed}
+        jdSummary={position.jdSummary}
+        jdSkills={position.jdSkills}
+        jdSeniority={position.jdSeniority}
+        jdLanguages={position.jdLanguages}
+        linkedinSearchQueries={position.linkedinSearchQueries}
+        coreSkills={position.coreSkills}
       />
 
       {/* Position Velocity */}
