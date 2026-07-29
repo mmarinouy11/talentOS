@@ -7,14 +7,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import type { Stage } from '@prisma/client'
 
-const STAGE_ORDER: Stage[] = [
+const ACTIVE_STAGES: Stage[] = [
   'APPLIED',
   'SCREENING',
   'TECHNICAL_INTERVIEW',
   'MANAGER_INTERVIEW',
   'CLIENT_INTERVIEW',
   'OFFER',
-  'HIRED',
 ]
 
 const STAGE_LABELS: Record<Stage, string> = {
@@ -28,18 +27,9 @@ const STAGE_LABELS: Record<Stage, string> = {
   REJECTED: 'Rejected',
 }
 
-function getNextStages(current: Stage): { primary: Stage[]; other: Stage[] } {
-  const currentIdx = STAGE_ORDER.indexOf(current)
-  const allStages: Stage[] = [...STAGE_ORDER, 'REJECTED']
-
-  // Natural next: up to 2 stages forward (excluding current)
-  const primary = STAGE_ORDER.slice(currentIdx + 1, currentIdx + 3)
-
-  // Everything else except the current stage
-  const other = allStages.filter((s) => s !== current && !primary.includes(s))
-
-  return { primary, other }
-}
+// Sentinel value for the On Hold option (not a real Stage)
+const ON_HOLD = 'ON_HOLD' as const
+type SelectionValue = Stage | typeof ON_HOLD
 
 interface MoveStageModalProps {
   candidatePositionId: string
@@ -49,9 +39,9 @@ interface MoveStageModalProps {
 
 export function MoveStageModal({ candidatePositionId, currentStage, onClose }: MoveStageModalProps) {
   const router = useRouter()
-  const { primary, other } = getNextStages(currentStage)
-  const defaultStage = primary[0] ?? other[0] ?? currentStage
-  const [newStage, setNewStage] = useState<Stage>(defaultStage)
+  const [selected, setSelected] = useState<SelectionValue>(
+    ACTIVE_STAGES[ACTIVE_STAGES.indexOf(currentStage) + 1] ?? 'HIRED'
+  )
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -61,10 +51,15 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     setLoading(true)
     setError('')
 
+    const body =
+      selected === ON_HOLD
+        ? { action: 'on_hold', notes: notes || null }
+        : { newStage: selected, notes: notes || null }
+
     const res = await fetch(`/api/candidate-positions/${candidatePositionId}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newStage, notes: notes || null }),
+      body: JSON.stringify(body),
     })
 
     setLoading(false)
@@ -79,10 +74,20 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     onClose()
   }
 
-  const StageOption = ({ stage, dim = false }: { stage: Stage; dim?: boolean }) => (
+  const Option = ({
+    value,
+    label,
+    dim = false,
+    colorClass,
+  }: {
+    value: SelectionValue
+    label: string
+    dim?: boolean
+    colorClass?: string
+  }) => (
     <label
       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-        newStage === stage
+        selected === value
           ? 'border-[#8DF000] bg-[#8DF000]/10'
           : dim
           ? 'border-gray-100 bg-gray-50 hover:bg-gray-100'
@@ -91,14 +96,14 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     >
       <input
         type="radio"
-        name="newStage"
-        value={stage}
-        checked={newStage === stage}
-        onChange={() => setNewStage(stage)}
+        name="selection"
+        value={value}
+        checked={selected === value}
+        onChange={() => setSelected(value)}
         className="sr-only"
       />
-      <span className={`text-sm font-medium ${dim ? 'text-gray-500' : 'text-gray-800'} ${stage === 'REJECTED' ? 'text-red-600' : ''}`}>
-        {STAGE_LABELS[stage]}
+      <span className={`text-sm font-medium ${colorClass ?? (dim ? 'text-gray-500' : 'text-gray-800')}`}>
+        {label}
       </span>
     </label>
   )
@@ -121,23 +126,20 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            {primary.length > 0 && (
-              <>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Next Steps</p>
-                {primary.map((s) => <StageOption key={s} stage={s} />)}
-              </>
-            )}
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Pipeline</p>
+            {ACTIVE_STAGES.map((s) => (
+              <Option key={s} value={s} label={STAGE_LABELS[s]} dim={ACTIVE_STAGES.indexOf(s) < ACTIVE_STAGES.indexOf(currentStage)} />
+            ))}
 
-            {other.length > 0 && (
-              <>
-                <div className={`flex items-center gap-2 ${primary.length > 0 ? 'pt-2' : ''}`}>
-                  <div className="flex-1 border-t border-gray-100" />
-                  <p className="text-xs text-gray-400">Other stages</p>
-                  <div className="flex-1 border-t border-gray-100" />
-                </div>
-                {other.map((s) => <StageOption key={s} stage={s} dim />)}
-              </>
-            )}
+            <div className="flex items-center gap-2 pt-2">
+              <div className="flex-1 border-t border-gray-100" />
+              <p className="text-xs text-gray-400">Final states</p>
+              <div className="flex-1 border-t border-gray-100" />
+            </div>
+
+            <Option value="HIRED" label="Hired" colorClass="text-green-700" />
+            <Option value={ON_HOLD} label="On Hold" colorClass="text-amber-600" />
+            <Option value="REJECTED" label="Rejected" colorClass="text-red-600" />
           </div>
 
           <div>
@@ -153,8 +155,8 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
 
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={loading || newStage === currentStage}>
-              {loading ? 'Moving…' : 'Move Stage'}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Saving…' : selected === ON_HOLD ? 'Put On Hold' : 'Move Stage'}
             </Button>
           </div>
         </form>

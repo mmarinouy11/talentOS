@@ -593,10 +593,11 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
             </>
           )}
 
-          {/* Not Moving Forward group */}
+          {/* Not Moving Forward For Now group */}
           {inactiveRows.length > 0 && (
             <div className={activeRows.length > 0 ? 'border-t border-gray-200' : ''}>
               <button
+                aria-label="Toggle Not Moving Forward For Now section"
                 className="w-full px-6 py-2 bg-gray-50 flex items-center gap-2 hover:bg-gray-100 transition-colors text-left"
                 onClick={() => setInactiveExpanded((v) => !v)}
               >
@@ -605,7 +606,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
                   : <ChevronUp size={14} className="text-gray-400 shrink-0 rotate-180" />
                 }
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Not Moving Forward ({inactiveRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN').length}` : ''})
+                  Not Moving Forward For Now ({inactiveRows.length}{filtersActive || search ? ` of ${rows.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN').length}` : ''})
                 </span>
               </button>
               {inactiveExpanded && (
