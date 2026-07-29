@@ -15,8 +15,9 @@ import { config } from 'dotenv'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 
-const db = new PrismaClient()
+const db = new PrismaClient({ adapter: new PrismaPg(process.env.DATABASE_URL!) })
 const apply = process.argv.includes('--apply')
 
 async function main() {
