@@ -14,17 +14,17 @@ import path from 'path'
 import { config } from 'dotenv'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
-import { PrismaClient, Stage } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
 const db = new PrismaClient({ adapter: new PrismaPg(process.env.DATABASE_URL!) })
 const apply = process.argv.includes('--apply')
 
 async function main() {
-  const affected = await db.candidatePosition.findMany({
-    where: { status: 'WITHDRAWN', stage: { not: Stage.WITHDRAWN } },
-    select: { id: true, stage: true, positionId: true },
-  })
+  const affected = await db.$queryRaw<{ id: string; stage: string; positionId: string }[]>`
+    SELECT id, stage, "positionId" FROM "CandidatePosition"
+    WHERE status = 'WITHDRAWN' AND stage != 'WITHDRAWN'
+  `
 
   console.log(`\n=== Migrate WITHDRAWN stage ===`)
   console.log(`Candidates with status=WITHDRAWN but stage != WITHDRAWN: ${affected.length}`)
@@ -34,12 +34,12 @@ async function main() {
     return
   }
 
-  const result = await db.candidatePosition.updateMany({
-    where: { status: 'WITHDRAWN', stage: { not: Stage.WITHDRAWN } },
-    data: { stage: Stage.WITHDRAWN },
-  })
+  const updated = await db.$executeRaw`
+    UPDATE "CandidatePosition" SET stage = 'WITHDRAWN'
+    WHERE status = 'WITHDRAWN' AND stage != 'WITHDRAWN'
+  `
 
-  console.log(`Updated ${result.count} records.`)
+  console.log(`Updated ${updated} records.`)
 }
 
 main()
