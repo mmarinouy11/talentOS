@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { callClaudeJSON } from '@/lib/anthropic'
 import { extractPdfText } from '@/lib/pdf-extract'
+import { uploadFileToDrive } from '@/lib/google'
 import AdmZip from 'adm-zip'
 import { randomUUID } from 'crypto'
 import { importJobs, scheduleJobCleanup, type ParsedCandidate } from '@/lib/import-jobs'
@@ -19,7 +20,9 @@ Return ONLY valid JSON with these exact fields:
   "yearsOfExperience": number or null,
   "skills": array of strings,
   "languages": array of strings — SPOKEN/WRITTEN human languages only,
-  "summary": string or null
+  "summary": string or null,
+  "experience": array of objects with shape { "title": string, "company": string, "startDate": string, "endDate": string, "bullets": string[] } — one entry per role, bullets are key achievements (2-4 per role),
+  "education": array of objects with shape { "degree": string, "institution": string, "year": string or null }
 }
 Rules:
 - Skills: specific technologies only, not soft skills
@@ -27,6 +30,7 @@ Rules:
 - Return null for fields you cannot determine
 - Never guess email or phone
 - Languages: only human spoken languages, never programming languages
+- "experience" and "education" must be arrays (empty array [] if not found)
 - No markdown, no explanation, only the JSON object`
 
 async function processJob(
@@ -43,26 +47,38 @@ async function processJob(
     const chunkResults = await Promise.all(
       chunk.map(async (entry): Promise<ParsedCandidate> => {
         const fileName = entry.entryName.split('/').pop() ?? entry.entryName
+        const fallback = {
+          fileName,
+          firstName: null, lastName: null, email: null, phone: null,
+          country: null, linkedinUrl: null, seniority: null,
+          yearsOfExperience: null, skills: [], languages: [], summary: null,
+          experience: [], education: [], cvDriveId: null, cvOriginalName: null,
+          duplicate: false,
+        }
         try {
           const pdfBuffer = entry.getData()
           const text = await extractPdfText(pdfBuffer)
 
           if (!text.trim()) {
-            return {
-              fileName,
-              firstName: null, lastName: null, email: null, phone: null,
-              country: null, linkedinUrl: null, seniority: null,
-              yearsOfExperience: null, skills: [], languages: [], summary: null,
-              duplicate: false,
-              error: 'Could not extract text from PDF',
-            }
+            return { ...fallback, error: 'Could not extract text from PDF' }
           }
 
-          const parsed = await callClaudeJSON<Omit<ParsedCandidate, 'fileName' | 'duplicate' | 'existingId' | 'error'>>(
-            `Parse this LinkedIn profile PDF and return the structured JSON:\n\n${text.slice(0, 8000)}`,
-            'FAST',
-            LINKEDIN_SYSTEM_PROMPT
-          )
+          const [driveResult, parsed] = await Promise.all([
+            uploadFileToDrive(
+              pdfBuffer,
+              `${Date.now()}_${fileName}`,
+              'application/pdf',
+              process.env.GOOGLE_DRIVE_FOLDER_ID!
+            ).catch((err) => {
+              console.error(`[bulk-import] Drive upload failed for ${fileName}:`, err)
+              return null
+            }),
+            callClaudeJSON<Omit<ParsedCandidate, 'fileName' | 'duplicate' | 'existingId' | 'error' | 'cvDriveId' | 'cvOriginalName'>>(
+              `Parse this LinkedIn profile PDF and return the structured JSON:\n\n${text.slice(0, 8000)}`,
+              'FAST',
+              LINKEDIN_SYSTEM_PROMPT
+            ),
+          ])
 
           const email = parsed.email ?? null
           const isDuplicate = !!(email && emailMap.has(email.toLowerCase()))
@@ -73,19 +89,16 @@ async function processJob(
             ...parsed,
             skills: parsed.skills ?? [],
             languages: parsed.languages ?? [],
+            experience: parsed.experience ?? [],
+            education: parsed.education ?? [],
+            cvDriveId: driveResult?.fileId ?? null,
+            cvOriginalName: driveResult?.fileName ?? fileName,
             duplicate: isDuplicate,
             existingId,
           }
         } catch (err) {
           console.error(`Failed to parse ${fileName}:`, err)
-          return {
-            fileName,
-            firstName: null, lastName: null, email: null, phone: null,
-            country: null, linkedinUrl: null, seniority: null,
-            yearsOfExperience: null, skills: [], languages: [], summary: null,
-            duplicate: false,
-            error: 'Parse failed',
-          }
+          return { ...fallback, error: 'Parse failed' }
         }
       })
     )

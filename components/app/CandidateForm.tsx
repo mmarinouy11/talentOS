@@ -78,6 +78,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
   const [cvBanner, setCvBanner] = useState(false)
   const [cvExperience, setCvExperience] = useState<ParsedCV['experience']>(undefined)
   const [cvEducation, setCvEducation] = useState<ParsedCV['education']>(undefined)
+  const [parsedSummary, setParsedSummary] = useState<string | null>(null)
   const [minimumManuallyEdited, setMinimumManuallyEdited] = useState(
     defaultValues.minimumCompensation != null && defaultValues.minimumCompensation !== defaultValues.desiredCompensation
   )
@@ -163,6 +164,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
     if (parsed.languages.length) setLanguages(parsed.languages)
     if (parsed.experience?.length) setCvExperience(parsed.experience)
     if (parsed.education?.length) setCvEducation(parsed.education)
+    setParsedSummary(parsed.summary ?? null)
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -186,6 +188,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
       notes: fields.notes || null,
       cvDriveId: cvDriveId || undefined,
       cvOriginalName: cvOriginalName || undefined,
+      summary: parsedSummary,
       cvExperience: cvExperience ?? undefined,
       cvEducation: cvEducation ?? undefined,
       recruiterId: fields.recruiterId || null,

@@ -13,6 +13,10 @@ export interface ParsedCandidate {
   skills: string[]
   languages: string[]
   summary: string | null
+  experience: { title: string; company: string; startDate: string; endDate: string; bullets: string[] }[]
+  education: { degree: string; institution: string; year?: string }[]
+  cvDriveId: string | null
+  cvOriginalName: string | null
   duplicate: boolean
   existingId?: string
   error?: string

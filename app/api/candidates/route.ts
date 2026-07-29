@@ -19,6 +19,7 @@ const candidateSchema = z.object({
   cvOriginalName: z.string().optional().nullable(),
   cvExperience: z.array(z.any()).optional().nullable(),
   cvEducation: z.array(z.any()).optional().nullable(),
+  summary: z.string().optional().nullable(),
   desiredCompensation: z.number().optional().nullable(),
   minimumCompensation: z.number().optional().nullable(),
   sourcedByType: z.enum(['RECRUITER', 'VENDOR', 'OTHER']).optional().nullable(),
