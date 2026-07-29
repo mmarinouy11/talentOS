@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     include: {
       candidate: {
         select: {
-          id: true, firstName: true, lastName: true, summary: true,
+          id: true, firstName: true, lastName: true, country: true, summary: true,
           skills: true, languages: true, seniority: true, yearsOfExperience: true,
           cvExperience: true, cvEducation: true, cvDriveId: true,
         },
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     ? (candidate.cvEducation as unknown as CvEducationEntry[])
     : []
   let skills = candidate.skills
+  let summary = candidate.summary
 
   if (experience.length === 0 && candidate.cvDriveId) {
     try {
@@ -55,14 +56,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (Array.isArray(parsed.experience) && parsed.experience.length > 0) data.cvExperience = parsed.experience
       if (Array.isArray(parsed.education) && parsed.education.length > 0) data.cvEducation = parsed.education
       if (newSkills.length > 0) data.skills = mergedSkills
+      if (!candidate.summary && parsed.summary) data.summary = parsed.summary
 
       if (Object.keys(data).length > 0) {
-        await db.candidate.update({ where: { id: candidate.id }, data })
+        db.candidate.update({ where: { id: candidate.id }, data }).catch((err) => {
+          console.error(`[tenarai-cv] Failed to persist parsed CV for candidate ${candidate.id}:`, err)
+        })
       }
 
       if (Array.isArray(parsed.experience)) experience = parsed.experience
       if (Array.isArray(parsed.education)) education = parsed.education
       skills = mergedSkills
+      if (!candidate.summary && parsed.summary) summary = parsed.summary
     } catch (err) {
       console.error(`[tenarai-cv] On-demand parse failed for candidate ${candidate.id}:`, err)
     }
@@ -84,16 +89,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .map((s) => s.toLowerCase())
   )
 
-  const seniorityLabel = candidate.seniority
-    ? candidate.seniority.charAt(0) + candidate.seniority.slice(1).toLowerCase()
-    : null
-
   const html = renderTenoraiCv({
     anonymizedName,
     positionTitle: position.title,
-    seniority: seniorityLabel,
+    country: candidate.country,
+    seniority: null,
     yearsOfExperience: candidate.yearsOfExperience,
-    summary: candidate.summary,
+    summary,
     skills,
     matchingSkillSet,
     languages: candidate.languages,

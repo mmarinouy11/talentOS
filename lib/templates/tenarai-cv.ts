@@ -78,6 +78,7 @@ export interface CvEducationEntry {
 export interface TenoraiCvData {
   anonymizedName: string
   positionTitle: string
+  country: string | null
   seniority: string | null
   yearsOfExperience: number | null
   summary: string | null
@@ -169,12 +170,12 @@ function renderEducationSection(education: CvEducationEntry[]): string {
 }
 
 export function renderTenoraiCv(data: TenoraiCvData): string {
-  const { anonymizedName, positionTitle, seniority, yearsOfExperience, summary, skills, matchingSkillSet, languages, experience, education } = data
+  const { anonymizedName, positionTitle, country, yearsOfExperience, summary, skills, matchingSkillSet, languages, experience, education } = data
 
   const subtitle = [
-    `Postulación para: ${positionTitle}`,
-    seniority,
-    yearsOfExperience != null ? `${yearsOfExperience}+ años de experiencia` : null,
+    country,
+    `Applying for: ${positionTitle}`,
+    yearsOfExperience != null ? `${yearsOfExperience}+ years of experience` : null,
   ].filter(Boolean).join(' | ')
 
   const summaryHtml = summary
@@ -194,14 +195,14 @@ export function renderTenoraiCv(data: TenoraiCvData): string {
   const toolbar = `
     <div class="toolbar" style="position:fixed;top:0;left:0;right:0;z-index:999;background:${CARBON};display:flex;align-items:center;justify-content:space-between;padding:10px 24px;font-family:${FONT};">
       <span style="color:${VOLT};font-size:13px;font-weight:600;letter-spacing:1px;">Tenarai LATAM · CV Preview</span>
-      <button onclick="window.print()" style="background:${VOLT};color:${CARBON};border:none;padding:7px 18px;border-radius:4px;font-weight:700;font-size:13px;cursor:pointer;font-family:${FONT};">Download / Print PDF</button>
+      <button onclick="window.print()" style="background:${VOLT};color:${CARBON};border:none;padding:7px 18px;border-radius:4px;font-weight:700;font-size:13px;cursor:pointer;font-family:${FONT};">Download PDF</button>
     </div>
     <div class="toolbar-spacer" style="height:44px;"></div>`
 
   const footer = `
     <div style="margin-top:48px;padding-top:16px;border-top:1px solid ${LIGHT_BORDER};display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
       ${LOGO_SVG}
-      <span style="font-family:${FONT};font-size:11px;color:${WARM_GRAY};">Confidential — Presented by Tenarai LATAM | hr.latam@tenarai.com</span>
+      <span style="font-family:${FONT};font-size:11px;color:${WARM_GRAY};">Confidential — Presented by Tenarai LATAM</span>
     </div>`
 
   return `<!DOCTYPE html>
@@ -242,7 +243,6 @@ ${toolbar}
 
   ${footer}
 </div>
-<script>setTimeout(function(){ window.print(); }, 900);<\/script>
 </body>
 </html>`
 }
