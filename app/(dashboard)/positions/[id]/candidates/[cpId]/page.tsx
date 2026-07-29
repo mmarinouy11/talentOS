@@ -168,6 +168,14 @@ export default async function CandidateInPositionPage({
             fitScoredAt={cp.fitScoredAt?.toISOString() ?? null}
           />
 
+          {/* Position Notes */}
+          {cp.notes && (
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <h2 className="text-sm font-medium text-gray-900 mb-2">Position Notes</h2>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{cp.notes}</p>
+            </div>
+          )}
+
           {/* Budget Fit (read-only, monthly comparison) */}
           {(() => {
             const minMonthly = candidate.minimumCompensation
