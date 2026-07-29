@@ -889,6 +889,7 @@ function EditInterviewModal({
   candidatePositionId,
   positionTitle,
   clientName,
+  positionTimezone = 'America/Montevideo',
   onClose,
   onSaved,
   onInterviewCreated,
@@ -900,6 +901,7 @@ function EditInterviewModal({
   candidatePositionId: string
   positionTitle: string
   clientName: string
+  positionTimezone?: string
   onClose: () => void
   onSaved: (interview: Interview) => void
   onInterviewCreated: (interview: Interview) => void
@@ -1147,7 +1149,7 @@ function EditInterviewModal({
           {currentInterview.status === 'COMPLETED' ? (
             <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-sm text-gray-600 space-y-0.5">
               {currentInterview.scheduledAt && (
-                <p><span className="font-medium text-gray-700">Date: </span>{new Date(currentInterview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+                <p><span className="font-medium text-gray-700">Date: </span>{new Date(currentInterview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: positionTimezone, timeZoneName: 'short' })}</p>
               )}
               {currentInterview.durationMinutes && (
                 <p><span className="font-medium text-gray-700">Duration: </span>{currentInterview.durationMinutes} min</p>
@@ -1336,6 +1338,7 @@ export function InterviewsSection({
   candidateEmail,
   positionTitle,
   clientName,
+  positionTimezone = 'America/Montevideo',
   initialOpenInterviewId,
 }: {
   candidatePositionId: string
@@ -1343,6 +1346,7 @@ export function InterviewsSection({
   candidateEmail: string
   positionTitle: string
   clientName: string
+  positionTimezone?: string
   initialOpenInterviewId?: string
 }) {
   const [interviews, setInterviews] = useState<Interview[]>([])
@@ -1451,6 +1455,7 @@ export function InterviewsSection({
           candidatePositionId={candidatePositionId}
           positionTitle={positionTitle}
           clientName={clientName}
+          positionTimezone={positionTimezone}
           onClose={() => setEditing(null)}
           onSaved={(i) => { upsertInterview(i); setEditing(null) }}
           onInterviewCreated={(i) => { upsertInterview(i) }}

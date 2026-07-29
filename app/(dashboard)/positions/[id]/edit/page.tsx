@@ -60,6 +60,7 @@ export default async function EditPositionPage({
             vendorMinFitScore: position.vendorMinFitScore,
             directMinFitScore: position.directMinFitScore,
             talentId: position.talentId,
+            timezone: position.timezone,
             reportingEmails: position.reportingEmails,
             reportingDays: position.reportingDays,
           }}

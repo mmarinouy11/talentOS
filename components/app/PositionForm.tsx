@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import type { Role, Priority, PositionStatus } from '@prisma/client'
+import { RECRUITER_TIMEZONES } from '@/lib/timezone'
 
 export interface UserOption {
   id: string
@@ -62,6 +63,7 @@ interface PositionFormProps {
     vendorMinFitScore?: number | null
     directMinFitScore?: number | null
     talentId?: string | null
+    timezone?: string | null
     reportingEmails?: string[]
     reportingDays?: string[]
   }
@@ -89,6 +91,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
   const [globalVendorThreshold, setGlobalVendorThreshold] = useState<number>(70)
   const [globalDirectThreshold, setGlobalDirectThreshold] = useState<number>(30)
   const [dgmThreshold, setDgmThreshold] = useState<number>(0.4)
+  const [timezone, setTimezone] = useState<string>(defaultValues.timezone ?? 'America/Montevideo')
   const [reportingEmails, setReportingEmails] = useState<string[]>(defaultValues.reportingEmails ?? [])
   const [reportingEmailInput, setReportingEmailInput] = useState('')
   const [reportingEmailError, setReportingEmailError] = useState('')
@@ -184,6 +187,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
       vendorMinFitScore: vendorMinFitScore !== '' && !isNaN(parseInt(vendorMinFitScore)) ? parseInt(vendorMinFitScore) : null,
       directMinFitScore: directMinFitScore !== '' && !isNaN(parseInt(directMinFitScore)) ? parseInt(directMinFitScore) : null,
       talentId: (fd.get('talentId') as string) || null,
+      timezone,
       reportingEmails,
       reportingDays,
     }
@@ -425,6 +429,18 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             defaultValue={defaultValues.sales_contact_email ?? ''}
             placeholder="Optional"
           />
+        </div>
+        <div>
+          <Label htmlFor="timezone">Position Timezone</Label>
+          <Select
+            id="timezone"
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+          >
+            {RECRUITER_TIMEZONES.map((tz) => (
+              <option key={tz.value} value={tz.value}>{tz.label}</option>
+            ))}
+          </Select>
         </div>
       </div>
 

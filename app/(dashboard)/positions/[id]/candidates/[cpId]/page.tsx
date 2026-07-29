@@ -26,7 +26,7 @@ export default async function CandidateInPositionPage({
     where: { id: cpId },
     include: {
       candidate: true,
-      position: { select: { id: true, title: true, client: true, internalCostBudget: true, jdSkills: true, coreSkills: true } },
+      position: { select: { id: true, title: true, client: true, internalCostBudget: true, jdSkills: true, coreSkills: true, timezone: true } },
       recruiter: { select: { name: true, email: true } },
       stageHistory: {
         orderBy: { movedAt: 'desc' },
@@ -213,6 +213,7 @@ export default async function CandidateInPositionPage({
             candidateEmail={candidate.email}
             positionTitle={position.title}
             clientName={position.client}
+            positionTimezone={position.timezone ?? 'America/Montevideo'}
             initialOpenInterviewId={openInterview}
           />
 

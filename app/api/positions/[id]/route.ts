@@ -30,6 +30,7 @@ const patchSchema = z.object({
   screeningQuestions: z.array(z.string()).optional(),
   coreSkills: z.array(z.string()).optional(),
   talentId: z.string().optional().nullable(),
+  timezone: z.string().optional().nullable(),
   reportingEmails: z.array(z.string().email()).optional(),
   reportingDays: z.array(z.string()).optional(),
 })

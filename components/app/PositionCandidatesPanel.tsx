@@ -219,12 +219,13 @@ interface CandidatePosition {
 
 interface Props {
   positionId: string
+  positionTimezone?: string
   candidatePositions: CandidatePosition[]
   activeCandidates: number
   currentUserId?: string
 }
 
-export function PositionCandidatesPanel({ positionId, candidatePositions: initial, activeCandidates, currentUserId }: Props) {
+export function PositionCandidatesPanel({ positionId, positionTimezone = 'America/Montevideo', candidatePositions: initial, activeCandidates, currentUserId }: Props) {
   const [rows, setRows] = useState<CandidatePosition[]>(initial)
   const [showModal, setShowModal] = useState(false)
   const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
@@ -442,7 +443,7 @@ export function PositionCandidatesPanel({ positionId, candidatePositions: initia
                 <span className="text-xs text-gray-400">
                   {new Date(cp.latestInterviewScheduledAt).toLocaleString('en-US', {
                     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                    timeZone: 'UTC', timeZoneName: 'short',
+                    timeZone: positionTimezone, timeZoneName: 'short',
                   })}
                 </span>
               )}
