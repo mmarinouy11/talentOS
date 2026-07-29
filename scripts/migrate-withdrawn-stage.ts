@@ -14,7 +14,7 @@ import path from 'path'
 import { config } from 'dotenv'
 config({ path: path.resolve(process.cwd(), '.env.local') })
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Stage } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
 const db = new PrismaClient({ adapter: new PrismaPg(process.env.DATABASE_URL!) })
@@ -22,7 +22,7 @@ const apply = process.argv.includes('--apply')
 
 async function main() {
   const affected = await db.candidatePosition.findMany({
-    where: { status: 'WITHDRAWN', stage: { not: 'WITHDRAWN' } },
+    where: { status: 'WITHDRAWN', stage: { not: Stage.WITHDRAWN } },
     select: { id: true, stage: true, positionId: true },
   })
 
@@ -35,8 +35,8 @@ async function main() {
   }
 
   const result = await db.candidatePosition.updateMany({
-    where: { status: 'WITHDRAWN', stage: { not: 'WITHDRAWN' } },
-    data: { stage: 'WITHDRAWN' },
+    where: { status: 'WITHDRAWN', stage: { not: Stage.WITHDRAWN } },
+    data: { stage: Stage.WITHDRAWN },
   })
 
   console.log(`Updated ${result.count} records.`)
