@@ -31,16 +31,22 @@ const INTERVIEW_STAGE_ORDER: Record<string, number> = {
 }
 
 function pickLatestInterview(
-  interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null }[]
+  interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null }[],
+  cpStage: string
 ) {
   if (!interviews.length) return null
-  // If any round has decision=REJECT, show that one (decisive round).
-  const rejected = interviews.find((i) => i.decision === 'REJECT')
-  if (rejected) return rejected
-  // Otherwise show the interview at the highest stage.
-  return interviews.reduce((best, cur) =>
-    (INTERVIEW_STAGE_ORDER[cur.stage] ?? 0) >= (INTERVIEW_STAGE_ORDER[best.stage] ?? 0) ? cur : best
-  )
+  // If the candidate's current stage is a terminal or APPLIED stage, fall back
+  // to the most recent round (highest stage order), preferring a REJECT decision.
+  if (cpStage === 'APPLIED' || cpStage === 'REJECTED' || cpStage === 'WITHDRAWN' || cpStage === 'HIRED') {
+    const rejected = interviews.find((i) => i.decision === 'REJECT')
+    if (rejected) return rejected
+    return interviews.reduce((best, cur) =>
+      (INTERVIEW_STAGE_ORDER[cur.stage] ?? 0) >= (INTERVIEW_STAGE_ORDER[best.stage] ?? 0) ? cur : best
+    )
+  }
+  // For all active pipeline stages: only show a round that matches the
+  // candidate's current stage. If none exists, return null (show "—").
+  return interviews.find((i) => i.stage === cpStage) ?? null
 }
 
 function fmt(date: Date) {
@@ -302,9 +308,9 @@ export default async function PositionDetailPage({
           status: cp.status,
           fitScore: cp.fitScore,
           createdAt: cp.createdAt.toISOString(),
-          latestInterviewStatus: pickLatestInterview(cp.interviews)?.status ?? null,
-          latestInterviewDecision: pickLatestInterview(cp.interviews)?.decision ?? null,
-          latestInterviewScheduledAt: pickLatestInterview(cp.interviews)?.scheduledAt?.toISOString() ?? null,
+          latestInterviewStatus: pickLatestInterview(cp.interviews, cp.stage)?.status ?? null,
+          latestInterviewDecision: pickLatestInterview(cp.interviews, cp.stage)?.decision ?? null,
+          latestInterviewScheduledAt: pickLatestInterview(cp.interviews, cp.stage)?.scheduledAt?.toISOString() ?? null,
           compensationOutOfRange:
             cp.candidate.minimumCompensation != null && position.internalCostBudget != null
               ? cp.candidate.minimumCompensation > hourlyToMonthly(position.internalCostBudget, hoursBaseline)
