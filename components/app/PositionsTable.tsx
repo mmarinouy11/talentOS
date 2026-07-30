@@ -217,9 +217,6 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
                     <td className="px-4 py-3 text-right text-gray-600">{p._partners > 0 ? p._partners : '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <Link href={`/positions/${p.id}/edit`} onClick={(e) => e.stopPropagation()}>
-                          <Button variant="outline" size="sm">Edit</Button>
-                        </Link>
                         {isAdmin && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(p) }}

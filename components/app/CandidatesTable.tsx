@@ -260,9 +260,6 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
                   <td className="px-4 py-3 text-right text-gray-600">{c._count.candidatePositions}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
-                      <Link href={`/candidates/${c.id}/edit`} onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm">Edit</Button>
-                      </Link>
                       <button onClick={(e) => { e.stopPropagation(); handleDelete(c) }} disabled={deleting === c.id} className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40" title="Delete candidate">
                         <TrashIcon />
                       </button>
