@@ -68,6 +68,7 @@ export async function runReportingCron() {
               decision: true,
               decidedAt: true,
               roundLabel: true,
+              decisionNotes: true,
             },
             orderBy: { decidedAt: 'desc' },
           },
@@ -141,6 +142,7 @@ type InterviewEntry = {
   decision: InterviewDecision | null
   decidedAt: Date | null
   roundLabel: string
+  decisionNotes: string | null
 }
 
 type CandidatePositionFull = {
@@ -190,12 +192,12 @@ function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): 
       }
     }
 
-    const decisions: { name: string; decision: InterviewDecision; roundLabel: string }[] = []
+    const decisions: { name: string; decision: InterviewDecision; roundLabel: string; decisionNotes: string | null }[] = []
     for (const cp of allCPs) {
       const name = `${cp.candidate.firstName} ${cp.candidate.lastName}`
       for (const iv of cp.interviews) {
         if (iv.decision && iv.decidedAt && iv.decidedAt >= lastSentAt) {
-          decisions.push({ name, decision: iv.decision, roundLabel: iv.roundLabel })
+          decisions.push({ name, decision: iv.decision, roundLabel: iv.roundLabel, decisionNotes: iv.decisionNotes })
         }
       }
     }
@@ -224,7 +226,7 @@ function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): 
 
       if (decisions.length > 0) {
         const rows = decisions
-          .map((d) => `<li style="margin:2px 0;color:#374151;">${d.name}: <span style="color:#6b7280;">${DECISION_LABELS[d.decision]} (${d.roundLabel})</span></li>`)
+          .map((d) => `<li style="margin:2px 0;color:#374151;">${d.name}: <span style="color:#6b7280;">${DECISION_LABELS[d.decision]} (${d.roundLabel})${d.decisionNotes ? ` — Note: ${d.decisionNotes}` : ''}</span></li>`)
           .join('')
         parts.push(`<p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:13px;">Decisions made:</p><ul style="margin:0 0 12px;padding-left:20px;">${rows}</ul>`)
       }
@@ -242,7 +244,7 @@ function buildReportEmailHtml(position: PositionFull, lastSentAt: Date | null): 
     byStage.set(cp.stage, arr)
   }
 
-  const stageRowsHtml = STAGE_SEQUENCE
+  const stageRowsHtml = [...STAGE_SEQUENCE].reverse()
     .filter((s) => byStage.has(s))
     .map((s) => {
       const cps = byStage.get(s)!
