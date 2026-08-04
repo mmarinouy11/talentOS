@@ -1401,7 +1401,15 @@ export function InterviewsSection({
         <p className="text-sm text-gray-400">No interview rounds yet.</p>
       ) : (
         <div className="space-y-3">
-          {interviews.map((interview) => (
+          {[...interviews].sort((a, b) => {
+            const stageOrder: Record<string, number> = {
+              APPLIED: 0, SCREENING: 1, TECHNICAL_INTERVIEW: 2, MANAGER_INTERVIEW: 3,
+              CLIENT_INTERVIEW: 4, OFFER: 5, HIRED: 6,
+            }
+            const stageDiff = (stageOrder[a.stage] ?? 99) - (stageOrder[b.stage] ?? 99)
+            if (stageDiff !== 0) return stageDiff
+            return a.roundNumber - b.roundNumber
+          }).map((interview) => (
             <div key={interview.id} className="border border-gray-100 rounded-lg p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -1417,14 +1425,13 @@ export function InterviewsSection({
                       </span>
                     )}
                   </div>
-                  {interview.calendarLinkUsed && (
-                    <p className="text-xs text-blue-600 mt-1 break-all">Calendar link: {interview.calendarLinkUsed}</p>
+                  {interview.scheduledAt && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(interview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </p>
                   )}
-                  {interview.proposedSlots.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">Slots: {interview.proposedSlots.map(formatSlot).join(' · ')}</p>
-                  )}
-                  {interview.feedbackText && (
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">{interview.feedbackText}</p>
+                  {interview.interviewerEmail && (
+                    <p className="text-xs text-gray-500 mt-1">{interview.interviewerEmail}</p>
                   )}
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => setEditing(interview)}>Edit</Button>
