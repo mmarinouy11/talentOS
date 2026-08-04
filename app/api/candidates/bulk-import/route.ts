@@ -49,7 +49,7 @@ async function processJob(
         const fileName = entry.entryName.split('/').pop() ?? entry.entryName
         const fallback = {
           fileName,
-          firstName: null, lastName: null, email: null, phone: null,
+          firstName: null, lastName: null, email: `unknown@import.linkedin.com`, phone: null,
           country: null, linkedinUrl: null, seniority: null,
           yearsOfExperience: null, skills: [], languages: [], summary: null,
           experience: [], education: [], cvDriveId: null, cvOriginalName: null,
