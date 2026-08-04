@@ -103,7 +103,7 @@ function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
 }
 
 function PositionCard({ pos }: { pos: PositionData }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
