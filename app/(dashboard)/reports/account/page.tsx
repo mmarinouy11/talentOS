@@ -12,16 +12,19 @@ const STAGE_COLORS: Record<string, string> = {
   'Applied':             'bg-gray-100 text-gray-700',
 }
 
+// Ordered most-advanced first (HIRED excluded from cross-position summary)
+const SUMMARY_STAGE_ORDER = [
+  'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW',
+  'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED',
+]
+
 interface CandidateEntry { name: string; daysInStage: number }
 interface PipelineStage  { stage: string; label: string; count: number; candidates: CandidateEntry[] }
-interface Movement       { name: string; source?: string; from?: string; to?: string; decision?: string; roundLabel?: string; notes?: string | null }
 interface PositionData {
   id: string; title: string; recruiter: string
-  vendorMinFitScore: number | null; directMinFitScore: number | null
   partners: string[]
   totalCandidates: number; activeCandidates: number; notMovingForward: number
   pipeline: PipelineStage[]
-  movements: { newCandidates: Movement[]; stageChanges: Movement[]; decisions: Movement[] }
 }
 interface AccountData {
   client: string; totalPositions: number; totalActive: number; totalNotMoving: number
@@ -36,16 +39,60 @@ function AgingBadge({ days }: { days: number }) {
   return <span className={`text-xs ${cls}`}>({days === 0 ? 'today' : `${days}d`})</span>
 }
 
+function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
+  // Build a map: stage → [{name, positionTitle}]
+  const byStage = new Map<string, { name: string; positionTitle: string }[]>()
+  for (const pos of positions) {
+    for (const s of pos.pipeline) {
+      if (!byStage.has(s.stage)) byStage.set(s.stage, [])
+      for (const c of s.candidates) {
+        byStage.get(s.stage)!.push({ name: c.name, positionTitle: pos.title })
+      }
+    }
+  }
+
+  const stagesWithCandidates = SUMMARY_STAGE_ORDER.filter((s) => byStage.has(s))
+  if (stagesWithCandidates.length === 0) return null
+
+  // Find a label for each stage from position pipeline data
+  const stageLabel = (stage: string) => {
+    for (const pos of positions) {
+      const found = pos.pipeline.find((s) => s.stage === stage)
+      if (found) return found.label
+    }
+    return stage
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 className="text-sm font-semibold text-gray-900 mb-4">All Candidates by Stage</h2>
+      <div className="space-y-3">
+        {stagesWithCandidates.map((stage) => {
+          const label = stageLabel(stage)
+          const candidates = byStage.get(stage)!
+          return (
+            <div key={stage} className="flex items-start gap-3">
+              <span className={`shrink-0 mt-0.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_COLORS[label] ?? 'bg-gray-100 text-gray-700'}`}>
+                {label} ({candidates.length})
+              </span>
+              <span className="text-sm text-gray-700 leading-snug">
+                {candidates.map((c, i) => (
+                  <span key={i}>{i > 0 && ', '}{c.name} <span className="text-gray-400 text-xs">({c.positionTitle})</span></span>
+                ))}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function PositionCard({ pos }: { pos: PositionData }) {
   const [open, setOpen] = useState(true)
-  const hasMovements =
-    pos.movements.newCandidates.length > 0 ||
-    pos.movements.stageChanges.length > 0 ||
-    pos.movements.decisions.length > 0
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Card header */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
@@ -67,8 +114,7 @@ function PositionCard({ pos }: { pos: PositionData }) {
       </button>
 
       {open && (
-        <div className="px-5 pb-5 space-y-5 border-t border-gray-100">
-          {/* Pipeline breakdown */}
+        <div className="px-5 pb-5 border-t border-gray-100">
           {pos.pipeline.length === 0 ? (
             <p className="text-sm text-gray-400 pt-4">No active candidates.</p>
           ) : (
@@ -88,64 +134,12 @@ function PositionCard({ pos }: { pos: PositionData }) {
             </div>
           )}
 
-          {/* Meta row: partners + thresholds */}
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm pt-1 border-t border-gray-100">
-            <div>
+          {pos.partners.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-100 text-sm">
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1.5">Partners</span>
-              <span className="text-gray-700">{pos.partners.length > 0 ? pos.partners.join(', ') : '—'}</span>
+              <span className="text-gray-700">{pos.partners.join(', ')}</span>
             </div>
-            <div>
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1.5">Vendor min score</span>
-              <span className="text-gray-700">{pos.vendorMinFitScore != null ? `${pos.vendorMinFitScore}%` : 'default'}</span>
-            </div>
-            <div>
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1.5">Direct min score</span>
-              <span className="text-gray-700">{pos.directMinFitScore != null ? `${pos.directMinFitScore}%` : 'default'}</span>
-            </div>
-          </div>
-
-          {/* Recent activity */}
-          <div className="border-t border-gray-100 pt-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent Activity (last 7 days)</p>
-            {!hasMovements ? (
-              <p className="text-sm text-gray-400">No recent activity.</p>
-            ) : (
-              <div className="space-y-3 text-sm">
-                {pos.movements.newCandidates.length > 0 && (
-                  <div>
-                    <p className="font-medium text-gray-700 mb-1">New candidates added</p>
-                    <ul className="space-y-0.5 pl-3">
-                      {pos.movements.newCandidates.map((m, i) => (
-                        <li key={i} className="text-gray-600">{m.name} <span className="text-gray-400">({m.source})</span></li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {pos.movements.stageChanges.length > 0 && (
-                  <div>
-                    <p className="font-medium text-gray-700 mb-1">Stage changes</p>
-                    <ul className="space-y-0.5 pl-3">
-                      {pos.movements.stageChanges.map((m, i) => (
-                        <li key={i} className="text-gray-600">{m.name}: <span className="text-gray-500">{m.from} → {m.to}</span></li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {pos.movements.decisions.length > 0 && (
-                  <div>
-                    <p className="font-medium text-gray-700 mb-1">Decisions made</p>
-                    <ul className="space-y-0.5 pl-3">
-                      {pos.movements.decisions.map((m, i) => (
-                        <li key={i} className="text-gray-600">
-                          {m.name}: <span className="text-gray-500">{m.decision} ({m.roundLabel}){m.notes ? ` — ${m.notes}` : ''}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       )}
     </div>
@@ -187,7 +181,6 @@ export default function AccountStatusPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Account Status</h1>
@@ -200,7 +193,6 @@ export default function AccountStatusPage() {
         )}
       </div>
 
-      {/* Account selector */}
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-gray-700 shrink-0">Select Account</label>
         <select
@@ -224,14 +216,12 @@ export default function AccountStatusPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {/* Empty state */}
       {!selectedClient && !loading && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 px-8 py-16 text-center">
           <p className="text-gray-500 text-sm">Select an account to view its pipeline status.</p>
         </div>
       )}
 
-      {/* Account summary + positions */}
       {data && !loading && (
         <div className="space-y-4">
           {/* Summary bar */}
@@ -257,7 +247,13 @@ export default function AccountStatusPage() {
           {data.positions.length === 0 ? (
             <p className="text-sm text-gray-500">No open positions for this account.</p>
           ) : (
-            data.positions.map((pos) => <PositionCard key={pos.id} pos={pos} />)
+            <>
+              {/* Cross-position summary — only when multiple positions */}
+              {data.positions.length > 1 && (
+                <CrossPositionSummary positions={data.positions} />
+              )}
+              {data.positions.map((pos) => <PositionCard key={pos.id} pos={pos} />)}
+            </>
           )}
         </div>
       )}
