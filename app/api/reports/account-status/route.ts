@@ -105,9 +105,10 @@ export async function GET(request: Request) {
     })
 
     // Group by date (YYYY-MM-DD in UTC) then by positionId
+    // decisions keyed by "DECISION|STAGE_ABBREV" to support per-stage breakdown
     const dayMap = new Map<string, Map<string, {
       scheduledByStage: Map<string, number>
-      decidedByDecision: Map<string, number>
+      decidedByKey: Map<string, { decision: string; stage: string; count: number }>
     }>>()
 
     for (const iv of interviews) {
@@ -123,7 +124,7 @@ export async function GET(request: Request) {
       for (const day of activityDates) {
         if (!dayMap.has(day)) dayMap.set(day, new Map())
         const posDay = dayMap.get(day)!
-        if (!posDay.has(posId)) posDay.set(posId, { scheduledByStage: new Map(), decidedByDecision: new Map() })
+        if (!posDay.has(posId)) posDay.set(posId, { scheduledByStage: new Map(), decidedByKey: new Map() })
         const entry = posDay.get(posId)!
 
         // Count scheduled (scheduledAt on this day)
@@ -132,12 +133,18 @@ export async function GET(request: Request) {
           entry.scheduledByStage.set(abbrev, (entry.scheduledByStage.get(abbrev) ?? 0) + 1)
         }
 
-        // Count decisions (decidedAt or updatedAt on this day, only when decision exists)
-        if (iv.decision) {
+        // Count decisions grouped by (decision, stage)
+        if (iv.decision && iv.stage) {
           const decidedDay = (iv.decidedAt ?? iv.updatedAt).toISOString().slice(0, 10)
           if (decidedDay === day) {
-            const dec = iv.decision
-            entry.decidedByDecision.set(dec, (entry.decidedByDecision.get(dec) ?? 0) + 1)
+            const stageAbbrev = STAGE_ABBREV[iv.stage] ?? iv.stage
+            const key = `${iv.decision}|${stageAbbrev}`
+            const existing = entry.decidedByKey.get(key)
+            if (existing) {
+              existing.count++
+            } else {
+              entry.decidedByKey.set(key, { decision: iv.decision, stage: stageAbbrev, count: 1 })
+            }
           }
         }
       }
@@ -152,7 +159,7 @@ export async function GET(request: Request) {
           posId,
           title: posMap.get(posId) ?? posId,
           scheduled: [...entry.scheduledByStage.entries()].map(([stage, count]) => ({ stage, count })),
-          decisions: [...entry.decidedByDecision.entries()].map(([decision, count]) => ({ decision, count })),
+          decisions: [...entry.decidedByKey.values()],
         })),
       }))
 

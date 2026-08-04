@@ -35,7 +35,7 @@ interface AccountData {
 
 // Activity Feed types
 interface ActivityScheduled { stage: string; count: number }
-interface ActivityDecision  { decision: string; count: number }
+interface ActivityDecision  { decision: string; stage: string; count: number }
 interface ActivityPosition  { posId: string; title: string; scheduled: ActivityScheduled[]; decisions: ActivityDecision[] }
 interface ActivityDay       { date: string; positions: ActivityPosition[] }
 interface ActivityData      { client: string; days: ActivityDay[]; generatedAt: string }
@@ -68,10 +68,11 @@ function fmtDate(dateStr: string) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-function DecisionBadge({ decision, count }: { decision: string; count: number }) {
-  if (decision === 'ADVANCE') return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-700"><span>✓</span><span>{count} Advance</span></span>
-  if (decision === 'REJECT')  return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-red-600"><span>✗</span><span>{count} Reject</span></span>
-  return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-600"><span>⏸</span><span>{count} Hold</span></span>
+function DecisionBadge({ decision, stage, count }: { decision: string; stage: string; count: number }) {
+  const label = `${count} ${decision === 'ADVANCE' ? 'Advance' : decision === 'REJECT' ? 'Reject' : 'Hold'} (${stage})`
+  if (decision === 'ADVANCE') return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-700"><span>✓</span><span>{label}</span></span>
+  if (decision === 'REJECT')  return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-red-600"><span>✗</span><span>{label}</span></span>
+  return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-600"><span>⏸</span><span>{label}</span></span>
 }
 
 function AgingBadge({ days }: { days: number }) {
@@ -321,7 +322,7 @@ function ActivityFeed({
                           <span key={s.stage} className="text-gray-500">{s.stage}: <span className="font-medium text-gray-800">{s.count}</span></span>
                         ))}
                         {pos.decisions.map((d) => (
-                          <DecisionBadge key={d.decision} decision={d.decision} count={d.count} />
+                          <DecisionBadge key={`${d.decision}|${d.stage}`} decision={d.decision} stage={d.stage} count={d.count} />
                         ))}
                       </div>
                     </div>
