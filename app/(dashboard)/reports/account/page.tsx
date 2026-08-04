@@ -33,6 +33,47 @@ interface AccountData {
   generatedAt: string
 }
 
+// Activity Feed types
+interface ActivityScheduled { stage: string; count: number }
+interface ActivityDecision  { decision: string; count: number }
+interface ActivityPosition  { posId: string; title: string; scheduled: ActivityScheduled[]; decisions: ActivityDecision[] }
+interface ActivityDay       { date: string; positions: ActivityPosition[] }
+interface ActivityData      { client: string; days: ActivityDay[]; generatedAt: string }
+
+type Period = 'today' | 'yesterday' | 'last7' | 'custom'
+
+function periodDates(period: Period, customFrom: string, customTo: string): { from: string; to: string } {
+  const now = new Date()
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x }
+  const endOfDay   = (d: Date) => { const x = new Date(d); x.setHours(23,59,59,999); return x }
+  if (period === 'today') {
+    return { from: startOfDay(now).toISOString(), to: endOfDay(now).toISOString() }
+  }
+  if (period === 'yesterday') {
+    const y = new Date(now); y.setDate(y.getDate() - 1)
+    return { from: startOfDay(y).toISOString(), to: endOfDay(y).toISOString() }
+  }
+  if (period === 'last7') {
+    const y = new Date(now); y.setDate(y.getDate() - 6)
+    return { from: startOfDay(y).toISOString(), to: endOfDay(now).toISOString() }
+  }
+  // custom
+  return {
+    from: customFrom ? new Date(customFrom + 'T00:00:00').toISOString() : startOfDay(now).toISOString(),
+    to:   customTo   ? new Date(customTo   + 'T23:59:59').toISOString() : endOfDay(now).toISOString(),
+  }
+}
+
+function fmtDate(dateStr: string) {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function DecisionBadge({ decision, count }: { decision: string; count: number }) {
+  if (decision === 'ADVANCE') return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-700"><span>✓</span><span>{count} Advance</span></span>
+  if (decision === 'REJECT')  return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-red-600"><span>✗</span><span>{count} Reject</span></span>
+  return <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-600"><span>⏸</span><span>{count} Hold</span></span>
+}
+
 function AgingBadge({ days }: { days: number }) {
   const cls = days >= 14 ? 'text-red-600 font-semibold'
     : days >= 7  ? 'text-amber-600'
@@ -41,7 +82,6 @@ function AgingBadge({ days }: { days: number }) {
 }
 
 function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
-  // Build: stage → Map<positionTitle, {posId, entries: {cpId, name}[]}
   const byStage = new Map<string, Map<string, { posId: string; entries: { cpId: string; name: string }[] }>>()
   for (const pos of positions) {
     for (const s of pos.pipeline) {
@@ -163,12 +203,151 @@ function PositionCard({ pos }: { pos: PositionData }) {
   )
 }
 
+function ActivityFeed({
+  client,
+  period,
+  setPeriod,
+  customFrom,
+  setCustomFrom,
+  customTo,
+  setCustomTo,
+}: {
+  client: string
+  period: Period
+  setPeriod: (p: Period) => void
+  customFrom: string
+  setCustomFrom: (s: string) => void
+  customTo: string
+  setCustomTo: (s: string) => void
+}) {
+  const [data, setData] = useState<ActivityData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    if (!client) return
+    setLoading(true); setError(null)
+    const { from, to } = periodDates(period, customFrom, customTo)
+    try {
+      const res = await fetch(`/api/reports/account-status?client=${encodeURIComponent(client)}&mode=activity&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      if (!res.ok) throw new Error('Failed to load')
+      setData(await res.json())
+    } catch {
+      setError('Failed to load activity data')
+    } finally {
+      setLoading(false)
+    }
+  }, [client, period, customFrom, customTo])
+
+  useEffect(() => { if (client) load() }, [client, load])
+
+  if (!client) return null
+
+  const PERIODS: { key: Period; label: string }[] = [
+    { key: 'today',     label: 'Today' },
+    { key: 'yesterday', label: 'Yesterday' },
+    { key: 'last7',     label: 'Last 7 days' },
+    { key: 'custom',    label: 'Custom' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Period selector */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`px-3 py-1.5 text-sm transition-colors ${period === p.key ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {period === 'custom' && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <span className="text-sm text-gray-500">to</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+            />
+            <button
+              onClick={load}
+              className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        )}
+        {loading && <span className="text-sm text-gray-400">Loading…</span>}
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {data && !loading && (
+        data.days.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-8 py-12 text-center">
+            <p className="text-gray-500 text-sm">No interview activity in this period.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {data.days.map((day) => (
+              <div key={day.date} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
+                  <span className="text-sm font-semibold text-gray-900">{fmtDate(day.date)}</span>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {day.positions.map((pos) => (
+                    <div key={pos.posId} className="px-5 py-3 flex items-start gap-4 flex-wrap">
+                      <Link
+                        href={`/positions/${pos.posId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-gray-900 hover:underline underline-offset-2 shrink-0 min-w-[160px]"
+                      >
+                        {pos.title}
+                      </Link>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                        {pos.scheduled.map((s) => (
+                          <span key={s.stage} className="text-gray-500">{s.stage}: <span className="font-medium text-gray-800">{s.count}</span></span>
+                        ))}
+                        {pos.decisions.map((d) => (
+                          <DecisionBadge key={d.decision} decision={d.decision} count={d.count} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  )
+}
+
 export default function AccountStatusPage() {
   const [clients, setClients] = useState<string[]>([])
   const [selectedClient, setSelectedClient] = useState('')
-  const [data, setData] = useState<AccountData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [tab, setTab] = useState<'pipeline' | 'activity'>('pipeline')
+  const [pipelineData, setPipelineData] = useState<AccountData | null>(null)
+  const [pipelineLoading, setPipelineLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Activity period state lifted up so it survives tab switches
+  const [period, setPeriod] = useState<Period>('today')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   useEffect(() => {
     fetch('/api/reports/account-status')
@@ -177,23 +356,29 @@ export default function AccountStatusPage() {
       .catch(() => setError('Failed to load client list'))
   }, [])
 
-  const load = useCallback(async (client: string) => {
-    if (!client) { setData(null); return }
-    setLoading(true); setError(null)
+  const loadPipeline = useCallback(async (client: string) => {
+    if (!client) { setPipelineData(null); return }
+    setPipelineLoading(true); setError(null)
     try {
       const res = await fetch(`/api/reports/account-status?client=${encodeURIComponent(client)}`)
       if (!res.ok) throw new Error('Failed to load')
-      setData(await res.json())
+      setPipelineData(await res.json())
     } catch {
       setError('Failed to load account data')
     } finally {
-      setLoading(false)
+      setPipelineLoading(false)
     }
   }, [])
 
   const handleSelect = (client: string) => {
     setSelectedClient(client)
-    load(client)
+    setPipelineData(null)
+    if (tab === 'pipeline') loadPipeline(client)
+  }
+
+  const handleTabChange = (t: 'pipeline' | 'activity') => {
+    setTab(t)
+    if (t === 'pipeline' && selectedClient && !pipelineData) loadPipeline(selectedClient)
   }
 
   return (
@@ -203,13 +388,14 @@ export default function AccountStatusPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Account Status</h1>
           <p className="text-sm text-gray-500 mt-0.5">Live pipeline view per client</p>
         </div>
-        {data && (
+        {pipelineData && tab === 'pipeline' && (
           <p className="text-xs text-gray-400 mt-1">
-            Last updated: {new Date(data.generatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            Last updated: {new Date(pipelineData.generatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
           </p>
         )}
       </div>
 
+      {/* Account selector */}
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-gray-700 shrink-0">Select Account</label>
         <select
@@ -220,10 +406,10 @@ export default function AccountStatusPage() {
           <option value="">— Choose a client —</option>
           {clients.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        {loading && <span className="text-sm text-gray-400">Loading…</span>}
-        {selectedClient && !loading && (
+        {pipelineLoading && <span className="text-sm text-gray-400">Loading…</span>}
+        {selectedClient && !pipelineLoading && tab === 'pipeline' && (
           <button
-            onClick={() => load(selectedClient)}
+            onClick={() => loadPipeline(selectedClient)}
             className="text-sm text-gray-500 hover:text-gray-900 underline underline-offset-2"
           >
             Refresh
@@ -233,46 +419,84 @@ export default function AccountStatusPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {!selectedClient && !loading && (
+      {!selectedClient && !pipelineLoading && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 px-8 py-16 text-center">
-          <p className="text-gray-500 text-sm">Select an account to view its pipeline status.</p>
+          <p className="text-gray-500 text-sm">Select an account to view its status.</p>
         </div>
       )}
 
-      {data && !loading && (
-        <div className="space-y-4">
-          {/* Summary bar */}
-          <div className="bg-white rounded-xl border border-gray-200 px-5 py-4 flex flex-wrap gap-6">
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Account</p>
-              <p className="text-lg font-semibold text-gray-900 mt-0.5">{data.client}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Open Positions</p>
-              <p className="text-lg font-semibold text-gray-900 mt-0.5">{data.totalPositions}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Candidates</p>
-              <p className="text-lg font-semibold text-green-700 mt-0.5">{data.totalActive}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Not Moving Forward</p>
-              <p className="text-lg font-semibold text-gray-400 mt-0.5">{data.totalNotMoving}</p>
-            </div>
+      {selectedClient && (
+        <>
+          {/* Tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex gap-6">
+              {(['pipeline', 'activity'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => handleTabChange(t)}
+                  className={`pb-3 text-sm font-medium border-b-2 transition-colors ${tab === t ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                >
+                  {t === 'pipeline' ? 'Pipeline' : 'Activity Feed'}
+                </button>
+              ))}
+            </nav>
           </div>
 
-          {data.positions.length === 0 ? (
-            <p className="text-sm text-gray-500">No open positions for this account.</p>
-          ) : (
-            <>
-              {/* Cross-position summary — only when multiple positions */}
-              {data.positions.length > 1 && (
-                <CrossPositionSummary positions={data.positions} />
-              )}
-              {data.positions.map((pos) => <PositionCard key={pos.id} pos={pos} />)}
-            </>
+          {/* Pipeline tab */}
+          {tab === 'pipeline' && (
+            pipelineData && !pipelineLoading ? (
+              <div className="space-y-4">
+                {/* Summary bar */}
+                <div className="bg-white rounded-xl border border-gray-200 px-5 py-4 flex flex-wrap gap-6">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Account</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-0.5">{pipelineData.client}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Open Positions</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-0.5">{pipelineData.totalPositions}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Candidates</p>
+                    <p className="text-lg font-semibold text-green-700 mt-0.5">{pipelineData.totalActive}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Not Moving Forward</p>
+                    <p className="text-lg font-semibold text-gray-400 mt-0.5">{pipelineData.totalNotMoving}</p>
+                  </div>
+                </div>
+
+                {pipelineData.positions.length === 0 ? (
+                  <p className="text-sm text-gray-500">No open positions for this account.</p>
+                ) : (
+                  <>
+                    {pipelineData.positions.length > 1 && (
+                      <CrossPositionSummary positions={pipelineData.positions} />
+                    )}
+                    {pipelineData.positions.map((pos) => <PositionCard key={pos.id} pos={pos} />)}
+                  </>
+                )}
+              </div>
+            ) : pipelineLoading ? null : (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-8 py-16 text-center">
+                <p className="text-gray-500 text-sm">Loading pipeline data…</p>
+              </div>
+            )
           )}
-        </div>
+
+          {/* Activity Feed tab */}
+          {tab === 'activity' && (
+            <ActivityFeed
+              client={selectedClient}
+              period={period}
+              setPeriod={setPeriod}
+              customFrom={customFrom}
+              setCustomFrom={setCustomFrom}
+              customTo={customTo}
+              setCustomTo={setCustomTo}
+            />
+          )}
+        </>
       )}
     </div>
   )

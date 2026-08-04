@@ -38,7 +38,15 @@ function sourceLabel(type: SourceType | null): string {
   return 'Internal'
 }
 
-// GET /api/reports/account-status?client=CLIENT_NAME
+const STAGE_ABBREV: Partial<Record<Stage, string>> = {
+  SCREENING: 'Screen',
+  TECHNICAL_INTERVIEW: 'Tech',
+  MANAGER_INTERVIEW: 'Manager',
+  CLIENT_INTERVIEW: 'Client',
+  OFFER: 'Offer',
+}
+
+// GET /api/reports/account-status?client=CLIENT_NAME[&mode=activity&from=ISO&to=ISO]
 // Returns list of unique clients when client param is omitted
 export async function GET(request: Request) {
   const session = await auth()
@@ -46,6 +54,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const client = searchParams.get('client')
+  const mode = searchParams.get('mode') // 'pipeline' (default) | 'activity'
 
   // No client param → return list of unique clients
   if (!client) {
@@ -56,6 +65,98 @@ export async function GET(request: Request) {
       orderBy: { client: 'asc' },
     })
     return NextResponse.json({ clients: positions.map((p) => p.client) })
+  }
+
+  // Activity mode
+  if (mode === 'activity') {
+    const fromParam = searchParams.get('from')
+    const toParam = searchParams.get('to')
+    const fromDate = fromParam ? new Date(fromParam) : new Date(new Date().setHours(0, 0, 0, 0))
+    const toDate = toParam ? new Date(toParam) : new Date(new Date().setHours(23, 59, 59, 999))
+
+    const positions = await db.position.findMany({
+      where: { client, deletedAt: null },
+      select: { id: true, title: true },
+    })
+    const positionIds = positions.map((p) => p.id)
+    const posMap = new Map(positions.map((p) => [p.id, p.title]))
+
+    if (positionIds.length === 0) {
+      return NextResponse.json({ client, days: [], generatedAt: new Date().toISOString() })
+    }
+
+    const interviews = await db.interview.findMany({
+      where: {
+        candidatePosition: { positionId: { in: positionIds } },
+        OR: [
+          { scheduledAt: { gte: fromDate, lte: toDate } },
+          { updatedAt: { gte: fromDate, lte: toDate } },
+        ],
+      },
+      select: {
+        id: true,
+        stage: true,
+        decision: true,
+        decidedAt: true,
+        updatedAt: true,
+        scheduledAt: true,
+        candidatePosition: { select: { positionId: true } },
+      },
+    })
+
+    // Group by date (YYYY-MM-DD in UTC) then by positionId
+    const dayMap = new Map<string, Map<string, {
+      scheduledByStage: Map<string, number>
+      decidedByDecision: Map<string, number>
+    }>>()
+
+    for (const iv of interviews) {
+      const posId = iv.candidatePosition.positionId
+      const activityDates = new Set<string>()
+      if (iv.scheduledAt) {
+        const d = iv.scheduledAt.toISOString().slice(0, 10)
+        if (iv.scheduledAt >= fromDate && iv.scheduledAt <= toDate) activityDates.add(d)
+      }
+      const updatedDay = iv.updatedAt.toISOString().slice(0, 10)
+      if (iv.updatedAt >= fromDate && iv.updatedAt <= toDate) activityDates.add(updatedDay)
+
+      for (const day of activityDates) {
+        if (!dayMap.has(day)) dayMap.set(day, new Map())
+        const posDay = dayMap.get(day)!
+        if (!posDay.has(posId)) posDay.set(posId, { scheduledByStage: new Map(), decidedByDecision: new Map() })
+        const entry = posDay.get(posId)!
+
+        // Count scheduled (scheduledAt on this day)
+        if (iv.scheduledAt && iv.scheduledAt.toISOString().slice(0, 10) === day && iv.stage) {
+          const abbrev = STAGE_ABBREV[iv.stage] ?? iv.stage
+          entry.scheduledByStage.set(abbrev, (entry.scheduledByStage.get(abbrev) ?? 0) + 1)
+        }
+
+        // Count decisions (decidedAt or updatedAt on this day, only when decision exists)
+        if (iv.decision) {
+          const decidedDay = (iv.decidedAt ?? iv.updatedAt).toISOString().slice(0, 10)
+          if (decidedDay === day) {
+            const dec = iv.decision
+            entry.decidedByDecision.set(dec, (entry.decidedByDecision.get(dec) ?? 0) + 1)
+          }
+        }
+      }
+    }
+
+    // Build sorted days (most recent first)
+    const days = [...dayMap.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, posMap2]) => ({
+        date,
+        positions: [...posMap2.entries()].map(([posId, entry]) => ({
+          posId,
+          title: posMap.get(posId) ?? posId,
+          scheduled: [...entry.scheduledByStage.entries()].map(([stage, count]) => ({ stage, count })),
+          decisions: [...entry.decidedByDecision.entries()].map(([decision, count]) => ({ decision, count })),
+        })),
+      }))
+
+    return NextResponse.json({ client, days, generatedAt: new Date().toISOString() })
   }
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
