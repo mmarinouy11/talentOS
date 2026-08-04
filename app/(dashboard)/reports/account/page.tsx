@@ -40,21 +40,20 @@ function AgingBadge({ days }: { days: number }) {
 }
 
 function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
-  // Build a map: stage → [{name, positionTitle}]
-  const byStage = new Map<string, { name: string; positionTitle: string }[]>()
+  // Build: stage → Map<positionTitle, name[]>
+  const byStage = new Map<string, Map<string, string[]>>()
   for (const pos of positions) {
     for (const s of pos.pipeline) {
-      if (!byStage.has(s.stage)) byStage.set(s.stage, [])
-      for (const c of s.candidates) {
-        byStage.get(s.stage)!.push({ name: c.name, positionTitle: pos.title })
-      }
+      if (!byStage.has(s.stage)) byStage.set(s.stage, new Map())
+      const byPos = byStage.get(s.stage)!
+      if (!byPos.has(pos.title)) byPos.set(pos.title, [])
+      for (const c of s.candidates) byPos.get(pos.title)!.push(c.name)
     }
   }
 
   const stagesWithCandidates = SUMMARY_STAGE_ORDER.filter((s) => byStage.has(s))
   if (stagesWithCandidates.length === 0) return null
 
-  // Find a label for each stage from position pipeline data
   const stageLabel = (stage: string) => {
     for (const pos of positions) {
       const found = pos.pipeline.find((s) => s.stage === stage)
@@ -66,20 +65,36 @@ function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <h2 className="text-sm font-semibold text-gray-900 mb-4">All Candidates by Stage</h2>
-      <div className="space-y-3">
+      <div className="space-y-4">
         {stagesWithCandidates.map((stage) => {
           const label = stageLabel(stage)
-          const candidates = byStage.get(stage)!
+          const byPos = byStage.get(stage)!
+          const totalCount = Array.from(byPos.values()).reduce((n, arr) => n + arr.length, 0)
+          const posEntries = Array.from(byPos.entries())
+          const multiPos = posEntries.length > 1
+
           return (
-            <div key={stage} className="flex items-start gap-3">
-              <span className={`shrink-0 mt-0.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_COLORS[label] ?? 'bg-gray-100 text-gray-700'}`}>
-                {label} ({candidates.length})
-              </span>
-              <span className="text-sm text-gray-700 leading-snug">
-                {candidates.map((c, i) => (
-                  <span key={i}>{i > 0 && ', '}{c.name} <span className="text-gray-400 text-xs">({c.positionTitle})</span></span>
-                ))}
-              </span>
+            <div key={stage}>
+              <div className="flex items-start gap-3">
+                <span className={`shrink-0 mt-0.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_COLORS[label] ?? 'bg-gray-100 text-gray-700'}`}>
+                  {label} ({totalCount})
+                </span>
+                {!multiPos && (
+                  <span className="text-sm text-gray-700 leading-snug">
+                    {posEntries[0][1].join(', ')}
+                  </span>
+                )}
+              </div>
+              {multiPos && (
+                <div className="mt-2 ml-2 space-y-1.5">
+                  {posEntries.map(([posTitle, names]) => (
+                    <div key={posTitle} className="text-sm">
+                      <span className="font-medium text-gray-600">{posTitle} ({names.length}):</span>{' '}
+                      <span className="text-gray-700">{names.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}
