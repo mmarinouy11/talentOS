@@ -249,10 +249,10 @@ function ActivityFeed({
   if (!client) return null
 
   const PERIODS: { key: Period; label: string }[] = [
+    { key: 'next7',     label: 'Next 7 days' },
     { key: 'today',     label: 'Today' },
     { key: 'yesterday', label: 'Yesterday' },
     { key: 'last7',     label: 'Last 7 days' },
-    { key: 'next7',     label: 'Next 7 days' },
     { key: 'custom',    label: 'Custom' },
   ]
 
