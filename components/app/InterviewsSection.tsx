@@ -1406,9 +1406,9 @@ export function InterviewsSection({
               APPLIED: 0, SCREENING: 1, TECHNICAL_INTERVIEW: 2, MANAGER_INTERVIEW: 3,
               CLIENT_INTERVIEW: 4, OFFER: 5, HIRED: 6,
             }
-            const stageDiff = (stageOrder[a.stage] ?? 99) - (stageOrder[b.stage] ?? 99)
+            const stageDiff = (stageOrder[b.stage] ?? 99) - (stageOrder[a.stage] ?? 99)
             if (stageDiff !== 0) return stageDiff
-            return a.roundNumber - b.roundNumber
+            return b.roundNumber - a.roundNumber
           }).map((interview) => (
             <div key={interview.id} className="border border-gray-100 rounded-lg p-4">
               <div className="flex items-start justify-between gap-2">
