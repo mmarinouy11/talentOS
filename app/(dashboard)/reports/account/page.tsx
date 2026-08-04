@@ -82,12 +82,12 @@ function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
                 {posEntries.map(([posTitle, group]) => (
                   <div key={posTitle} className="text-sm">
                     <span className="text-gray-500 mr-1">•</span>
-                    <span className="font-semibold text-gray-800">{posTitle}</span>
+                    <Link href={`/positions/${group.posId}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-800 hover:underline underline-offset-2">{posTitle}</Link>
                     <span className="text-gray-500"> ({group.entries.length}):</span>{' '}
                     <span className="text-gray-700">
                       {group.entries.map((e, i) => (
                         <span key={e.cpId}>{i > 0 && ', '}
-                          <Link href={`/positions/${group.posId}/candidates/${e.cpId}`} className="hover:underline underline-offset-2">{e.name}</Link>
+                          <Link href={`/positions/${group.posId}/candidates/${e.cpId}`} target="_blank" rel="noopener noreferrer" className="hover:underline underline-offset-2">{e.name}</Link>
                         </span>
                       ))}
                     </span>
@@ -112,7 +112,7 @@ function PositionCard({ pos }: { pos: PositionData }) {
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <Link href={`/positions/${pos.id}`} onClick={(e) => e.stopPropagation()} className="text-base font-semibold text-gray-900 truncate hover:underline underline-offset-2">{pos.title}</Link>
+          <Link href={`/positions/${pos.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-base font-semibold text-gray-900 truncate hover:underline underline-offset-2">{pos.title}</Link>
           <span className="text-sm text-gray-500 shrink-0">· {pos.recruiter}</span>
         </div>
         <div className="flex items-center gap-4 shrink-0 ml-4">
@@ -141,7 +141,7 @@ function PositionCard({ pos }: { pos: PositionData }) {
                   <span className="text-sm text-gray-700 leading-snug">
                     {s.candidates.map((c, i) => (
                       <span key={c.cpId}>{i > 0 && ', '}
-                        <Link href={`/positions/${pos.id}/candidates/${c.cpId}`} className="hover:underline underline-offset-2">{c.name}</Link>{' '}
+                        <Link href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank" rel="noopener noreferrer" className="hover:underline underline-offset-2">{c.name}</Link>{' '}
                         <AgingBadge days={c.daysInStage} />
                       </span>
                     ))}
