@@ -1410,32 +1410,27 @@ export function InterviewsSection({
             if (stageDiff !== 0) return stageDiff
             return b.roundNumber - a.roundNumber
           }).map((interview) => (
-            <div key={interview.id} className="border border-gray-100 rounded-lg p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm text-gray-900">{interview.roundLabel}</span>
-                    <span className="text-xs text-gray-500">{STAGE_LABELS[interview.stage]}</span>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[interview.status]}`}>
-                      {STATUS_LABELS[interview.status]}
-                    </span>
-                    {interview.decision && (
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DECISION_COLORS[interview.decision]}`}>
-                        {interview.decision.charAt(0) + interview.decision.slice(1).toLowerCase()}
-                      </span>
-                    )}
-                  </div>
-                  {interview.scheduledAt && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(interview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                    </p>
-                  )}
-                  {interview.interviewerEmail && (
-                    <p className="text-xs text-gray-500 mt-1">{interview.interviewerEmail}</p>
-                  )}
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(interview)}>Edit</Button>
+            <div key={interview.id} className="border border-gray-100 rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setEditing(interview)}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium text-sm text-gray-900">{interview.roundLabel}</span>
+                <span className="text-xs text-gray-500">{STAGE_LABELS[interview.stage]}</span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[interview.status]}`}>
+                  {STATUS_LABELS[interview.status]}
+                </span>
+                {interview.decision && (
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DECISION_COLORS[interview.decision]}`}>
+                    {interview.decision.charAt(0) + interview.decision.slice(1).toLowerCase()}
+                  </span>
+                )}
               </div>
+              {interview.scheduledAt && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {new Date(interview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </p>
+              )}
+              {interview.interviewerEmail && (
+                <p className="text-xs text-gray-500 mt-1">{interview.interviewerEmail}</p>
+              )}
             </div>
           ))}
         </div>
