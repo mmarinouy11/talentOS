@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 
 const STAGE_COLORS: Record<string, string> = {
   'Hired':               'bg-green-100 text-green-800',
@@ -18,7 +19,7 @@ const SUMMARY_STAGE_ORDER = [
   'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED',
 ]
 
-interface CandidateEntry { name: string; daysInStage: number }
+interface CandidateEntry { cpId: string; name: string; daysInStage: number }
 interface PipelineStage  { stage: string; label: string; count: number; candidates: CandidateEntry[] }
 interface PositionData {
   id: string; title: string; recruiter: string
@@ -40,14 +41,14 @@ function AgingBadge({ days }: { days: number }) {
 }
 
 function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
-  // Build: stage → Map<positionTitle, name[]>
-  const byStage = new Map<string, Map<string, string[]>>()
+  // Build: stage → Map<positionTitle, {posId, entries: {cpId, name}[]}
+  const byStage = new Map<string, Map<string, { posId: string; entries: { cpId: string; name: string }[] }>>()
   for (const pos of positions) {
     for (const s of pos.pipeline) {
       if (!byStage.has(s.stage)) byStage.set(s.stage, new Map())
       const byPos = byStage.get(s.stage)!
-      if (!byPos.has(pos.title)) byPos.set(pos.title, [])
-      for (const c of s.candidates) byPos.get(pos.title)!.push(c.name)
+      if (!byPos.has(pos.title)) byPos.set(pos.title, { posId: pos.id, entries: [] })
+      for (const c of s.candidates) byPos.get(pos.title)!.entries.push({ cpId: c.cpId, name: c.name })
     }
   }
 
@@ -69,7 +70,7 @@ function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
         {stagesWithCandidates.map((stage) => {
           const label = stageLabel(stage)
           const byPos = byStage.get(stage)!
-          const totalCount = Array.from(byPos.values()).reduce((n, arr) => n + arr.length, 0)
+          const totalCount = Array.from(byPos.values()).reduce((n, g) => n + g.entries.length, 0)
           const posEntries = Array.from(byPos.entries())
 
           return (
@@ -78,12 +79,18 @@ function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
                 {label} ({totalCount})
               </span>
               <div className="mt-2 ml-2 space-y-1.5">
-                {posEntries.map(([posTitle, names]) => (
+                {posEntries.map(([posTitle, group]) => (
                   <div key={posTitle} className="text-sm">
                     <span className="text-gray-500 mr-1">•</span>
                     <span className="font-semibold text-gray-800">{posTitle}</span>
-                    <span className="text-gray-500"> ({names.length}):</span>{' '}
-                    <span className="text-gray-700">{names.join(', ')}</span>
+                    <span className="text-gray-500"> ({group.entries.length}):</span>{' '}
+                    <span className="text-gray-700">
+                      {group.entries.map((e, i) => (
+                        <span key={e.cpId}>{i > 0 && ', '}
+                          <Link href={`/positions/${group.posId}/candidates/${e.cpId}`} className="hover:underline underline-offset-2">{e.name}</Link>
+                        </span>
+                      ))}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -105,7 +112,7 @@ function PositionCard({ pos }: { pos: PositionData }) {
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-base font-semibold text-gray-900 truncate">{pos.title}</span>
+          <Link href={`/positions/${pos.id}`} onClick={(e) => e.stopPropagation()} className="text-base font-semibold text-gray-900 truncate hover:underline underline-offset-2">{pos.title}</Link>
           <span className="text-sm text-gray-500 shrink-0">· {pos.recruiter}</span>
         </div>
         <div className="flex items-center gap-4 shrink-0 ml-4">
@@ -133,7 +140,10 @@ function PositionCard({ pos }: { pos: PositionData }) {
                   </span>
                   <span className="text-sm text-gray-700 leading-snug">
                     {s.candidates.map((c, i) => (
-                      <span key={i}>{i > 0 && ', '}{c.name} <AgingBadge days={c.daysInStage} /></span>
+                      <span key={c.cpId}>{i > 0 && ', '}
+                        <Link href={`/positions/${pos.id}/candidates/${c.cpId}`} className="hover:underline underline-offset-2">{c.name}</Link>{' '}
+                        <AgingBadge days={c.daysInStage} />
+                      </span>
                     ))}
                   </span>
                 </div>

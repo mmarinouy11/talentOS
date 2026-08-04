@@ -113,6 +113,7 @@ export async function GET(request: Request) {
           const entryRecord = cp.stageHistory.find((h) => h.toStage === cp.stage)
           const days = entryRecord ? daysAgo(entryRecord.movedAt) : daysAgo(cp.createdAt)
           return {
+            cpId: cp.id,
             name: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
             daysInStage: days,
           }
