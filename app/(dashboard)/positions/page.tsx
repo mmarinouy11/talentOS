@@ -29,7 +29,7 @@ export default async function PositionsPage() {
       recruiter: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true, positionVendors: true } },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ client: 'asc' }, { createdAt: 'desc' }],
   })
 
   const counts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CLOSED: 0, FILLED: 0 }
