@@ -58,7 +58,7 @@ function periodDates(period: Period, customFrom: string, customTo: string): { fr
     return { from: startOfDay(y).toISOString(), to: endOfDay(now).toISOString() }
   }
   if (period === 'next7') {
-    const f = new Date(now); f.setDate(f.getDate() + 7)
+    const f = new Date(now); f.setFullYear(f.getFullYear() + 10)
     return { from: startOfDay(now).toISOString(), to: endOfDay(f).toISOString() }
   }
   // custom — no date restrictions, supports past and future
@@ -249,7 +249,7 @@ function ActivityFeed({
   if (!client) return null
 
   const PERIODS: { key: Period; label: string }[] = [
-    { key: 'next7',     label: 'Next 7 days' },
+    { key: 'next7',     label: 'Next' },
     { key: 'today',     label: 'Today' },
     { key: 'yesterday', label: 'Yesterday' },
     { key: 'last7',     label: 'Last 7 days' },
