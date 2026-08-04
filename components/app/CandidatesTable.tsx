@@ -245,7 +245,7 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
             </thead>
             <tbody className="divide-y divide-gray-50">
               {sorted.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { window.location.href = `/candidates/${c.id}` }}>
+                <tr key={c.id} className="hover:bg-[#F5F0EB] transition-colors cursor-pointer" onClick={() => { window.location.href = `/candidates/${c.id}` }}>
                   <td className="px-4 py-3 font-medium text-gray-900">
                     <Link href={`/candidates/${c.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
                       {c.firstName} {c.lastName}

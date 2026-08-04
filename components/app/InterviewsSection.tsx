@@ -1410,7 +1410,7 @@ export function InterviewsSection({
             if (stageDiff !== 0) return stageDiff
             return b.roundNumber - a.roundNumber
           }).map((interview) => (
-            <div key={interview.id} className="border border-gray-100 rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setEditing(interview)}>
+            <div key={interview.id} className="border border-gray-100 rounded-lg p-4 cursor-pointer hover:bg-[#F5F0EB] transition-colors" onClick={() => setEditing(interview)}>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-sm text-gray-900">{interview.roundLabel}</span>
                 <span className="text-xs text-gray-500">{STAGE_LABELS[interview.stage]}</span>

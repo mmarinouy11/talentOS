@@ -330,7 +330,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
               {candidates.map((c, i) => (
                 <tr
                   key={i}
-                  className={`${selected.has(i) ? 'bg-[#fafff0]' : ''} ${c.error ? 'opacity-50' : 'cursor-pointer hover:bg-gray-50'}`}
+                  className={`${selected.has(i) ? 'bg-[#fafff0]' : ''} ${c.error ? 'opacity-50' : 'cursor-pointer hover:bg-[#F5F0EB]'}`}
                   onClick={() => { if (!c.error) toggleRow(i) }}
                 >
                   <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>

@@ -408,7 +408,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
 
   function renderRow(cp: CandidatePosition) {
     return (
-      <tr key={cp.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { window.location.href = `/positions/${positionId}/candidates/${cp.id}` }}>
+      <tr key={cp.id} className="hover:bg-[#F5F0EB] cursor-pointer" onClick={() => { window.location.href = `/positions/${positionId}/candidates/${cp.id}` }}>
         <td className="px-4 py-3 font-medium text-gray-900">
           <Link href={`/positions/${positionId}/candidates/${cp.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
             {cp.candidate.firstName} {cp.candidate.lastName}

@@ -243,7 +243,7 @@ export function UsersManager({ initialUsers }: { initialUsers: UserRow[] }) {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {users.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={u.id} className="hover:bg-[#F5F0EB] transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{u.name ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-600">{u.email}</td>
                 <td className="px-4 py-3 text-gray-600">{ROLE_LABELS[u.role]}</td>
