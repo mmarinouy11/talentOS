@@ -203,7 +203,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
     const payload = [...selected].map((i) => {
       const c = candidates[i]
       return { ...c, email: editedEmails[i] ?? c.email }
-    }).filter((c) => c.email)
+    })
 
     try {
       const res = await fetch('/api/candidates/bulk-import/confirm', {
@@ -234,6 +234,8 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
   const newCount = candidates.filter((c) => !c.error && !c.duplicate).length
   const dupCount = candidates.filter((c) => c.duplicate).length
   const errCount = candidates.filter((c) => c.error).length
+  const selectedWithEmail = [...selected].filter((i) => editedEmails[i] ?? candidates[i]?.email).length
+  const selectedMissingEmail = selected.size - selectedWithEmail
 
   // --- Upload zone (shared by upload + parsing steps) ---
   const uploadZone = (
@@ -378,17 +380,22 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
           </table>
         </div>
 
+        {selectedMissingEmail > 0 && (
+          <p className="text-xs text-amber-600">
+            {selectedMissingEmail} selected candidate{selectedMissingEmail !== 1 ? 's have' : ' has'} no email and will be skipped — enter an email above to include {selectedMissingEmail !== 1 ? 'them' : 'them'}.
+          </p>
+        )}
         <div className="flex items-center gap-2">
           <Button
             onClick={handleConfirm}
-            disabled={selected.size === 0 || step === 'confirming'}
+            disabled={selectedWithEmail === 0 || step === 'confirming'}
             size={compact ? 'sm' : 'default'}
           >
             {step === 'confirming'
               ? 'Creating…'
               : positionId
-                ? `Add ${selected.size} to position`
-                : `Import ${selected.size} candidate${selected.size !== 1 ? 's' : ''}`}
+                ? `Add ${selectedWithEmail} to position`
+                : `Import ${selectedWithEmail} candidate${selectedWithEmail !== 1 ? 's' : ''}`}
           </Button>
           <Button variant="outline" size={compact ? 'sm' : 'default'} onClick={reset}>
             Start over
