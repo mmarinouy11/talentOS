@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       recruiter: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true } },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ client: 'asc' }, { createdAt: 'desc' }],
   })
 
   return NextResponse.json(positions)
