@@ -1425,7 +1425,7 @@ export function InterviewsSection({
               </div>
               {interview.scheduledAt && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {new Date(interview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  {new Date(interview.scheduledAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: positionTimezone, timeZoneName: 'short' })}
                 </p>
               )}
               {interview.interviewerEmail && (
