@@ -71,30 +71,22 @@ function CrossPositionSummary({ positions }: { positions: PositionData[] }) {
           const byPos = byStage.get(stage)!
           const totalCount = Array.from(byPos.values()).reduce((n, arr) => n + arr.length, 0)
           const posEntries = Array.from(byPos.entries())
-          const multiPos = posEntries.length > 1
 
           return (
             <div key={stage}>
-              <div className="flex items-start gap-3">
-                <span className={`shrink-0 mt-0.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_COLORS[label] ?? 'bg-gray-100 text-gray-700'}`}>
-                  {label} ({totalCount})
-                </span>
-                {!multiPos && (
-                  <span className="text-sm text-gray-700 leading-snug">
-                    {posEntries[0][1].join(', ')}
-                  </span>
-                )}
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STAGE_COLORS[label] ?? 'bg-gray-100 text-gray-700'}`}>
+                {label} ({totalCount})
+              </span>
+              <div className="mt-2 ml-2 space-y-1.5">
+                {posEntries.map(([posTitle, names]) => (
+                  <div key={posTitle} className="text-sm">
+                    <span className="text-gray-500 mr-1">•</span>
+                    <span className="font-semibold text-gray-800">{posTitle}</span>
+                    <span className="text-gray-500"> ({names.length}):</span>{' '}
+                    <span className="text-gray-700">{names.join(', ')}</span>
+                  </div>
+                ))}
               </div>
-              {multiPos && (
-                <div className="mt-2 ml-2 space-y-1.5">
-                  {posEntries.map(([posTitle, names]) => (
-                    <div key={posTitle} className="text-sm">
-                      <span className="font-medium text-gray-600">{posTitle} ({names.length}):</span>{' '}
-                      <span className="text-gray-700">{names.join(', ')}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )
         })}
