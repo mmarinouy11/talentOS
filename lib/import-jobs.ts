@@ -1,10 +1,18 @@
 export type Seniority = 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL'
 
+export const PLACEHOLDER_EMAIL_DOMAINS = ['@import.linkedin.com', '@import.tenarai.com']
+
+export function isPlaceholderEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  const lower = email.toLowerCase()
+  return PLACEHOLDER_EMAIL_DOMAINS.some((d) => lower.endsWith(d))
+}
+
 export interface ParsedCandidate {
   fileName: string
   firstName: string | null
   lastName: string | null
-  email: string | null
+  email: string
   phone: string | null
   country: string | null
   linkedinUrl: string | null

@@ -14,6 +14,7 @@ import {
 } from '@/lib/email-templates'
 import { getNextStage, STAGE_SEQUENCE } from '@/lib/pipeline'
 import { RECRUITER_TIMEZONES, zonedToUtcIso } from '@/lib/timezone'
+import { isPlaceholderEmail } from '@/lib/import-jobs'
 
 type InterviewStatus = 'PENDING' | 'AWAITING_SCHEDULE' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
 type InterviewDecision = 'ADVANCE' | 'REJECT' | 'HOLD'
@@ -497,6 +498,12 @@ function GenericEmailPreviewModal({
           </div>
         </div>
 
+        {isPlaceholderEmail(candidateEmail) && (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+            This candidate has a placeholder email address. Please update their email before sending any communications.
+          </p>
+        )}
+
         {error && (
           <p className="text-sm text-red-600 mt-3">
             {error}
@@ -509,7 +516,7 @@ function GenericEmailPreviewModal({
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
           <Button type="button" variant="outline" onClick={onSkip}>Skip for now</Button>
-          <Button type="button" onClick={send} disabled={sending}>{sending ? 'Sending…' : 'Send Email'}</Button>
+          <Button type="button" onClick={send} disabled={sending || isPlaceholderEmail(candidateEmail)}>{sending ? 'Sending…' : 'Send Email'}</Button>
         </div>
       </div>
     </div>

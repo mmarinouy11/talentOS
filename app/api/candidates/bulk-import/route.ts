@@ -80,13 +80,20 @@ async function processJob(
             ),
           ])
 
-          const email = parsed.email ?? null
-          const isDuplicate = !!(email && emailMap.has(email.toLowerCase()))
-          const existingId = email ? emailMap.get(email.toLowerCase()) : undefined
+          const rawEmail = parsed.email ?? null
+          const email: string = rawEmail ?? (() => {
+            const first = (parsed.firstName ?? '').toLowerCase().replace(/[^a-z0-9]/g, '.')
+            const last  = (parsed.lastName  ?? '').toLowerCase().replace(/[^a-z0-9]/g, '.')
+            const base  = [first, last].filter(Boolean).join('.') || 'unknown'
+            return `${base}@import.linkedin.com`
+          })()
+          const isDuplicate = emailMap.has(email.toLowerCase())
+          const existingId = isDuplicate ? emailMap.get(email.toLowerCase()) : undefined
 
           return {
             fileName,
             ...parsed,
+            email,
             skills: parsed.skills ?? [],
             languages: parsed.languages ?? [],
             experience: parsed.experience ?? [],

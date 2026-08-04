@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { google } from 'googleapis'
+import { isPlaceholderEmail } from '@/lib/import-jobs'
 
 function encodeSubject(subject: string): string {
   if (/[^\x00-\x7F]/.test(subject)) {
@@ -42,6 +43,10 @@ export async function sendEmailViaGmail(
   userId: string,
   { to, subject, html }: { to: string; subject: string; html: string },
 ): Promise<string> {
+  if (isPlaceholderEmail(to)) {
+    console.log('[email] Skipped send to placeholder email:', to)
+    return to
+  }
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { gmailAccessToken: true, gmailRefreshToken: true, gmailTokenExpiry: true, gmailConnectedEmail: true },
@@ -113,6 +118,10 @@ export async function sendEmailViaSystemGmail({
   subject: string
   html: string
 }): Promise<void> {
+  if (isPlaceholderEmail(to)) {
+    console.log('[email] Skipped send to placeholder email:', to)
+    return
+  }
   const account = await db.systemEmailAccount.findUnique({ where: { purpose: 'system_notifications' } })
   if (!account?.refreshToken) {
     console.log('[system-gmail] No system Gmail connected, skipping notification')
@@ -171,6 +180,10 @@ export async function sendEmail({
   sentById?: string
   userId?: string
 }): Promise<{ success: boolean; error?: string; gmailExpired?: boolean }> {
+  if (isPlaceholderEmail(to)) {
+    console.log('[email] Skipped send to placeholder email:', to)
+    return { success: false, error: 'placeholder_email' }
+  }
   if (!userId) {
     return { success: false, error: 'No sender specified — a Gmail account is required to send emails.' }
   }

@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ParsedCandidate } from '@/lib/import-jobs'
+import { isPlaceholderEmail } from '@/lib/import-jobs'
 import type { ConfirmResult } from '@/app/api/candidates/bulk-import/confirm/route'
 
 export type { ParsedCandidate }
@@ -234,8 +235,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
   const newCount = candidates.filter((c) => !c.error && !c.duplicate).length
   const dupCount = candidates.filter((c) => c.duplicate).length
   const errCount = candidates.filter((c) => c.error).length
-  const selectedWithEmail = [...selected].filter((i) => editedEmails[i] ?? candidates[i]?.email).length
-  const selectedMissingEmail = selected.size - selectedWithEmail
+  const selectedPlaceholderCount = [...selected].filter((i) => isPlaceholderEmail(editedEmails[i] ?? candidates[i]?.email)).length
 
   // --- Upload zone (shared by upload + parsing steps) ---
   const uploadZone = (
@@ -353,14 +353,24 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
                     {c.error ? (
                       <span className="text-gray-400">—</span>
                     ) : (
-                      <Input
-                        value={editedEmails[i] ?? c.email ?? ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setEditedEmails((prev) => ({ ...prev, [i]: e.target.value }))
-                        }
-                        className="h-6 text-xs w-40"
-                        placeholder="email@example.com"
-                      />
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={editedEmails[i] ?? c.email ?? ''}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setEditedEmails((prev) => ({ ...prev, [i]: e.target.value }))
+                          }
+                          className="h-6 text-xs w-40"
+                          placeholder="email@example.com"
+                        />
+                        {isPlaceholderEmail(editedEmails[i] ?? c.email) && (
+                          <span
+                            className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 cursor-help shrink-0"
+                            title="Placeholder email — update with real email before sending any communications"
+                          >
+                            !
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                   {!compact && <td className="px-3 py-2 text-gray-600">{c.country ?? '—'}</td>}
@@ -380,22 +390,22 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
           </table>
         </div>
 
-        {selectedMissingEmail > 0 && (
+        {selectedPlaceholderCount > 0 && (
           <p className="text-xs text-amber-600">
-            {selectedMissingEmail} selected candidate{selectedMissingEmail !== 1 ? 's have' : ' has'} no email and will be skipped — enter an email above to include {selectedMissingEmail !== 1 ? 'them' : 'them'}.
+            {selectedPlaceholderCount} selected candidate{selectedPlaceholderCount !== 1 ? 's have' : ' has'} a placeholder email (!) — update with a real email before sending any communications.
           </p>
         )}
         <div className="flex items-center gap-2">
           <Button
             onClick={handleConfirm}
-            disabled={selectedWithEmail === 0 || step === 'confirming'}
+            disabled={selected.size === 0 || step === 'confirming'}
             size={compact ? 'sm' : 'default'}
           >
             {step === 'confirming'
               ? 'Creating…'
               : positionId
-                ? `Add ${selectedWithEmail} to position`
-                : `Import ${selectedWithEmail} candidate${selectedWithEmail !== 1 ? 's' : ''}`}
+                ? `Add ${selected.size} to position`
+                : `Import ${selected.size} candidate${selected.size !== 1 ? 's' : ''}`}
           </Button>
           <Button variant="outline" size={compact ? 'sm' : 'default'} onClick={reset}>
             Start over
