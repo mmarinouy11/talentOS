@@ -29,7 +29,32 @@ interface Position {
   jdSummary: string | null
   location: string[]
   budgetMonthly: number | null
+  timezone: string
   existingCandidates: ExistingCandidate[]
+}
+
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const h = Math.floor(i / 4)
+  const m = (i % 4) * 15
+  const hh = String(h).padStart(2, '0')
+  const mm = String(m).padStart(2, '0')
+  const label = `${h === 0 ? 12 : h > 12 ? h - 12 : h}:${mm} ${h < 12 ? 'AM' : 'PM'}`
+  return { value: `${hh}:${mm}`, label }
+})
+
+function tzAbbr(timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' })
+      .formatToParts(new Date())
+      .find((p) => p.type === 'timeZoneName')?.value ?? timezone
+  } catch {
+    return timezone
+  }
+}
+
+function isSlotInPast(date: string, time: string): boolean {
+  if (!date || !time) return false
+  return new Date(`${date}T${time}`) <= new Date()
 }
 
 interface Submission {
@@ -145,7 +170,7 @@ export default function VendorPortalPage() {
     }
   }
 
-  function addSlot() { if (availabilitySlots.length < 5) setAvailabilitySlots(prev => [...prev, { date: '', time: '' }]) }
+  function addSlot() { if (availabilitySlots.length < 5) setAvailabilitySlots(prev => [...prev, { date: '', time: '09:00' }]) }
   function removeSlot(i: number) { setAvailabilitySlots(prev => prev.filter((_, idx) => idx !== i)) }
   function updateSlot(i: number, field: 'date' | 'time', value: string) {
     setAvailabilitySlots(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
@@ -156,6 +181,10 @@ export default function VendorPortalPage() {
     if (!selectedPosition || !file) return
     if (!consentChecked) {
       setConsentError(true)
+      return
+    }
+    if (availabilitySlots.some((s) => isSlotInPast(s.date, s.time))) {
+      setSubmitError('One or more availability slots are in the past. Please update them.')
       return
     }
     setSubmitting(true)
@@ -641,15 +670,41 @@ export default function VendorPortalPage() {
 
             {/* Availability slots */}
             <div style={{ marginTop: 24, borderTop: '1px solid #f0ebe5', paddingTop: 18 }}>
-              <h2 style={{ fontSize: 13, fontWeight: 700, color: '#2F2C29', marginBottom: 4 }}>Availability <span style={{ color: '#9a9490', fontWeight: 400 }}>(optional)</span></h2>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#2F2C29' }}>Availability <span style={{ color: '#9a9490', fontWeight: 400 }}>(optional)</span></h2>
+                {selectedPosition && (
+                  <span style={{ fontSize: 11, color: '#9a9490' }}>All times in {tzAbbr(selectedPosition.timezone)}</span>
+                )}
+              </div>
               <p style={{ fontSize: 12, color: '#9a9490', marginBottom: 14 }}>Share up to 5 time slots when you&apos;re available for an interview. This helps us schedule faster.</p>
-              {availabilitySlots.map((slot, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                  <input type="date" value={slot.date} onChange={(e) => updateSlot(i, 'date', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  <input type="time" step="900" value={slot.time} onChange={(e) => updateSlot(i, 'time', e.target.value)} style={{ ...inputStyle, width: 120 }} />
-                  <button type="button" onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9a9490', fontSize: 18, padding: '0 4px', lineHeight: 1 }}>×</button>
-                </div>
-              ))}
+              {availabilitySlots.map((slot, i) => {
+                const past = isSlotInPast(slot.date, slot.time)
+                return (
+                  <div key={i} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="date"
+                        value={slot.date}
+                        onChange={(e) => updateSlot(i, 'date', e.target.value)}
+                        style={{ ...inputStyle, flex: 1, borderColor: past ? '#fca5a5' : '#e5e0da' }}
+                      />
+                      <select
+                        value={slot.time}
+                        onChange={(e) => updateSlot(i, 'time', e.target.value)}
+                        style={{ ...inputStyle, width: 130, cursor: 'pointer', borderColor: past ? '#fca5a5' : '#e5e0da' }}
+                      >
+                        {TIME_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9a9490', fontSize: 18, padding: '0 4px', lineHeight: 1 }}>×</button>
+                    </div>
+                    {past && (
+                      <p style={{ fontSize: 11, color: '#dc2626', marginTop: 3, marginLeft: 2 }}>Please select a future date and time.</p>
+                    )}
+                  </div>
+                )
+              })}
               {availabilitySlots.length < 5 && (
                 <button type="button" onClick={addSlot} style={{ background: 'none', border: '1.5px dashed #d5d0ca', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#6b6560', cursor: 'pointer', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
                   + Add time slot

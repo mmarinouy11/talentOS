@@ -26,6 +26,7 @@ export async function GET(
               jdSummary: true,
               internalCostBudget: true,
               location: true,
+              timezone: true,
             },
           },
         },
@@ -104,6 +105,7 @@ export async function GET(
     budgetMonthly: p.internalCostBudget != null
       ? Math.round(hourlyToMonthly(p.internalCostBudget, hoursBaseline))
       : null,
+    timezone: p.timezone ?? 'America/Montevideo',
     existingCandidates: otherByPosition.get(p.id) ?? [],
   }))
 
