@@ -87,6 +87,8 @@ export async function POST(request: Request) {
               summary: c.summary ?? null,
               cvDriveId: c.cvDriveId ?? null,
               cvOriginalName: c.cvOriginalName ?? null,
+              sourcedByType: 'RECRUITER',
+              recruiterId: userId,
               ...(Array.isArray(c.experience) && c.experience.length > 0 ? { cvExperience: c.experience } : {}),
               ...(Array.isArray(c.education) && c.education.length > 0 ? { cvEducation: c.education } : {}),
             },
