@@ -626,7 +626,7 @@ export default function VendorPortalPage() {
 
             {/* Compensation */}
             <div style={{ marginBottom: 8 }}>
-              <InputField label="Expected Monthly Compensation" required hint="(USD)">
+              <InputField label="Monthly Rate (USD)" required>
                 <input
                   type="number" min={0} step="1" value={desiredCompensation}
                   onChange={(e) => setDesiredCompensation(e.target.value)}
@@ -634,7 +634,6 @@ export default function VendorPortalPage() {
                   onFocus={(e) => { e.target.style.borderColor = '#8CF000'; e.target.style.boxShadow = '0 0 0 3px rgba(140,240,0,0.15)' }}
                   onBlur={(e) => { e.target.style.borderColor = '#e5e0da'; e.target.style.boxShadow = 'none' }}
                 />
-                <p style={{ fontSize: 12, color: '#9a9490', marginTop: 4 }}>Gross monthly amount in USD that the candidate expects to earn.</p>
               </InputField>
             </div>
 
