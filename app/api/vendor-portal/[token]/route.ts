@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 import { isCandidateInactive } from '@/lib/candidate-status'
+import { locationAllowed } from '@/lib/location'
 
 export async function GET(
   _request: Request,
@@ -52,14 +53,18 @@ export async function GET(
     return `${first} ${initials}`
   }
 
-  // Fetch all candidates in pipeline for each position except this vendor's own submissions
+  // Fetch all candidates in pipeline for each position except this vendor's own submissions.
+  // Use OR to correctly handle NULL sourcedByVendorId (Prisma NOT on nullable field excludes NULLs).
   const otherCPs = positionIds.length > 0
     ? await db.candidatePosition.findMany({
         where: {
           positionId: { in: positionIds },
           candidate: {
             deletedAt: null,
-            NOT: { sourcedByVendorId: vendor.id },
+            OR: [
+              { sourcedByVendorId: null },
+              { sourcedByVendorId: { not: vendor.id } },
+            ],
           },
         },
         select: {
@@ -69,12 +74,19 @@ export async function GET(
       })
     : []
 
-  // Group by positionId
+  // Build a lookup from positionId to position location for filtering
+  const positionLocationMap = new Map(activePositions.map((p) => [p.id, p.location ?? []]))
+
+  // Group by positionId, filtering by position location and excluding candidates with no country
   const otherByPosition = new Map<string, { firstNameInitial: string; country: string | null }[]>()
   for (const cp of otherCPs) {
+    const country = cp.candidate.country
+    if (!country) continue
+    const posLocation = positionLocationMap.get(cp.positionId) ?? []
+    if (!locationAllowed(posLocation, country)) continue
     const entry = {
       firstNameInitial: semiAnonymizeName(cp.candidate.firstName, cp.candidate.lastName),
-      country: cp.candidate.country,
+      country,
     }
     const arr = otherByPosition.get(cp.positionId) ?? []
     arr.push(entry)
