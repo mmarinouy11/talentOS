@@ -114,38 +114,31 @@ export async function POST(
     return NextResponse.json({ error: 'Could not read the CV file. Please upload a valid PDF.' }, { status: 422 })
   }
 
-  let parsed: {
+  type ParsedCV = {
     seniority: 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL' | null
     yearsOfExperience: number | null
     skills: string[]
     languages: string[]
     summary: string | null
-  } = { seniority: null, yearsOfExperience: null, skills: [], languages: [], summary: null }
-  try {
-    parsed = await callClaudeJSON(
-      `Parse this CV and return the structured JSON:\n\n${cvText.slice(0, 8000)}`,
-      'FAST',
-      CV_PARSE_SYSTEM
-    )
-  } catch {
-    // Non-fatal — proceed with empty fields
   }
+  const defaultParsed: ParsedCV = { seniority: null, yearsOfExperience: null, skills: [], languages: [], summary: null }
 
-  // Upload CV to Drive (non-fatal)
-  let cvDriveId: string | undefined
-  let cvOriginalName: string | undefined
-  try {
-    const { fileId, fileName } = await uploadFileToDrive(
-      buffer,
-      `${Date.now()}_${cvFile.name}`,
-      cvFile.type,
-      process.env.GOOGLE_DRIVE_FOLDER_ID!
-    )
-    cvDriveId = fileId
-    cvOriginalName = fileName
-  } catch {
-    // continue without Drive upload
-  }
+  // Parallelize Drive upload and Claude parsing — both are non-fatal and independent
+  const [driveResult, parsedResult] = await Promise.all([
+    uploadFileToDrive(buffer, `${Date.now()}_${cvFile.name}`, cvFile.type, process.env.GOOGLE_DRIVE_FOLDER_ID!)
+      .catch(() => null),
+    cvText
+      ? callClaudeJSON<ParsedCV>(
+          `Parse this CV and return the structured JSON:\n\n${cvText.slice(0, 8000)}`,
+          'FAST',
+          CV_PARSE_SYSTEM
+        ).catch(() => null)
+      : Promise.resolve(null),
+  ])
+
+  const parsed: ParsedCV = parsedResult ?? defaultParsed
+  const cvDriveId = driveResult?.fileId
+  const cvOriginalName = driveResult?.fileName
 
   // Create candidate (duplicate check above guarantees no existing record)
   const createdCandidate = true

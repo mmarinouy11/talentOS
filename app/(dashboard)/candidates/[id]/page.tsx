@@ -38,7 +38,7 @@ export default async function CandidateDetailPage({
     include: {
       candidatePositions: {
         include: {
-          position: { select: { title: true, client: true } },
+          position: { select: { id: true, title: true, client: true } },
         },
         orderBy: { createdAt: 'desc' },
       },

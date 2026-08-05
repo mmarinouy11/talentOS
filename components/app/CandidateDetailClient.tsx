@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddToPositionModal } from './AddToPositionModal'
 import { MoveStageModal } from './MoveStageModal'
@@ -12,7 +13,7 @@ interface CandidatePosition {
   stage: Stage
   stageEnteredAt: string
   notes: string | null
-  position: { title: string; client: string }
+  position: { id: string; title: string; client: string }
 }
 
 interface CandidateDetailClientProps {
@@ -36,24 +37,28 @@ export function CandidateDetailClient({ candidateId, candidatePositions }: Candi
       ) : (
         <div className="divide-y divide-gray-100">
           {candidatePositions.map((cp) => (
-            <div key={cp.id} className="py-3 flex items-center justify-between">
+            <Link
+              key={cp.id}
+              href={`/positions/${cp.position.id}/candidates/${cp.id}`}
+              className="py-3 flex items-center justify-between hover:bg-gray-50 -mx-1 px-1 rounded-lg cursor-pointer transition-colors"
+            >
               <div>
                 <p className="text-sm font-medium text-gray-900">{cp.position.title}</p>
                 <p className="text-xs text-gray-500">{cp.position.client}</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                 <StageBadge stage={cp.stage} />
                 {!['HIRED', 'REJECTED'].includes(cp.stage) && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setMoveTarget({ id: cp.id, stage: cp.stage })}
+                    onClick={(e) => { e.preventDefault(); setMoveTarget({ id: cp.id, stage: cp.stage }) }}
                   >
                     Move Stage
                   </Button>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

@@ -98,6 +98,7 @@ export default function ApplyPage() {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentError, setConsentError] = useState(false)
+  const [cvDragOver, setCvDragOver] = useState(false)
 
   const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
   const [rejectionMessage, setRejectionMessage] = useState('')
@@ -332,13 +333,21 @@ export default function ApplyPage() {
               </label>
               <div
                 onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setCvDragOver(true) }}
+                onDragLeave={() => setCvDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setCvDragOver(false)
+                  const dropped = e.dataTransfer.files[0]
+                  if (dropped) handleFileChange({ target: { files: e.dataTransfer.files } } as React.ChangeEvent<HTMLInputElement>)
+                }}
                 style={{
-                  border: `2px dashed ${file ? '#8CF000' : '#d5d0ca'}`,
+                  border: `2px dashed ${file || cvDragOver ? '#8CF000' : '#d5d0ca'}`,
                   borderRadius: 12,
                   padding: '20px 16px',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  background: file ? '#f9ffe6' : '#fafaf8',
+                  background: file || cvDragOver ? '#f9ffe6' : '#fafaf8',
                   transition: 'all 0.15s',
                 }}
               >
@@ -346,7 +355,7 @@ export default function ApplyPage() {
                   <p style={{ fontSize: 14, color: '#3a6600', fontWeight: 500 }}>📄 {file.name}</p>
                 ) : (
                   <>
-                    <p style={{ fontSize: 14, color: '#9a9490' }}>Click to upload your CV</p>
+                    <p style={{ fontSize: 14, color: '#9a9490' }}>Drag &amp; drop your CV here, or <span style={{ color: '#2F2C29', fontWeight: 600 }}>Browse</span></p>
                     <p style={{ fontSize: 12, color: '#b5b0aa', marginTop: 4 }}>PDF only · Max 10MB</p>
                   </>
                 )}

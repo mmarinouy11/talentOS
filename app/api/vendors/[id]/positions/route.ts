@@ -20,7 +20,7 @@ export async function GET(
   const { id: vendorId } = await params
 
   const assigned = await db.positionVendor.findMany({
-    where: { vendorId },
+    where: { vendorId, position: { deletedAt: null } },
     include: { position: { select: { id: true, title: true, client: true, status: true } } },
     orderBy: { assignedAt: 'asc' },
   })

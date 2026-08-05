@@ -84,7 +84,10 @@ export function FitScoreCard({
   }
 
   const scoredAgo = fitScoredAt
-    ? `${Math.round((Date.now() - new Date(fitScoredAt).getTime()) / 60000)}m ago`
+    ? (() => {
+        const days = Math.floor((Date.now() - new Date(fitScoredAt).getTime()) / 86400000)
+        return days < 1 ? 'today' : `${days} day${days === 1 ? '' : 's'} ago`
+      })()
     : null
 
   return (
