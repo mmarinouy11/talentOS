@@ -15,6 +15,11 @@ interface Check {
   detail: string
 }
 
+interface ExistingCandidate {
+  firstNameInitial: string
+  country: string | null
+}
+
 interface Position {
   id: string
   title: string
@@ -24,17 +29,18 @@ interface Position {
   jdSummary: string | null
   location: string[]
   budgetMonthly: number | null
+  existingCandidates: ExistingCandidate[]
 }
 
 interface Submission {
   id: string
   firstName: string
-  lastInitial: string
+  lastName: string
   country: string | null
   positionTitle: string
   stage: string
   isActive: boolean
-  latestInterview: { label: string; status: string } | null
+  decisionNotes: string | null
   submittedAt: string
 }
 
@@ -97,7 +103,9 @@ export default function VendorPortalPage() {
   const [rejectionMessage, setRejectionMessage] = useState('')
   const [rejectionChecks, setRejectionChecks] = useState<Check[]>([])
   const [expandedJD, setExpandedJD] = useState<Set<string>>(new Set())
+  const [expandedPipeline, setExpandedPipeline] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'positions' | 'submissions'>('positions')
+  const [submissionsSearch, setSubmissionsSearch] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -204,6 +212,14 @@ export default function VendorPortalPage() {
 
   function toggleJD(id: string) {
     setExpandedJD((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function togglePipeline(id: string) {
+    setExpandedPipeline((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
@@ -406,6 +422,27 @@ export default function VendorPortalPage() {
                           )}
                         </div>
                       )}
+                      {pos.existingCandidates.length > 0 && (
+                        <div style={{ marginTop: 12, borderTop: '1px solid #f0ebe5', paddingTop: 12 }}>
+                          <button
+                            onClick={() => togglePipeline(pos.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2F2C29', fontSize: 13, fontWeight: 600, padding: 0, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Arial, "Open Sans", sans-serif' }}
+                          >
+                            <span style={{ color: '#9a9490', fontSize: 14 }}>{expandedPipeline.has(pos.id) ? '▲' : '▼'}</span>
+                            Already in pipeline ({pos.existingCandidates.length})
+                          </button>
+                          {expandedPipeline.has(pos.id) && (
+                            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {pos.existingCandidates.map((ec, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#4a4540' }}>
+                                  <span style={{ fontWeight: 500 }}>{ec.firstNameInitial}</span>
+                                  {ec.country && <span style={{ color: '#9a9490' }}>· {ec.country}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -414,55 +451,79 @@ export default function VendorPortalPage() {
           )}
 
           {/* ── Tab: My Submissions ── */}
-          {activeTab === 'submissions' && (
-            submissions.length === 0 ? (
+          {activeTab === 'submissions' && (() => {
+            const filteredSubmissions = submissions.filter((s) => {
+              if (!submissionsSearch.trim()) return true
+              const q = submissionsSearch.toLowerCase()
+              return `${s.firstName} ${s.lastName}`.toLowerCase().includes(q)
+            })
+            return submissions.length === 0 ? (
               <div style={{ background: '#fff', borderRadius: 20, padding: '40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
                 <p style={{ color: '#9a9490', fontSize: 14 }}>No candidates submitted yet. Switch to Open Positions to submit your first candidate.</p>
               </div>
             ) : (
-              <div style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: '#f5f0eb', borderBottom: '1px solid #e8e3dd' }}>
-                      {['Candidate', 'Country', 'Position', 'Stage', 'Status', 'Latest Round', 'Submitted'].map((h) => (
-                        <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9a9490' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {submissions.map((s, i) => (
-                      <tr key={s.id} style={{ borderBottom: i < submissions.length - 1 ? '1px solid #f0ebe5' : 'none' }}>
-                        <td style={{ padding: '14px 16px', fontWeight: 600, color: '#2F2C29' }}>
-                          {s.firstName} {s.lastInitial}.
-                        </td>
-                        <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.country ?? '—'}</td>
-                        <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.positionTitle}</td>
-                        <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.stage}</td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <span style={{
-                            background: s.isActive ? '#f0fde0' : '#fff5f5',
-                            color: s.isActive ? '#3a6600' : '#b91c1c',
-                            border: `1px solid ${s.isActive ? '#c4f060' : '#fca5a5'}`,
-                            borderRadius: 999, padding: '3px 9px', fontSize: 11, fontWeight: 600,
-                          }}>
-                            {s.isActive ? 'Active' : 'Not Moving Forward'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px 16px', color: '#6b6560' }}>
-                          {s.latestInterview ? (
-                            <span>{s.latestInterview.label} · {s.latestInterview.status}</span>
-                          ) : '—'}
-                        </td>
-                        <td style={{ padding: '14px 16px', color: '#9a9490', whiteSpace: 'nowrap' }}>
-                          {new Date(s.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                <div style={{ marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="Search by name…"
+                    value={submissionsSearch}
+                    onChange={(e) => setSubmissionsSearch(e.target.value)}
+                    style={{ ...inputStyle, maxWidth: 280 }}
+                  />
+                </div>
+                <div style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                  {filteredSubmissions.length === 0 ? (
+                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                      <p style={{ color: '#9a9490', fontSize: 14 }}>No results for &quot;{submissionsSearch}&quot;.</p>
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#f5f0eb', borderBottom: '1px solid #e8e3dd' }}>
+                          {['Candidate', 'Country', 'Position', 'Stage', 'Status', 'Submitted'].map((h) => (
+                            <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9a9490' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredSubmissions.map((s, i) => (
+                          <tr key={s.id} style={{ borderBottom: i < filteredSubmissions.length - 1 ? '1px solid #f0ebe5' : 'none' }}>
+                            <td style={{ padding: '14px 16px', fontWeight: 600, color: '#2F2C29' }}>
+                              {s.firstName} {s.lastName}
+                            </td>
+                            <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.country ?? '—'}</td>
+                            <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.positionTitle}</td>
+                            <td style={{ padding: '14px 16px', color: '#4a4540' }}>
+                              {s.stage}
+                              {s.decisionNotes && (
+                                <div style={{ fontSize: 12, color: '#9a9490', marginTop: 3 }}>
+                                  <span style={{ fontWeight: 600 }}>Note:</span> {s.decisionNotes}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <span style={{
+                                background: s.isActive ? '#f0fde0' : '#fff5f5',
+                                color: s.isActive ? '#3a6600' : '#b91c1c',
+                                border: `1px solid ${s.isActive ? '#c4f060' : '#fca5a5'}`,
+                                borderRadius: 999, padding: '3px 9px', fontSize: 11, fontWeight: 600,
+                              }}>
+                                {s.isActive ? 'Active' : 'Not Moving Forward'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 16px', color: '#9a9490', whiteSpace: 'nowrap' }}>
+                              {new Date(s.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               </div>
             )
-          )}
+          })()}
         </div>
       </div>
     )
