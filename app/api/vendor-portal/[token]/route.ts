@@ -38,21 +38,54 @@ export async function GET(
 
   const hoursBaseline = await getMonthlyHoursBaseline()
 
-  const positions = vendor.positionVendors
+  const activePositions = vendor.positionVendors
     .map((pv) => pv.position)
     .filter((p) => !p.deletedAt)
-    .map((p) => ({
-      id: p.id,
-      title: p.title,
-      client: p.client,
-      status: p.status,
-      jdRaw: p.description ?? null,
-      jdSummary: p.jdSummary ?? null,
-      location: p.location ?? [],
-      budgetMonthly: p.internalCostBudget != null
-        ? Math.round(hourlyToMonthly(p.internalCostBudget, hoursBaseline))
-        : null,
-    }))
+
+  const positionIds = activePositions.map((p) => p.id)
+
+  // Fetch other-source candidates for each position (semi-anonymized "already in pipeline")
+  const otherCPs = positionIds.length > 0
+    ? await db.candidatePosition.findMany({
+        where: {
+          positionId: { in: positionIds },
+          candidate: {
+            deletedAt: null,
+            NOT: { sourcedByVendorId: vendor.id },
+          },
+        },
+        select: {
+          positionId: true,
+          candidate: { select: { firstName: true, lastName: true, country: true } },
+        },
+      })
+    : []
+
+  // Group by positionId
+  const otherByPosition = new Map<string, { firstNameInitial: string; country: string | null }[]>()
+  for (const cp of otherCPs) {
+    const entry = {
+      firstNameInitial: `${cp.candidate.firstName} ${cp.candidate.lastName?.[0] ?? ''}.`,
+      country: cp.candidate.country,
+    }
+    const arr = otherByPosition.get(cp.positionId) ?? []
+    arr.push(entry)
+    otherByPosition.set(cp.positionId, arr)
+  }
+
+  const positions = activePositions.map((p) => ({
+    id: p.id,
+    title: p.title,
+    client: p.client,
+    status: p.status,
+    jdRaw: p.description ?? null,
+    jdSummary: p.jdSummary ?? null,
+    location: p.location ?? [],
+    budgetMonthly: p.internalCostBudget != null
+      ? Math.round(hourlyToMonthly(p.internalCostBudget, hoursBaseline))
+      : null,
+    existingCandidates: otherByPosition.get(p.id) ?? [],
+  }))
 
   const submissions = await db.candidatePosition.findMany({
     where: { candidate: { sourcedByVendorId: vendor.id, deletedAt: null } },
@@ -60,9 +93,10 @@ export async function GET(
       candidate: { select: { firstName: true, lastName: true, country: true } },
       position: { select: { title: true } },
       interviews: {
-        orderBy: { roundNumber: 'desc' },
+        where: { decisionNotes: { not: null } },
+        orderBy: { decidedAt: 'desc' },
         take: 1,
-        select: { status: true, roundLabel: true },
+        select: { decisionNotes: true, roundLabel: true },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -77,14 +111,7 @@ export async function GET(
     OFFER: 'Offer',
     HIRED: 'Hired',
     REJECTED: 'Rejected',
-  }
-
-  const INTERVIEW_STATUS_LABELS: Record<string, string> = {
-    PENDING: 'Pending',
-    AWAITING_SCHEDULE: 'Awaiting Schedule',
-    SCHEDULED: 'Scheduled',
-    COMPLETED: 'Completed',
-    CANCELLED: 'Cancelled',
+    WITHDRAWN: 'On Hold',
   }
 
   return NextResponse.json({
@@ -94,14 +121,12 @@ export async function GET(
     submissions: submissions.map((cp) => ({
       id: cp.id,
       firstName: cp.candidate.firstName,
-      lastInitial: cp.candidate.lastName?.[0] ?? '',
+      lastName: cp.candidate.lastName,
       country: cp.candidate.country,
       positionTitle: cp.position.title,
       stage: STAGE_LABELS[cp.stage] ?? cp.stage,
       isActive: !isCandidateInactive(cp),
-      latestInterview: cp.interviews[0]
-        ? { label: cp.interviews[0].roundLabel, status: INTERVIEW_STATUS_LABELS[cp.interviews[0].status] ?? cp.interviews[0].status }
-        : null,
+      decisionNotes: cp.interviews[0]?.decisionNotes ?? null,
       submittedAt: cp.createdAt.toISOString(),
     })),
   })

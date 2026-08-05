@@ -29,6 +29,12 @@ export async function GET(
     include: {
       candidate: { select: { firstName: true, lastName: true, country: true } },
       position: { select: { title: true } },
+      interviews: {
+        where: { decisionNotes: { not: null } },
+        orderBy: { decidedAt: 'desc' },
+        take: 1,
+        select: { decisionNotes: true },
+      },
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -36,11 +42,12 @@ export async function GET(
   return NextResponse.json(submissions.map((cp) => ({
     id: cp.id,
     firstName: cp.candidate.firstName,
-    lastInitial: cp.candidate.lastName?.[0] ?? '',
+    lastName: cp.candidate.lastName,
     country: cp.candidate.country,
     positionTitle: cp.position.title,
     stage: STAGE_LABELS[cp.stage] ?? cp.stage,
     isActive: !isCandidateInactive(cp),
+    decisionNotes: cp.interviews[0]?.decisionNotes ?? null,
     submittedAt: cp.createdAt.toISOString(),
   })))
 }
