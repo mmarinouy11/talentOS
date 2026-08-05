@@ -40,7 +40,7 @@ const features = [
     icon: BarChart2,
     title: 'Reporting & Analytics',
     description:
-      'Daily pipeline reports, account status views, activity feeds, and recruiter performance tracking.',
+      'Daily pipeline reports, account status views, activity feeds, and performance tracking.',
   },
   {
     icon: Mail,
