@@ -44,6 +44,18 @@ export async function POST(
   const desiredCompensationRaw = (formData.get('desiredCompensation') as string | null)?.trim() ?? ''
   const currentCompensationRaw = (formData.get('currentCompensation') as string | null)?.trim() ?? ''
 
+  // Parse availability slots
+  const slotsRaw = formData.get('availabilitySlots') as string | null
+  let availabilitySlots: Date[] = []
+  if (slotsRaw) {
+    try {
+      const parsedSlots = JSON.parse(slotsRaw)
+      if (Array.isArray(parsedSlots)) {
+        availabilitySlots = parsedSlots.map((s: string) => new Date(s)).filter((d) => !isNaN(d.getTime()))
+      }
+    } catch { /* ignore */ }
+  }
+
   // Collect screening answers
   const screeningAnswers: string[] = []
   for (let i = 0; i < position.screeningQuestions.length; i++) {
@@ -256,6 +268,25 @@ export async function POST(
     await sendEmailViaSystemGmail({ to: position.recruiter.email, subject, html })
   } catch (err) {
     console.error('[apply] Failed to notify recruiter:', err)
+  }
+
+  // Auto-create Interview round (SCREENING for direct applicants)
+  try {
+    await db.interview.create({
+      data: {
+        candidatePositionId: cp.id,
+        stage: 'SCREENING',
+        roundLabel: 'Screening',
+        roundNumber: 1,
+        isInternal: false,
+        status: availabilitySlots.length > 0 ? 'PENDING' : 'AWAITING_SCHEDULE',
+        schedulingMode: availabilitySlots.length > 0 ? 'MANUAL_SLOTS' : null,
+        proposedSlots: availabilitySlots,
+      },
+    })
+  } catch (err) {
+    console.error('[apply] Failed to create interview:', err)
+    // Non-fatal
   }
 
   return NextResponse.json({

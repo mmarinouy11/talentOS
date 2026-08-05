@@ -30,6 +30,7 @@ interface Submission {
   id: string
   firstName: string
   lastInitial: string
+  country: string | null
   positionTitle: string
   stage: string
   isActive: boolean
@@ -89,6 +90,7 @@ export default function VendorPortalPage() {
   const [parsing, setParsing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [availabilitySlots, setAvailabilitySlots] = useState<{ date: string; time: string }[]>([])
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentError, setConsentError] = useState(false)
   const [rejectionReason, setRejectionReason] = useState<RejectionReason | null>(null)
@@ -135,6 +137,12 @@ export default function VendorPortalPage() {
     }
   }
 
+  function addSlot() { if (availabilitySlots.length < 5) setAvailabilitySlots(prev => [...prev, { date: '', time: '' }]) }
+  function removeSlot(i: number) { setAvailabilitySlots(prev => prev.filter((_, idx) => idx !== i)) }
+  function updateSlot(i: number, field: 'date' | 'time', value: string) {
+    setAvailabilitySlots(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedPosition || !file) return
@@ -153,6 +161,10 @@ export default function VendorPortalPage() {
       fd.append('email', email)
       fd.append('country', country)
       fd.append('desiredCompensation', desiredCompensation)
+      const isoSlots = availabilitySlots
+        .filter(s => s.date && s.time)
+        .map(s => new Date(`${s.date}T${s.time}`).toISOString())
+      fd.append('availabilitySlots', JSON.stringify(isoSlots))
       const res = await fetch(`/api/vendor-portal/${token}/submit`, { method: 'POST', body: fd })
       const d = await res.json()
       if (d.rejected) {
@@ -179,6 +191,7 @@ export default function VendorPortalPage() {
     setCountry('')
     setDesiredCompensation('')
     setSubmitError('')
+    setAvailabilitySlots([])
     setConsentChecked(false)
     setConsentError(false)
     setState('submit')
@@ -411,7 +424,7 @@ export default function VendorPortalPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: '#f5f0eb', borderBottom: '1px solid #e8e3dd' }}>
-                      {['Candidate', 'Position', 'Stage', 'Status', 'Latest Round', 'Submitted'].map((h) => (
+                      {['Candidate', 'Country', 'Position', 'Stage', 'Status', 'Latest Round', 'Submitted'].map((h) => (
                         <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9a9490' }}>{h}</th>
                       ))}
                     </tr>
@@ -422,6 +435,7 @@ export default function VendorPortalPage() {
                         <td style={{ padding: '14px 16px', fontWeight: 600, color: '#2F2C29' }}>
                           {s.firstName} {s.lastInitial}.
                         </td>
+                        <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.country ?? '—'}</td>
                         <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.positionTitle}</td>
                         <td style={{ padding: '14px 16px', color: '#4a4540' }}>{s.stage}</td>
                         <td style={{ padding: '14px 16px' }}>
@@ -564,6 +578,24 @@ export default function VendorPortalPage() {
             </div>
 
             {submitError && <p style={{ color: '#e53e3e', fontSize: 13, marginTop: 8 }}>{submitError}</p>}
+
+            {/* Availability slots */}
+            <div style={{ marginTop: 24, borderTop: '1px solid #f0ebe5', paddingTop: 18 }}>
+              <h2 style={{ fontSize: 13, fontWeight: 700, color: '#2F2C29', marginBottom: 4 }}>Availability <span style={{ color: '#9a9490', fontWeight: 400 }}>(optional)</span></h2>
+              <p style={{ fontSize: 12, color: '#9a9490', marginBottom: 14 }}>Share up to 5 time slots when you&apos;re available for an interview. This helps us schedule faster.</p>
+              {availabilitySlots.map((slot, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <input type="date" value={slot.date} onChange={(e) => updateSlot(i, 'date', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <input type="time" step="900" value={slot.time} onChange={(e) => updateSlot(i, 'time', e.target.value)} style={{ ...inputStyle, width: 120 }} />
+                  <button type="button" onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9a9490', fontSize: 18, padding: '0 4px', lineHeight: 1 }}>×</button>
+                </div>
+              ))}
+              {availabilitySlots.length < 5 && (
+                <button type="button" onClick={addSlot} style={{ background: 'none', border: '1.5px dashed #d5d0ca', borderRadius: 8, padding: '7px 14px', fontSize: 12, color: '#6b6560', cursor: 'pointer', fontFamily: 'Arial, "Open Sans", sans-serif' }}>
+                  + Add time slot
+                </button>
+              )}
+            </div>
 
             {/* Consent checkbox */}
             <div style={{ marginTop: 20, borderTop: '1px solid #f0ebe5', paddingTop: 16 }}>

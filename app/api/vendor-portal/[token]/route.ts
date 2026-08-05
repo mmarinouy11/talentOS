@@ -57,7 +57,7 @@ export async function GET(
   const submissions = await db.candidatePosition.findMany({
     where: { candidate: { sourcedByVendorId: vendor.id, deletedAt: null } },
     include: {
-      candidate: { select: { firstName: true, lastName: true } },
+      candidate: { select: { firstName: true, lastName: true, country: true } },
       position: { select: { title: true } },
       interviews: {
         orderBy: { roundNumber: 'desc' },
@@ -95,6 +95,7 @@ export async function GET(
       id: cp.id,
       firstName: cp.candidate.firstName,
       lastInitial: cp.candidate.lastName?.[0] ?? '',
+      country: cp.candidate.country,
       positionTitle: cp.position.title,
       stage: STAGE_LABELS[cp.stage] ?? cp.stage,
       isActive: !isCandidateInactive(cp),

@@ -43,6 +43,18 @@ export async function POST(
   const countryRaw = (formData.get('country') as string | null)?.trim() ?? ''
   const compensationRaw = (formData.get('desiredCompensation') as string | null)?.trim() ?? ''
 
+  // Parse availability slots
+  const slotsRaw = formData.get('availabilitySlots') as string | null
+  let availabilitySlots: Date[] = []
+  if (slotsRaw) {
+    try {
+      const parsed = JSON.parse(slotsRaw)
+      if (Array.isArray(parsed)) {
+        availabilitySlots = parsed.map((s: string) => new Date(s)).filter((d) => !isNaN(d.getTime()))
+      }
+    } catch { /* ignore */ }
+  }
+
   if (!cvFile || !positionId || !firstName || !lastName || !emailRaw || !countryRaw || !compensationRaw) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
@@ -246,6 +258,25 @@ export async function POST(
   } catch (err) {
     console.error('[vendor-portal] Failed to notify recruiter:', err)
     // Non-fatal — don't block acceptance
+  }
+
+  // Auto-create Interview round (TECHNICAL_INTERVIEW for vendor submissions)
+  try {
+    await db.interview.create({
+      data: {
+        candidatePositionId: cp.id,
+        stage: 'TECHNICAL_INTERVIEW',
+        roundLabel: 'Technical Interview',
+        roundNumber: 1,
+        isInternal: false,
+        status: availabilitySlots.length > 0 ? 'PENDING' : 'AWAITING_SCHEDULE',
+        schedulingMode: availabilitySlots.length > 0 ? 'MANUAL_SLOTS' : null,
+        proposedSlots: availabilitySlots,
+      },
+    })
+  } catch (err) {
+    console.error('[vendor-portal] Failed to create interview:', err)
+    // Non-fatal
   }
 
   return NextResponse.json({ rejected: false, message: 'Candidate submitted successfully!' })
