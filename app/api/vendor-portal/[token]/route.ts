@@ -44,7 +44,15 @@ export async function GET(
 
   const positionIds = activePositions.map((p) => p.id)
 
-  // Fetch other-source candidates for each position (semi-anonymized "already in pipeline")
+  function semiAnonymizeName(firstName: string, lastName: string | null): string {
+    const allParts = `${firstName} ${lastName ?? ''}`.trim().split(/\s+/)
+    if (allParts.length === 1) return allParts[0]
+    const first = allParts[0]
+    const initials = allParts.slice(1).map((p) => p[0].toUpperCase() + '.').join(' ')
+    return `${first} ${initials}`
+  }
+
+  // Fetch all candidates in pipeline for each position except this vendor's own submissions
   const otherCPs = positionIds.length > 0
     ? await db.candidatePosition.findMany({
         where: {
@@ -65,7 +73,7 @@ export async function GET(
   const otherByPosition = new Map<string, { firstNameInitial: string; country: string | null }[]>()
   for (const cp of otherCPs) {
     const entry = {
-      firstNameInitial: `${cp.candidate.firstName} ${cp.candidate.lastName?.[0] ?? ''}.`,
+      firstNameInitial: semiAnonymizeName(cp.candidate.firstName, cp.candidate.lastName),
       country: cp.candidate.country,
     }
     const arr = otherByPosition.get(cp.positionId) ?? []
