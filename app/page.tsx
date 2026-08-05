@@ -100,9 +100,6 @@ export default async function RootPage() {
 
       {/* Hero */}
       <section style={{ maxWidth: 780, margin: '0 auto', padding: '80px 24px 64px', textAlign: 'center' }}>
-        <div style={{ display: 'inline-block', background: '#000', color: '#8CF000', fontWeight: 700, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '5px 14px', borderRadius: 999, marginBottom: 24 }}>
-          Internal Tool
-        </div>
         <h1 style={{ fontSize: 'clamp(28px, 5vw, 48px)', fontWeight: 900, lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: 20, color: '#000' }}>
           TalentOS —<br />Recruiting Intelligence Platform
         </h1>
