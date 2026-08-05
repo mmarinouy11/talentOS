@@ -61,7 +61,7 @@ export default async function CandidateInPositionPage({
         <p className="text-sm text-gray-500 mt-0.5">{position.title} · {position.client}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-4">
         {/* Left column: profile, score, budget, notes, actions */}
         <div className="space-y-3">
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
