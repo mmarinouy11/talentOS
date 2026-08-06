@@ -684,7 +684,7 @@ export default function VendorPortalPage() {
             {/* Availability slots */}
             <div style={{ marginTop: 24, borderTop: '1px solid #f0ebe5', paddingTop: 18 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#2F2C29' }}>Availability <span style={{ color: '#e53e3e' }}>*</span></h2>
+                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#2F2C29' }}>Availability <span style={{ color: '#8CF000' }}>*</span></h2>
                 {selectedPosition && (
                   <span style={{ fontSize: 11, color: '#9a9490' }}>All times in {tzAbbr(selectedPosition.timezone)}</span>
                 )}
