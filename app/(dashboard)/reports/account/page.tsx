@@ -568,7 +568,7 @@ function ActivityFeed({
 export default function AccountStatusPage() {
   const [clients, setClients] = useState<string[]>([])
   const [selectedClient, setSelectedClient] = useState('')
-  const [tab, setTab] = useState<'pipeline' | 'activity' | 'dashboard'>('pipeline')
+  const [tab, setTab] = useState<'pipeline' | 'activity' | 'dashboard'>('dashboard')
   const [pipelineData, setPipelineData] = useState<AccountData | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -602,7 +602,7 @@ export default function AccountStatusPage() {
   const handleSelect = (client: string) => {
     setSelectedClient(client)
     setPipelineData(null)
-    if (tab === 'pipeline') loadPipeline(client)
+    setTab('dashboard')
   }
 
   const handleTabChange = (t: 'pipeline' | 'activity' | 'dashboard') => {
@@ -659,7 +659,7 @@ export default function AccountStatusPage() {
           {/* Tabs */}
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex gap-6">
-              {([['pipeline', 'Pipeline'], ['activity', 'Activity Feed'], ['dashboard', 'Dashboard']] as const).map(([t, label]) => (
+              {([['dashboard', 'Dashboard'], ['pipeline', 'Pipeline'], ['activity', 'Activity Feed']] as const).map(([t, label]) => (
                 <button
                   key={t}
                   onClick={() => handleTabChange(t)}
