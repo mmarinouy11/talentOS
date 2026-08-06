@@ -57,7 +57,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
   return (
     <>
       <tr className="border-b border-gray-100 last:border-0">
-        <td className="py-2.5 pr-3 text-sm font-medium text-gray-900 max-w-[180px]">
+        <td className="py-2.5 pl-4 pr-3 text-sm font-medium text-gray-900 max-w-[180px]">
           <Link href={`/positions/${pos.id}`} target="_blank" className="hover:underline">{pos.title}</Link>
           <p className="text-xs text-gray-400 font-normal">{pos.recruiter}</p>
         </td>
@@ -190,7 +190,7 @@ function DashboardTab({ client }: { client: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="py-2.5 pr-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Position</th>
+              <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Position</th>
               {DASH_STAGES.map((s) => (
                 <th key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   {DASH_COL_LABELS[s]}
@@ -207,7 +207,7 @@ function DashboardTab({ client }: { client: string }) {
             ))}
             {/* Totals row */}
             <tr className="bg-gray-50 border-t border-gray-200">
-              <td className="py-2.5 pr-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Totals</td>
+              <td className="py-2.5 pl-4 pr-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Totals</td>
               {DASH_STAGES.map((s) => (
                 <td key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
                   {totals[s] || '—'}
