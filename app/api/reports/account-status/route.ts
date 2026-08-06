@@ -84,7 +84,7 @@ export async function GET(request: Request) {
             candidate: { select: { firstName: true, lastName: true } },
             stageHistory: { orderBy: { movedAt: 'desc' } },
             interviews: {
-              where: { scheduledAt: { not: null }, status: { in: ['SCHEDULED', 'COMPLETED'] } },
+              where: { scheduledAt: { not: null }, status: 'SCHEDULED' },
               select: { stage: true, status: true, scheduledAt: true },
             },
           },
@@ -92,6 +92,8 @@ export async function GET(request: Request) {
       },
       orderBy: { title: 'asc' },
     })
+
+    const now = new Date()
 
     const result = positions.map((pos) => {
       const allCPs = pos.candidatePositions
@@ -105,14 +107,15 @@ export async function GET(request: Request) {
         }
       }
 
-      // Interview counts
+      // Interview counts (SCHEDULED + future only)
       const allInterviews = allCPs.flatMap((cp) => cp.interviews)
-      const interviewsToday = allInterviews.filter((iv) =>
+      const futureInterviews = allInterviews.filter((iv) => iv.scheduledAt! >= now)
+      const interviewsToday = futureInterviews.filter((iv) =>
         iv.scheduledAt! >= todayStart && iv.scheduledAt! <= todayEnd
       ).length
-      const interviewsTotal = allInterviews.length
+      const interviewsTotal = futureInterviews.length
 
-      // Candidates by stage for expanded view (most-advanced first)
+      // Candidates by stage with their next upcoming SCHEDULED interview
       const candidatesByStage = DASH_STAGES
         .filter((s) => stageCounts[s])
         .map((s) => ({
@@ -122,22 +125,19 @@ export async function GET(request: Request) {
             .filter((cp) => cp.stage === s)
             .map((cp) => {
               const entry = cp.stageHistory.find((h) => h.toStage === cp.stage)
+              // Pick the soonest upcoming SCHEDULED interview for this candidate
+              const nextIv = cp.interviews
+                .filter((iv) => iv.scheduledAt! >= now)
+                .sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())[0] ?? null
               return {
                 cpId: cp.id,
                 name: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
                 daysInStage: entry ? daysAgo(entry.movedAt) : daysAgo(cp.createdAt),
+                scheduledAt: nextIv?.scheduledAt?.toISOString() ?? null,
+                scheduledStageLabel: nextIv ? (STAGE_ABBREV[nextIv.stage] ?? STAGE_LABELS[nextIv.stage] ?? nextIv.stage) : null,
               }
             }),
         }))
-
-      // Scheduled interviews for expanded view
-      const scheduledInterviews = allCPs.flatMap((cp) =>
-        cp.interviews.map((iv) => ({
-          stage: iv.stage as string,
-          label: STAGE_LABELS[iv.stage as Stage] ?? iv.stage,
-          scheduledAt: iv.scheduledAt!.toISOString(),
-        }))
-      ).sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
 
       return {
         id: pos.id,
@@ -148,7 +148,6 @@ export async function GET(request: Request) {
         interviewsToday,
         interviewsTotal,
         candidatesByStage,
-        scheduledInterviews,
       }
     })
 

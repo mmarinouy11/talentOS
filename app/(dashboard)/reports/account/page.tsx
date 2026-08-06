@@ -4,15 +4,16 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 
 // ─── Dashboard tab types ─────────────────────────────────────────────────────
-interface DashboardCandidateEntry { cpId: string; name: string; daysInStage: number }
+interface DashboardCandidateEntry {
+  cpId: string; name: string; daysInStage: number
+  scheduledAt: string | null; scheduledStageLabel: string | null
+}
 interface DashboardStageGroup { stage: string; label: string; candidates: DashboardCandidateEntry[] }
-interface DashboardScheduledIv { stage: string; label: string; scheduledAt: string }
 interface DashboardPosition {
   id: string; title: string; recruiter: string; timezone: string
   stageCounts: Partial<Record<string, number>>
   interviewsToday: number; interviewsTotal: number
   candidatesByStage: DashboardStageGroup[]
-  scheduledInterviews: DashboardScheduledIv[]
 }
 interface DashboardData {
   client: string
@@ -28,10 +29,15 @@ const DASH_COL_LABELS: Record<string, string> = {
 
 function formatIvTime(iso: string, timezone: string): string {
   try {
-    return new Intl.DateTimeFormat('en-US', {
+    const d = new Date(iso)
+    const time = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone, month: 'short', day: 'numeric',
       hour: 'numeric', minute: '2-digit',
-    }).format(new Date(iso))
+    }).format(d)
+    const tzAbbr = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone, timeZoneName: 'short',
+    }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value ?? ''
+    return tzAbbr ? `${time} ${tzAbbr}` : time
   } catch {
     return iso
   }
@@ -79,39 +85,27 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
       {open && (
         <tr className="bg-gray-50 border-b border-gray-100">
           <td colSpan={DASH_STAGES.length + 4} className="px-4 py-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Candidates by stage */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Active Candidates</p>
-                {pos.candidatesByStage.length === 0
-                  ? <p className="text-xs text-gray-400">No active candidates</p>
-                  : pos.candidatesByStage.map((sg) => (
-                    <div key={sg.stage} className="mb-2">
-                      <p className="text-xs font-medium text-gray-600 mb-1">{sg.label}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {sg.candidates.map((c) => (
-                          <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
-                            className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 hover:border-gray-400">
-                            {c.name} <AgingBadge days={c.daysInStage} />
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-              {/* Scheduled interviews */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Scheduled Interviews</p>
-                {pos.scheduledInterviews.length === 0
-                  ? <p className="text-xs text-gray-400">No scheduled interviews</p>
-                  : pos.scheduledInterviews.map((iv, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-700 mb-1">
-                      <span className="font-medium shrink-0">{iv.label}</span>
-                      <span className="text-gray-400">{formatIvTime(iv.scheduledAt, pos.timezone)}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Active Candidates</p>
+            {pos.candidatesByStage.length === 0
+              ? <p className="text-xs text-gray-400">No active candidates</p>
+              : pos.candidatesByStage.map((sg) => (
+                <div key={sg.stage} className="mb-2">
+                  <p className="text-xs font-medium text-gray-600 mb-1">{sg.label}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sg.candidates.map((c) => (
+                      <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
+                        className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 hover:border-gray-400">
+                        {c.name} <AgingBadge days={c.daysInStage} />
+                        {c.scheduledAt && c.scheduledStageLabel && (
+                          <span className="text-gray-400 ml-0.5">
+                            — {c.scheduledStageLabel}: {formatIvTime(c.scheduledAt, pos.timezone)}
+                          </span>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
           </td>
         </tr>
       )}
