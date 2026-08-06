@@ -3,6 +3,236 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 
+// ─── Dashboard tab types ─────────────────────────────────────────────────────
+interface DashboardCandidateEntry { cpId: string; name: string; daysInStage: number }
+interface DashboardStageGroup { stage: string; label: string; candidates: DashboardCandidateEntry[] }
+interface DashboardScheduledIv { stage: string; label: string; scheduledAt: string }
+interface DashboardPosition {
+  id: string; title: string; recruiter: string; timezone: string
+  stageCounts: Partial<Record<string, number>>
+  interviewsToday: number; interviewsTotal: number
+  candidatesByStage: DashboardStageGroup[]
+  scheduledInterviews: DashboardScheduledIv[]
+}
+interface DashboardData {
+  client: string
+  positions: DashboardPosition[]
+  generatedAt: string
+}
+
+const DASH_STAGES = ['OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED'] as const
+const DASH_COL_LABELS: Record<string, string> = {
+  OFFER: 'Offer', CLIENT_INTERVIEW: 'Client', MANAGER_INTERVIEW: 'Mgr',
+  TECHNICAL_INTERVIEW: 'Tech', SCREENING: 'Screen', APPLIED: 'Applied',
+}
+
+function formatIvTime(iso: string, timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone, month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  )
+}
+
+function DashboardRow({ pos }: { pos: DashboardPosition }) {
+  const [open, setOpen] = useState(false)
+  const totalActive = Object.values(pos.stageCounts).reduce((s, n) => s + (n ?? 0), 0)
+  return (
+    <>
+      <tr className="border-b border-gray-100 last:border-0">
+        <td className="py-2.5 pr-3 text-sm font-medium text-gray-900 max-w-[180px]">
+          <Link href={`/positions/${pos.id}`} target="_blank" className="hover:underline">{pos.title}</Link>
+          <p className="text-xs text-gray-400 font-normal">{pos.recruiter}</p>
+        </td>
+        {DASH_STAGES.map((s) => (
+          <td key={s} className="py-2.5 px-2 text-center text-sm">
+            {pos.stageCounts[s] ? (
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-lime-100 text-lime-800 font-semibold text-xs">
+                {pos.stageCounts[s]}
+              </span>
+            ) : <span className="text-gray-300">—</span>}
+          </td>
+        ))}
+        <td className="py-2.5 px-2 text-center text-sm text-gray-700">{totalActive || '—'}</td>
+        <td className="py-2.5 px-2 text-center text-sm">
+          {pos.interviewsToday > 0
+            ? <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-800 font-semibold text-xs">{pos.interviewsToday}</span>
+            : <span className="text-gray-300">—</span>}
+        </td>
+        <td className="py-2.5 pl-2 text-sm">
+          <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 text-gray-500 hover:text-gray-800 text-xs">
+            Details <Chevron open={open} />
+          </button>
+        </td>
+      </tr>
+      {open && (
+        <tr className="bg-gray-50 border-b border-gray-100">
+          <td colSpan={DASH_STAGES.length + 4} className="px-4 py-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Candidates by stage */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Active Candidates</p>
+                {pos.candidatesByStage.length === 0
+                  ? <p className="text-xs text-gray-400">No active candidates</p>
+                  : pos.candidatesByStage.map((sg) => (
+                    <div key={sg.stage} className="mb-2">
+                      <p className="text-xs font-medium text-gray-600 mb-1">{sg.label}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sg.candidates.map((c) => (
+                          <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
+                            className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 hover:border-gray-400">
+                            {c.name} <AgingBadge days={c.daysInStage} />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              {/* Scheduled interviews */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Scheduled Interviews</p>
+                {pos.scheduledInterviews.length === 0
+                  ? <p className="text-xs text-gray-400">No scheduled interviews</p>
+                  : pos.scheduledInterviews.map((iv, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-gray-700 mb-1">
+                      <span className="font-medium shrink-0">{iv.label}</span>
+                      <span className="text-gray-400">{formatIvTime(iv.scheduledAt, pos.timezone)}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function PipelineFunnel({ positions }: { positions: DashboardPosition[] }) {
+  const totals = DASH_STAGES.map((s) =>
+    positions.reduce((sum, p) => sum + (p.stageCounts[s] ?? 0), 0)
+  )
+  const maxVal = Math.max(...totals, 1)
+  const CX = 310, MAX_HW = 170, MIN_HW = 12, ROW_H = 52, GAP = 5
+  const opacities = [0.14, 0.26, 0.42, 0.58, 0.76, 1.0]
+  const widths = totals.map((v) => MIN_HW + (v / maxVal) * (MAX_HW - MIN_HW))
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Pipeline Funnel</p>
+      <svg width="100%" viewBox={`0 0 620 ${DASH_STAGES.length * (ROW_H + GAP) + 10}`} className="max-w-[620px] mx-auto">
+        {DASH_STAGES.map((s, i) => {
+          const hw = widths[i]
+          const y = i * (ROW_H + GAP)
+          const nextHw = i < widths.length - 1 ? widths[i + 1] : hw
+          const points = `${CX - hw},${y} ${CX + hw},${y} ${CX + nextHw},${y + ROW_H} ${CX - nextHw},${y + ROW_H}`
+          const count = totals[i]
+          const highOpacity = opacities[i] >= 0.58
+          const convRate = i > 0 && totals[i - 1] > 0 ? Math.round((count / totals[i - 1]) * 100) : null
+          return (
+            <g key={s}>
+              <polygon points={points} fill={`rgba(132,204,22,${opacities[i]})`} />
+              {count > 0 && (
+                <text x={CX} y={y + ROW_H / 2 + 5} textAnchor="middle" fontSize={13} fontWeight={600}
+                  fill={highOpacity ? '#fff' : '#3a4a10'}>
+                  {count}
+                </text>
+              )}
+              <text x={CX - hw - 8} y={y + ROW_H / 2 + 5} textAnchor="end" fontSize={11} fill="#6b7280">
+                {DASH_COL_LABELS[s]}
+              </text>
+              {convRate !== null && (
+                <text x={CX + MAX_HW + 16} y={y + 5} fontSize={10} fill="#9ca3af">
+                  → {convRate}%
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function DashboardTab({ client }: { client: string }) {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!client) return
+    setLoading(true); setError(null)
+    fetch(`/api/reports/account-status?client=${encodeURIComponent(client)}&mode=dashboard`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => setError('Failed to load dashboard data'))
+      .finally(() => setLoading(false))
+  }, [client])
+
+  if (loading) return <p className="text-sm text-gray-400">Loading dashboard…</p>
+  if (error) return <p className="text-sm text-red-600">{error}</p>
+  if (!data) return null
+
+  const totals = DASH_STAGES.reduce((acc, s) => {
+    acc[s] = data.positions.reduce((sum, p) => sum + (p.stageCounts[s] ?? 0), 0)
+    return acc
+  }, {} as Record<string, number>)
+  const grandTotal = Object.values(totals).reduce((s, n) => s + n, 0)
+  const ivsToday = data.positions.reduce((s, p) => s + p.interviewsToday, 0)
+
+  return (
+    <div className="space-y-4">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              <th className="py-2.5 pr-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Position</th>
+              {DASH_STAGES.map((s) => (
+                <th key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {DASH_COL_LABELS[s]}
+                </th>
+              ))}
+              <th className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+              <th className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Today</th>
+              <th className="py-2.5 pl-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.positions.map((pos) => (
+              <DashboardRow key={pos.id} pos={pos} />
+            ))}
+            {/* Totals row */}
+            <tr className="bg-gray-50 border-t border-gray-200">
+              <td className="py-2.5 pr-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Totals</td>
+              {DASH_STAGES.map((s) => (
+                <td key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
+                  {totals[s] || '—'}
+                </td>
+              ))}
+              <td className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">{grandTotal || '—'}</td>
+              <td className="py-2.5 px-2 text-center text-xs font-semibold text-blue-700">{ivsToday || '—'}</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {data.positions.length > 0 && <PipelineFunnel positions={data.positions} />}
+    </div>
+  )
+}
+
+
 const STAGE_COLORS: Record<string, string> = {
   'Hired':               'bg-green-100 text-green-800',
   'Offer':               'bg-emerald-100 text-emerald-800',
@@ -345,7 +575,7 @@ function ActivityFeed({
 export default function AccountStatusPage() {
   const [clients, setClients] = useState<string[]>([])
   const [selectedClient, setSelectedClient] = useState('')
-  const [tab, setTab] = useState<'pipeline' | 'activity'>('pipeline')
+  const [tab, setTab] = useState<'pipeline' | 'activity' | 'dashboard'>('pipeline')
   const [pipelineData, setPipelineData] = useState<AccountData | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -382,7 +612,7 @@ export default function AccountStatusPage() {
     if (tab === 'pipeline') loadPipeline(client)
   }
 
-  const handleTabChange = (t: 'pipeline' | 'activity') => {
+  const handleTabChange = (t: 'pipeline' | 'activity' | 'dashboard') => {
     setTab(t)
     if (t === 'pipeline' && selectedClient && !pipelineData) loadPipeline(selectedClient)
   }
@@ -436,13 +666,13 @@ export default function AccountStatusPage() {
           {/* Tabs */}
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex gap-6">
-              {(['pipeline', 'activity'] as const).map((t) => (
+              {([['pipeline', 'Pipeline'], ['activity', 'Activity Feed'], ['dashboard', 'Dashboard']] as const).map(([t, label]) => (
                 <button
                   key={t}
                   onClick={() => handleTabChange(t)}
                   className={`pb-3 text-sm font-medium border-b-2 transition-colors ${tab === t ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
                 >
-                  {t === 'pipeline' ? 'Pipeline' : 'Activity Feed'}
+                  {label}
                 </button>
               ))}
             </nav>
@@ -502,6 +732,9 @@ export default function AccountStatusPage() {
               setCustomTo={setCustomTo}
             />
           )}
+
+          {/* Dashboard tab */}
+          {tab === 'dashboard' && <DashboardTab client={selectedClient} />}
         </>
       )}
     </div>

@@ -54,7 +54,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const client = searchParams.get('client')
-  const mode = searchParams.get('mode') // 'pipeline' (default) | 'activity'
+  const mode = searchParams.get('mode') // 'pipeline' (default) | 'activity' | 'dashboard'
 
   // No client param → return list of unique clients
   if (!client) {
@@ -65,6 +65,94 @@ export async function GET(request: Request) {
       orderBy: { client: 'asc' },
     })
     return NextResponse.json({ clients: positions.map((p) => p.client) })
+  }
+
+  // Dashboard mode
+  if (mode === 'dashboard') {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999)
+
+    const DASH_STAGES: Stage[] = ['OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
+
+    const positions = await db.position.findMany({
+      where: { client, status: 'OPEN', deletedAt: null },
+      include: {
+        recruiter: { select: { name: true, email: true } },
+        candidatePositions: {
+          where: { candidate: { deletedAt: null } },
+          include: {
+            candidate: { select: { firstName: true, lastName: true } },
+            stageHistory: { orderBy: { movedAt: 'desc' } },
+            interviews: {
+              where: { scheduledAt: { not: null }, status: { in: ['SCHEDULED', 'COMPLETED'] } },
+              select: { stage: true, status: true, scheduledAt: true },
+            },
+          },
+        },
+      },
+      orderBy: { title: 'asc' },
+    })
+
+    const result = positions.map((pos) => {
+      const allCPs = pos.candidatePositions
+      const activeCPs = allCPs.filter((cp) => !isCandidateInactive(cp))
+
+      // Stage counts (active only, relevant stages)
+      const stageCounts: Partial<Record<string, number>> = {}
+      for (const cp of activeCPs) {
+        if (DASH_STAGES.includes(cp.stage as Stage)) {
+          stageCounts[cp.stage] = (stageCounts[cp.stage] ?? 0) + 1
+        }
+      }
+
+      // Interview counts
+      const allInterviews = allCPs.flatMap((cp) => cp.interviews)
+      const interviewsToday = allInterviews.filter((iv) =>
+        iv.scheduledAt! >= todayStart && iv.scheduledAt! <= todayEnd
+      ).length
+      const interviewsTotal = allInterviews.length
+
+      // Candidates by stage for expanded view (most-advanced first)
+      const candidatesByStage = DASH_STAGES
+        .filter((s) => stageCounts[s])
+        .map((s) => ({
+          stage: s,
+          label: STAGE_LABELS[s],
+          candidates: activeCPs
+            .filter((cp) => cp.stage === s)
+            .map((cp) => {
+              const entry = cp.stageHistory.find((h) => h.toStage === cp.stage)
+              return {
+                cpId: cp.id,
+                name: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
+                daysInStage: entry ? daysAgo(entry.movedAt) : daysAgo(cp.createdAt),
+              }
+            }),
+        }))
+
+      // Scheduled interviews for expanded view
+      const scheduledInterviews = allCPs.flatMap((cp) =>
+        cp.interviews.map((iv) => ({
+          stage: iv.stage as string,
+          label: STAGE_LABELS[iv.stage as Stage] ?? iv.stage,
+          scheduledAt: iv.scheduledAt!.toISOString(),
+        }))
+      ).sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+
+      return {
+        id: pos.id,
+        title: pos.title,
+        recruiter: pos.recruiter.name ?? pos.recruiter.email,
+        timezone: (pos as { timezone?: string | null }).timezone ?? 'America/Montevideo',
+        stageCounts,
+        interviewsToday,
+        interviewsTotal,
+        candidatesByStage,
+        scheduledInterviews,
+      }
+    })
+
+    return NextResponse.json({ client, positions: result, generatedAt: new Date().toISOString() })
   }
 
   // Activity mode
@@ -105,7 +193,6 @@ export async function GET(request: Request) {
     })
 
     // Group by date (YYYY-MM-DD in UTC) then by positionId
-    // decisions keyed by "DECISION|STAGE_ABBREV" to support per-stage breakdown
     const dayMap = new Map<string, Map<string, {
       scheduledByStage: Map<string, number>
       decidedByKey: Map<string, { decision: string; stage: string; count: number }>
@@ -127,13 +214,11 @@ export async function GET(request: Request) {
         if (!posDay.has(posId)) posDay.set(posId, { scheduledByStage: new Map(), decidedByKey: new Map() })
         const entry = posDay.get(posId)!
 
-        // Count scheduled (scheduledAt on this day)
         if (iv.scheduledAt && iv.scheduledAt.toISOString().slice(0, 10) === day && iv.stage) {
           const abbrev = STAGE_ABBREV[iv.stage] ?? iv.stage
           entry.scheduledByStage.set(abbrev, (entry.scheduledByStage.get(abbrev) ?? 0) + 1)
         }
 
-        // Count decisions grouped by (decision, stage)
         if (iv.decision && iv.stage) {
           const decidedDay = (iv.decidedAt ?? iv.updatedAt).toISOString().slice(0, 10)
           if (decidedDay === day) {
@@ -150,7 +235,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Build sorted days (most recent first)
     const days = [...dayMap.entries()]
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([date, posMap2]) => ({
@@ -204,7 +288,6 @@ export async function GET(request: Request) {
     const activeCPs = allCPs.filter((cp) => !isCandidateInactive(cp))
     const inactiveCPs = allCPs.filter((cp) => isCandidateInactive(cp))
 
-    // Pipeline breakdown (most advanced first, skip REJECTED/WITHDRAWN)
     const byStage = new Map<Stage, typeof allCPs>()
     for (const cp of activeCPs) {
       const arr = byStage.get(cp.stage) ?? []
@@ -228,7 +311,6 @@ export async function GET(request: Request) {
         }),
       }))
 
-    // Movements last 7 days
     const newCandidates = activeCPs
       .filter((cp) => cp.createdAt >= sevenDaysAgo)
       .map((cp) => ({
