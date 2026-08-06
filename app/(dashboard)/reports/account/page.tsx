@@ -27,6 +27,11 @@ const DASH_COL_LABELS: Record<string, string> = {
   TECHNICAL_INTERVIEW: 'Tech', SCREENING: 'Screen', APPLIED: 'Applied',
 }
 
+const DASH_FUNNEL_LABELS: Record<string, string> = {
+  OFFER: 'Offer', CLIENT_INTERVIEW: 'Client Interview', MANAGER_INTERVIEW: 'Manager Interview',
+  TECHNICAL_INTERVIEW: 'Technical Interview', SCREENING: 'Screening', APPLIED: 'Applied',
+}
+
 function formatIvTime(iso: string, timezone: string): string {
   try {
     const d = new Date(iso)
@@ -123,14 +128,16 @@ function PipelineFunnel({ positions }: { positions: DashboardPosition[] }) {
     positions.reduce((sum, p) => sum + (p.stageCounts[s] ?? 0), 0)
   )
   const maxVal = Math.max(...totals, 1)
-  const CX = 310, MAX_HW = 170, MIN_HW = 12, ROW_H = 52, GAP = 5
+  // Label column is 160px wide; funnel starts at x=170, centered at CX=370
+  const LABEL_X = 155, CX = 370, MAX_HW = 170, MIN_HW = 12, ROW_H = 52, GAP = 5
+  const VW = 560
   const opacities = [0.14, 0.26, 0.42, 0.58, 0.76, 1.0]
   const widths = totals.map((v) => MIN_HW + (v / maxVal) * (MAX_HW - MIN_HW))
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Pipeline Funnel</p>
-      <svg width="100%" viewBox={`0 0 620 ${DASH_STAGES.length * (ROW_H + GAP) + 10}`} className="max-w-[620px] mx-auto">
+      <svg width="100%" viewBox={`0 0 ${VW} ${DASH_STAGES.length * (ROW_H + GAP) + 10}`} className="max-w-[560px] mx-auto">
         {DASH_STAGES.map((s, i) => {
           const hw = widths[i]
           const y = i * (ROW_H + GAP)
@@ -147,8 +154,8 @@ function PipelineFunnel({ positions }: { positions: DashboardPosition[] }) {
                   {count}
                 </text>
               )}
-              <text x={CX - hw - 8} y={y + ROW_H / 2 + 5} textAnchor="end" fontSize={11} fill="#6b7280">
-                {DASH_COL_LABELS[s]}
+              <text x={LABEL_X} y={y + ROW_H / 2 + 5} textAnchor="end" fontSize={11} fill="#6b7280">
+                {DASH_FUNNEL_LABELS[s]}
               </text>
             </g>
           )
