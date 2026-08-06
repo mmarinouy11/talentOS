@@ -99,6 +99,12 @@ function SourceCell({ row }: { row: CandidateRow }) {
       <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">Direct</span>
     </span>
   )
+  if (row.sourcedByType === 'REFERRAL') return (
+    <span className="text-gray-700 text-xs">
+      {row.sourcedByVendor?.name ?? '—'}{' '}
+      <span className="inline-flex items-center rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700">Referral</span>
+    </span>
+  )
   return (
     <span className="text-gray-700 text-xs">
       {row.sourcedByOther ?? '—'}{' '}
@@ -200,13 +206,13 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
         <Input placeholder="Search by name, email, or skill…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
 
         {uniqueCountries.length > 1 && (
-          <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="h-9 py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+          <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="h-9 py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8CF000] bg-white">
             <option value="">All Countries</option>
             {uniqueCountries.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
 
-        <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="h-9 py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white">
+        <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="h-9 py-1.5 pl-2 pr-7 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8CF000] bg-white">
           <option value="">All Sources</option>
           <option value="RECRUITER">Internal Recruiter</option>
           <option value="VENDOR">Partner</option>
@@ -231,7 +237,7 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+              <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
                 {sh('Name', '_name')}
                 {sh('Date Added', '_createdAt')}
                 {sh('Email', 'email')}

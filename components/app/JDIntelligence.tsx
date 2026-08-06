@@ -151,7 +151,7 @@ export function JDIntelligence({
                   title={isCore ? 'Core skill (click to unmark)' : 'Click to mark as core'}
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                     isCore
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      ? 'bg-[#8CF000] text-black hover:bg-[#7ADF00]'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -162,7 +162,7 @@ export function JDIntelligence({
             })}
           </div>
           {coreSkills.size > 0 && (
-            <p className="text-xs text-blue-600 mt-1.5">★ Core skills penalize candidates who lack them during fit scoring.</p>
+            <p className="text-xs text-gray-500 mt-1.5">★ Core skills penalize candidates who lack them during fit scoring.</p>
           )}
         </div>
       )}

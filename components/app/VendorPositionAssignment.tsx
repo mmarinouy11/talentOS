@@ -116,7 +116,7 @@ export function VendorPositionAssignment({ vendorId }: { vendorId: string }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search open positions to assign…"
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
         />
         {search && filtered.length > 0 && (
           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">

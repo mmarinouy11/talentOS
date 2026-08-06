@@ -234,7 +234,7 @@ export default async function PositionDetailPage({
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Partner Min Score</p>
             <p className="text-sm text-gray-900 mt-0.5">
               {position.vendorMinFitScore != null
-                ? <>{position.vendorMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
+                ? <>{position.vendorMinFitScore} <span className="text-xs text-gray-500">(custom)</span></>
                 : <>{globalVendorMin} <span className="text-xs text-gray-400">(default)</span></>}
             </p>
           </div>
@@ -242,7 +242,7 @@ export default async function PositionDetailPage({
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Direct Min Score</p>
             <p className="text-sm text-gray-900 mt-0.5">
               {position.directMinFitScore != null
-                ? <>{position.directMinFitScore} <span className="text-xs text-blue-600">(custom)</span></>
+                ? <>{position.directMinFitScore} <span className="text-xs text-gray-500">(custom)</span></>
                 : <>{globalDirectMin} <span className="text-xs text-gray-400">(default)</span></>}
             </p>
           </div>
@@ -279,11 +279,11 @@ export default async function PositionDetailPage({
 
       {/* Metrics */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-4 py-3">
+        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8CF000] px-4 py-3">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Aging</p>
           <p className="text-3xl font-semibold mt-0.5 text-gray-900">{days}d</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8DF000] px-4 py-3">
+        <div className="bg-white rounded-xl border border-gray-200 border-t-[2px] border-t-[#8CF000] px-4 py-3">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Candidates</p>
           <div className="flex items-baseline gap-3 mt-0.5 flex-wrap">
             <span className="text-3xl font-semibold text-gray-900">{totalCandidates}</span>

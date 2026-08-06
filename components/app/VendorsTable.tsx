@@ -19,7 +19,7 @@ export function VendorsTable({ vendors }: { vendors: Vendor[] }) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+        <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
           <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Point of Contact</th>

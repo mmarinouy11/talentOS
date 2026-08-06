@@ -73,7 +73,7 @@ export default function InvitePage() {
         {state === 'used' && (
           <div className="mt-4">
             <p className="text-sm text-gray-700">{message || 'This invitation has already been used.'}</p>
-            <a href="/login" className="mt-3 inline-block text-sm text-blue-600 hover:underline">Go to login →</a>
+            <a href="/login" className="mt-3 inline-block text-sm text-gray-600 hover:underline">Go to login →</a>
           </div>
         )}
 
@@ -98,7 +98,7 @@ export default function InvitePage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
                   placeholder="Min. 8 characters"
                 />
               </div>
@@ -111,7 +111,7 @@ export default function InvitePage() {
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
                 />
               </div>
               {formError && <p className="text-sm text-red-600">{formError}</p>}

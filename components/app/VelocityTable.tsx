@@ -28,7 +28,7 @@ export function VelocityTable({ data, label, emptyMessage = 'Not enough data yet
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+        <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
           <th className="text-left px-3 py-2 font-medium text-gray-600">Stage</th>
           <th className="text-right px-3 py-2 font-medium text-gray-600">{label}</th>
           <th className="text-right px-3 py-2 font-medium text-gray-600">Sample</th>

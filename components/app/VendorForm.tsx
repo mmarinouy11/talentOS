@@ -88,14 +88,14 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
           <Label htmlFor="type">Partner Type</Label>
           <div className="flex gap-3 mt-1">
             {(['RECRUITING_PARTNER', 'REFERRAL_NETWORK'] as const).map((t) => (
-              <label key={t} className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-colors ${type === t ? 'border-[#8DF000] bg-[#F5FBE8]' : 'border-gray-200 hover:border-gray-300'}`}>
+              <label key={t} className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-colors ${type === t ? 'border-[#8CF000] bg-[#F5FBE8]' : 'border-gray-200 hover:border-gray-300'}`}>
                 <input
                   type="radio"
                   name="type"
                   value={t}
                   checked={type === t}
                   onChange={() => setType(t)}
-                  className="accent-[#8DF000]"
+                  className="accent-[#8CF000]"
                 />
                 <span className="text-sm font-medium text-gray-700">
                   {t === 'RECRUITING_PARTNER' ? 'Recruiting Partner' : 'Referral Network'}
@@ -151,7 +151,7 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
               type="checkbox"
               checked={active}
               onChange={(e) => setActive(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 accent-[#8DF000]"
+              className="h-4 w-4 rounded border-gray-300 accent-[#8CF000]"
             />
             <span className="text-sm font-medium text-gray-700">Active partner</span>
           </label>

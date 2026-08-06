@@ -86,7 +86,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     <label
       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
         selected === value
-          ? 'border-[#8DF000] bg-[#8DF000]/10'
+          ? 'border-[#8CF000] bg-[#8CF000]/10'
           : dim
           ? 'border-gray-100 bg-gray-50 hover:bg-gray-100'
           : 'border-gray-200 bg-white hover:bg-gray-50'

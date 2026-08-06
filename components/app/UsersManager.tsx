@@ -122,7 +122,7 @@ function UserForm({ user, onClose, onSaved }: UserFormProps) {
               id="u-role"
               value={role}
               onChange={(e) => setRole(e.target.value as Role)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -156,7 +156,7 @@ function UserForm({ user, onClose, onSaved }: UserFormProps) {
             <button
               type="button"
               onClick={() => setShowReset(true)}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-gray-600 hover:underline"
             >
               Reset password
             </button>
@@ -233,7 +233,7 @@ export function UsersManager({ initialUsers }: { initialUsers: UserRow[] }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+            <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
               <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>

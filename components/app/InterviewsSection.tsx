@@ -121,7 +121,7 @@ const DECISION_COLORS: Record<InterviewDecision, string> = {
 // ─── helpers ───────────────────────────────────────────────────────────────
 
 function selectClass() {
-  return 'mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]'
+  return 'mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]'
 }
 
 function buildSchedulingEmailContent(
@@ -196,7 +196,7 @@ function SlotEntry({ value, onChange, onRemove, showRemove, timezone }: { value:
   return (
     <div className="flex items-center gap-2">
       <Input type="date" value={date} onChange={(e) => set(e.target.value, time)} className="flex-1" required />
-      <select value={time} onChange={(e) => set(date, e.target.value)} className="border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white border-gray-200">
+      <select value={time} onChange={(e) => set(date, e.target.value)} className="border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000] bg-white border-gray-200">
         {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       {showRemove && (
@@ -214,7 +214,7 @@ function SlotList({ slots, onChange, timezone }: { slots: string[]; onChange: (s
       {slots.map((slot, i) => (
         <SlotEntry key={i} value={slot} onChange={(v) => update(i, v)} onRemove={() => remove(i)} showRemove={slots.length > 1} timezone={timezone} />
       ))}
-      <button type="button" onClick={() => onChange([...slots, ''])} className="text-sm text-blue-600 hover:underline">
+      <button type="button" onClick={() => onChange([...slots, ''])} className="text-sm text-gray-600 hover:underline">
         + Add another slot
       </button>
     </div>
@@ -241,7 +241,7 @@ function ConfirmedDatePicker({ value, onChange, disabled }: { value: string; onC
         value={time}
         onChange={(e) => set(date, e.target.value)}
         disabled={disabled}
-        className={`border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white border-gray-200 ${disabled ? 'bg-gray-50 text-gray-400' : ''}`}
+        className={`border rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000] bg-white border-gray-200 ${disabled ? 'bg-gray-50 text-gray-400' : ''}`}
       >
         {TIME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -315,7 +315,7 @@ function FeedbackPdfUpload({
             href={`https://drive.google.com/file/d/${existingPdfUrl}/view`}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-blue-600 hover:underline"
+            className="text-xs text-gray-600 hover:underline"
           >
             View current PDF ↗
           </a>
@@ -323,7 +323,7 @@ function FeedbackPdfUpload({
       </div>
 
       <label
-        className={`relative flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 cursor-pointer transition-colors ${dragOver ? 'border-[#8DF000] bg-lime-50' : 'border-gray-200 hover:border-gray-300 bg-gray-50'} ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+        className={`relative flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 cursor-pointer transition-colors ${dragOver ? 'border-[#8CF000] bg-lime-50' : 'border-gray-200 hover:border-gray-300 bg-gray-50'} ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
@@ -489,7 +489,7 @@ function GenericEmailPreviewModal({
               value={html}
               onChange={(e) => setHtml(e.target.value)}
               rows={10}
-              className="mt-1 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+              className="mt-1 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
             />
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
@@ -628,11 +628,11 @@ function NextRoundModal({
           {isScreening && (
             <div className="flex gap-3 flex-wrap">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={schedulingMode === 'MANUAL_SLOTS'} onChange={() => setSchedulingMode('MANUAL_SLOTS')} className="accent-[#8DF000]" />
+                <input type="radio" checked={schedulingMode === 'MANUAL_SLOTS'} onChange={() => setSchedulingMode('MANUAL_SLOTS')} className="accent-[#8CF000]" />
                 <span className="text-sm text-gray-700">Add time slots manually</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={schedulingMode === 'CALENDAR_LINK'} onChange={() => setSchedulingMode('CALENDAR_LINK')} className="accent-[#8DF000]" />
+                <input type="radio" checked={schedulingMode === 'CALENDAR_LINK'} onChange={() => setSchedulingMode('CALENDAR_LINK')} className="accent-[#8CF000]" />
                 <span className="text-sm text-gray-700">Use my Calendar Link</span>
               </label>
             </div>
@@ -829,11 +829,11 @@ function AddInterviewModal({
             {isScreening && (
               <div className="flex gap-3 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="schedulingMode" value="MANUAL_SLOTS" checked={schedulingMode === 'MANUAL_SLOTS'} onChange={() => setSchedulingMode('MANUAL_SLOTS')} className="accent-[#8DF000]" />
+                  <input type="radio" name="schedulingMode" value="MANUAL_SLOTS" checked={schedulingMode === 'MANUAL_SLOTS'} onChange={() => setSchedulingMode('MANUAL_SLOTS')} className="accent-[#8CF000]" />
                   <span className="text-sm text-gray-700">Add time slots manually</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="schedulingMode" value="CALENDAR_LINK" checked={schedulingMode === 'CALENDAR_LINK'} onChange={() => setSchedulingMode('CALENDAR_LINK')} className="accent-[#8DF000]" />
+                  <input type="radio" name="schedulingMode" value="CALENDAR_LINK" checked={schedulingMode === 'CALENDAR_LINK'} onChange={() => setSchedulingMode('CALENDAR_LINK')} className="accent-[#8CF000]" />
                   <span className="text-sm text-gray-700">Use my Calendar Link</span>
                 </label>
               </div>
@@ -1180,11 +1180,11 @@ function EditInterviewModal({
                     <Label>Panel Type <span className="text-red-500">*</span></Label>
                     <div className="flex gap-4 mt-1.5">
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="panelType" value="INTERNAL" checked={panelType === 'INTERNAL'} onChange={() => setPanelType('INTERNAL')} className="accent-[#8DF000]" disabled={isCancelled} />
+                        <input type="radio" name="panelType" value="INTERNAL" checked={panelType === 'INTERNAL'} onChange={() => setPanelType('INTERNAL')} className="accent-[#8CF000]" disabled={isCancelled} />
                         <span className="text-sm text-gray-700">Internal Panel</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="panelType" value="EXTERNAL" checked={panelType === 'EXTERNAL'} onChange={() => { setPanelType('EXTERNAL'); setInterviewerEmail(''); setConfirmationError(null) }} className="accent-[#8DF000]" disabled={isCancelled} />
+                        <input type="radio" name="panelType" value="EXTERNAL" checked={panelType === 'EXTERNAL'} onChange={() => { setPanelType('EXTERNAL'); setInterviewerEmail(''); setConfirmationError(null) }} className="accent-[#8CF000]" disabled={isCancelled} />
                         <span className="text-sm text-gray-700">External Panel</span>
                       </label>
                     </div>
@@ -1214,7 +1214,7 @@ function EditInterviewModal({
 
           {currentInterview.humanScore != null && (
             <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-2">
-              <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">Interviewer Feedback</p>
+              <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">Interviewer Feedback</p>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-blue-900">Score: {currentInterview.humanScore}/5</span>
                 <span className="text-yellow-500">{'★'.repeat(currentInterview.humanScore)}{'☆'.repeat(5 - currentInterview.humanScore)}</span>
@@ -1224,7 +1224,7 @@ function EditInterviewModal({
               )}
               {currentInterview.skillRatings.length > 0 && (
                 <div className="pt-2 border-t border-blue-200 space-y-1.5">
-                  <p className="text-xs font-medium text-blue-600">Skill Ratings</p>
+                  <p className="text-xs font-medium text-gray-700">Skill Ratings</p>
                   {currentInterview.skillRatings.map((sr) => (
                     <div key={sr.skillName} className="flex items-start gap-2 text-sm">
                       <span className="font-medium text-blue-900 w-32 shrink-0">{sr.skillName}</span>
@@ -1263,7 +1263,7 @@ function EditInterviewModal({
               href={`https://drive.google.com/file/d/${currentInterview.feedbackPdfUrl}/view`}
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-blue-600 hover:underline"
+              className="text-xs text-gray-600 hover:underline"
             >
               View Feedback PDF ↗
             </a>
@@ -1291,7 +1291,7 @@ function EditInterviewModal({
                 onChange={(e) => { setFeedbackText(e.target.value); if (previewResult) setPreviewResult(null) }}
                 rows={4}
                 disabled={isCancelled}
-                className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] disabled:bg-gray-50 disabled:text-gray-400"
+                className="mt-0.5 block w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000] disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder="Interviewer notes…"
               />
             </div>

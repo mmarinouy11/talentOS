@@ -25,7 +25,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
             {/* Lima accent left border for active item */}
             <span
               className="flex-shrink-0 self-stretch w-[3px] rounded-sm mr-3 ml-0"
-              style={{ background: isActive ? '#8DF000' : 'transparent' }}
+              style={{ background: isActive ? '#8CF000' : 'transparent' }}
             />
             {item.label}
           </Link>

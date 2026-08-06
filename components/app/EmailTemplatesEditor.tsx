@@ -132,7 +132,7 @@ function TemplateRow({ template }: { template: TemplateEntry }) {
               onChange={(e) => setHtmlBody(e.target.value)}
               placeholder={template.defaultHtml ?? 'HTML body…'}
               rows={10}
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#8CF000] resize-y"
             />
           </div>
 

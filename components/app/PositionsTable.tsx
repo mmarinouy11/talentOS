@@ -181,7 +181,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+              <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
                 {sh('Title', 'title')}
                 {sh('Client', 'client')}
                 {sh('Status', '_statusOrder')}

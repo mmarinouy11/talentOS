@@ -60,7 +60,7 @@ function TemplateEditor({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={6}
-        className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+        className="block w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
       />
       <p className="text-xs text-gray-400">
         Available tokens: {TEMPLATE_TOKENS[tokenKey].join(', ')}
@@ -191,7 +191,7 @@ export default function ProfilePage() {
               id="timezone"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+              className="mt-1 block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
             >
               {RECRUITER_TIMEZONES.map((tz) => (
                 <option key={tz.value} value={tz.value}>{tz.label}</option>

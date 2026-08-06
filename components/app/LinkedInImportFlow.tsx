@@ -51,7 +51,7 @@ function ProgressBar({ completed, total }: { completed: number; total: number })
     <div className="space-y-2">
       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
         <div
-          className="h-full bg-[#8DF000] rounded-full transition-all duration-500"
+          className="h-full bg-[#8CF000] rounded-full transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -243,7 +243,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
       <div
         className={`border-2 border-dashed rounded-lg text-center transition-colors cursor-pointer ${
           compact ? 'p-8' : 'p-12'
-        } ${dragOver ? 'border-[#8DF000] bg-[#f9ffe6]' : 'border-gray-200 hover:border-gray-300'}`}
+        } ${dragOver ? 'border-[#8CF000] bg-[#f9ffe6]' : 'border-gray-200 hover:border-gray-300'}`}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e: React.DragEvent<HTMLDivElement>) => handleDrop(e)}
@@ -309,7 +309,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
         <div className={`bg-white rounded-xl border border-gray-200 overflow-x-auto ${compact ? 'max-h-64 overflow-y-auto' : ''}`}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
-              <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+              <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
                 <th className="px-3 py-2">
                   <input
                     type="checkbox"
@@ -424,7 +424,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
   if (step === 'done' && result) {
     return (
       <div className="text-center py-6">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#8DF000] mb-4">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#8CF000] mb-4">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>

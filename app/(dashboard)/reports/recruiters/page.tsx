@@ -102,7 +102,7 @@ function MiniBarChart({ data, from, to }: { data: Record<string, number>; from: 
       {days.map((d) => (
         <div key={d.key} className="flex-1 flex flex-col items-center group relative">
           <div
-            className="w-full bg-[#8DF000] rounded-sm transition-all"
+            className="w-full bg-[#8CF000] rounded-sm transition-all"
             style={{ height: `${Math.max(2, (d.count / max) * 56)}px`, opacity: d.count === 0 ? 0.15 : 1 }}
           />
           {d.count > 0 && (
@@ -216,16 +216,16 @@ export default function RecruiterPerformancePage() {
           <button
             key={p.value}
             onClick={() => setPeriod(p.value)}
-            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${period === p.value ? 'bg-[#8DF000] border-[#8DF000] text-gray-900 font-medium' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${period === p.value ? 'bg-[#8CF000] border-[#8CF000] text-gray-900 font-medium' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
           >
             {p.label}
           </button>
         ))}
         {period === 'custom' && (
           <div className="flex items-center gap-2 ml-2">
-            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#8DF000]" />
+            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#8CF000]" />
             <span className="text-gray-400 text-sm">to</span>
-            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#8DF000]" />
+            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#8CF000]" />
           </div>
         )}
         {period !== 'custom' && (
@@ -241,7 +241,7 @@ export default function RecruiterPerformancePage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+                <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
                   <SortableHeader label="Recruiter" col="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:bg-gray-100 whitespace-nowrap" />
                   {sh('Active Pos.', 'activePositions')}
                   {sh('Manual', 'manual')}

@@ -13,8 +13,8 @@ export function PriorityBadge({ priority }: { priority: Priority }) {
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>
       {priority === 'URGENT' && (
         <span className="relative flex h-1.5 w-1.5 shrink-0">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#8DF000' }} />
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#8DF000' }} />
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#8CF000' }} />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: '#8CF000' }} />
         </span>
       )}
       {label}

@@ -167,7 +167,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
     })
   }
 
-  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8DF000] focus:border-transparent'
+  const inputClass = 'mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000] focus:border-transparent'
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 px-6 py-4">

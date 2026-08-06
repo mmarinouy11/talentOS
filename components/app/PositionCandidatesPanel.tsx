@@ -46,7 +46,7 @@ function MultiSelectDropdown({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1.5 py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] bg-white whitespace-nowrap transition-colors ${count > 0 ? 'border-[#8DF000] text-gray-900' : 'border-gray-200 text-gray-600'}`}
+        className={`flex items-center gap-1.5 py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CF000] bg-white whitespace-nowrap transition-colors ${count > 0 ? 'border-[#8CF000] text-gray-900' : 'border-gray-200 text-gray-600'}`}
       >
         {buttonLabel}
         <svg className={`h-3.5 w-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -61,7 +61,7 @@ function MultiSelectDropdown({
                 type="checkbox"
                 checked={selected.has(opt.value)}
                 onChange={() => toggle(opt.value)}
-                className="h-3.5 w-3.5 rounded accent-[#8DF000]"
+                className="h-3.5 w-3.5 rounded accent-[#8CF000]"
               />
               {opt.label}
             </label>
@@ -474,7 +474,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
 
   const thead = (
     <thead>
-      <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
+      <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
         {sh('Name', 'name')}
         {sh('Date Added', 'dateAdded')}
         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Country</th>
@@ -511,7 +511,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search candidates..."
-                className="pl-9 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000] focus:border-transparent w-56"
+                className="pl-9 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CF000] focus:border-transparent w-56"
               />
               {search && (
                 <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="Clear search">×</button>
@@ -561,7 +561,7 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
                 value={filterMinScore}
                 onChange={(e) => setFilterMinScore(e.target.value)}
                 placeholder="0–100"
-                className="w-16 py-1.5 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8DF000]"
+                className="w-16 py-1.5 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
               />
             </div>
 

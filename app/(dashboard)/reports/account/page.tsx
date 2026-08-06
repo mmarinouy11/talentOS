@@ -76,7 +76,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
   const totalActive = Object.values(pos.stageCounts).reduce((s, n) => (s ?? 0) + (n ?? 0), 0)
   return (
     <>
-      <tr className="border-b border-gray-100 last:border-0">
+      <tr className="border-b border-gray-100 last:border-0 hover:bg-[#F5F0EB] transition-colors">
         <td className="py-2.5 pl-4 pr-3 text-sm font-medium text-gray-900 max-w-[180px]">
           <Link href={`/positions/${pos.id}`} target="_blank" className="hover:underline">{pos.title}</Link>
           <p className="text-xs text-gray-400 font-normal">{pos.recruiter}</p>
@@ -175,7 +175,7 @@ function DashboardTab({ client }: { client: string }) {
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
+            <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
               <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Position</th>
               {DASH_STAGES.map((s) => (
                 <th key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -527,14 +527,14 @@ function ActivityFeed({
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
             />
             <span className="text-sm text-gray-500">to</span>
             <input
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
             />
             <button
               onClick={load}
@@ -657,7 +657,7 @@ export default function AccountStatusPage() {
         <select
           value={selectedClient}
           onChange={(e) => handleSelect(e.target.value)}
-          className="block rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 min-w-[240px]"
+          className="block rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#8CF000] min-w-[240px]"
         >
           <option value="">— Choose a client —</option>
           {clients.map((c) => <option key={c} value={c}>{c}</option>)}

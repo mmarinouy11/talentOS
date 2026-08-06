@@ -145,7 +145,7 @@ export function ApplicationPortalLink({ positionId, initialToken, screeningQuest
                   next[i] = e.target.value
                   setQuestions(next)
                 }}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
               />
             </div>
           ))
