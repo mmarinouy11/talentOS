@@ -47,7 +47,7 @@ function Chevron({ open }: { open: boolean }) {
 
 function DashboardRow({ pos }: { pos: DashboardPosition }) {
   const [open, setOpen] = useState(false)
-  const totalActive = Object.values(pos.stageCounts).reduce((s, n) => s + (n ?? 0), 0)
+  const totalActive = Object.values(pos.stageCounts).reduce((s, n) => (s ?? 0) + (n ?? 0), 0)
   return (
     <>
       <tr className="border-b border-gray-100 last:border-0">
