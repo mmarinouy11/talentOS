@@ -11,6 +11,7 @@ const patchSchema = z.object({
   phone: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   active: z.boolean().optional(),
+  type: z.enum(['RECRUITING_PARTNER', 'REFERRAL_NETWORK']).optional(),
 })
 
 export async function GET(
@@ -49,7 +50,12 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const vendor = await db.vendor.update({ where: { id }, data: parsed.data })
+  // Auto-generate referralToken when switching to REFERRAL_NETWORK type
+  let extraData: { referralToken?: string } = {}
+  if (parsed.data.type === 'REFERRAL_NETWORK' && !existing.referralToken) {
+    extraData.referralToken = randomBytes(32).toString('hex')
+  }
+  const vendor = await db.vendor.update({ where: { id }, data: { ...parsed.data, ...extraData } })
   return NextResponse.json(vendor)
 }
 

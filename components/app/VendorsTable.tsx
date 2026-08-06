@@ -9,6 +9,7 @@ interface Vendor {
   pocEmail: string | null
   phone: string | null
   active: boolean
+  type: string
   _count: { candidates: number; positionVendors: number }
 }
 
@@ -20,6 +21,7 @@ export function VendorsTable({ vendors }: { vendors: Vendor[] }) {
       <thead>
         <tr className="border-b-[2px] border-b-[#8DF000] bg-gray-50">
           <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
+          <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Point of Contact</th>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
           <th className="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
@@ -36,6 +38,12 @@ export function VendorsTable({ vendors }: { vendors: Vendor[] }) {
             onClick={() => router.push(`/vendors/${v.id}/edit`)}
           >
             <td className="px-4 py-3 font-medium text-gray-900">{v.name}</td>
+            <td className="px-4 py-3">
+              {v.type === 'REFERRAL_NETWORK'
+                ? <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">Referral</span>
+                : <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Recruiting</span>
+              }
+            </td>
             <td className="px-4 py-3 text-gray-600">{v.pocName ?? '—'}</td>
             <td
               className="px-4 py-3 text-gray-600"

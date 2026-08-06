@@ -8,12 +8,13 @@ import { SkillTags } from '@/components/app/SkillTags'
 import { CandidateDetailClient } from '@/components/app/CandidateDetailClient'
 import { CvSection } from '@/components/app/CvSection'
 
-function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' | 'DIRECT' }) {
+function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' | 'DIRECT' | 'REFERRAL' }) {
   const config = {
     RECRUITER: { label: 'Internal', className: 'bg-blue-100 text-blue-700' },
     VENDOR: { label: 'Partner', className: 'bg-purple-100 text-purple-700' },
     OTHER: { label: 'Other', className: 'bg-gray-100 text-gray-600' },
     DIRECT: { label: 'Direct', className: 'bg-green-100 text-green-700' },
+    REFERRAL: { label: 'Referral', className: 'bg-violet-100 text-violet-700' },
   }
   const { label, className } = config[type]
   return (
@@ -150,6 +151,20 @@ export default async function CandidateDetailPage({
                         <span className="text-gray-900">—</span>
                       )}
                       <SourceBadge type="VENDOR" />
+                    </div>
+                  ) : candidate.sourcedByType === 'REFERRAL' ? (
+                    <div className="flex items-center gap-2">
+                      {candidate.sourcedByVendor ? (
+                        <Link
+                          href={`/vendors/${candidate.sourcedByVendor.id}/edit`}
+                          className="text-gray-900 hover:underline"
+                        >
+                          {candidate.sourcedByVendor.name}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-900">Referral</span>
+                      )}
+                      <SourceBadge type="REFERRAL" />
                     </div>
                   ) : candidate.sourcedByType === 'DIRECT' ? (
                     <div className="flex items-center gap-2">

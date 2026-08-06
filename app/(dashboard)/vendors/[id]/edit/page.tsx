@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { VendorForm } from '@/components/app/VendorForm'
 import { VendorPortalLink } from '@/components/app/VendorPortalLink'
+import { ReferralPortalLink } from '@/components/app/ReferralPortalLink'
 import { VendorPositionAssignment } from '@/components/app/VendorPositionAssignment'
 
 export default async function EditVendorPage({
@@ -41,6 +42,7 @@ export default async function EditVendorPage({
           phone: vendor.phone,
           notes: vendor.notes,
           active: vendor.active,
+          type: vendor.type,
         }}
       />
 
@@ -50,11 +52,21 @@ export default async function EditVendorPage({
         <VendorPositionAssignment vendorId={vendor.id} />
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 max-w-2xl space-y-2">
-        <p className="text-sm font-medium text-gray-700">Partner Portal Link</p>
-        <p className="text-xs text-gray-500">Share this link with the partner so they can submit candidates directly.</p>
-        <VendorPortalLink vendorId={vendor.id} initialToken={vendor.portalToken} />
-      </div>
+      {vendor.type !== 'REFERRAL_NETWORK' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 max-w-2xl space-y-2">
+          <p className="text-sm font-medium text-gray-700">Partner Portal Link</p>
+          <p className="text-xs text-gray-500">Share this link with the partner so they can submit candidates directly.</p>
+          <VendorPortalLink vendorId={vendor.id} initialToken={vendor.portalToken} />
+        </div>
+      )}
+
+      {vendor.type === 'REFERRAL_NETWORK' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 max-w-2xl space-y-2">
+          <p className="text-sm font-medium text-gray-700">Referral Portal Link</p>
+          <p className="text-xs text-gray-500">Share this link with referrers so they can submit candidates directly.</p>
+          <ReferralPortalLink vendorId={vendor.id} initialToken={vendor.referralToken} />
+        </div>
+      )}
     </div>
   )
 }

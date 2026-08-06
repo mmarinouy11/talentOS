@@ -11,6 +11,7 @@ const vendorSchema = z.object({
   phone: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   active: z.boolean().default(true),
+  type: z.enum(['RECRUITING_PARTNER', 'REFERRAL_NETWORK']).default('RECRUITING_PARTNER'),
 })
 
 export async function GET(request: Request) {
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
   }
 
   const portalToken = randomBytes(32).toString('hex')
-  const vendor = await db.vendor.create({ data: { ...parsed.data, portalToken } })
+  const referralToken = parsed.data.type === 'REFERRAL_NETWORK' ? randomBytes(32).toString('hex') : undefined
+  const vendor = await db.vendor.create({ data: { ...parsed.data, portalToken, referralToken } })
   return NextResponse.json(vendor, { status: 201 })
 }

@@ -17,6 +17,7 @@ interface VendorFormProps {
     phone?: string | null
     notes?: string | null
     active?: boolean
+    type?: 'RECRUITING_PARTNER' | 'REFERRAL_NETWORK'
   }
 }
 
@@ -30,6 +31,7 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
   const [phone, setPhone] = useState(defaultValues.phone ?? '')
   const [notes, setNotes] = useState(defaultValues.notes ?? '')
   const [active, setActive] = useState(defaultValues.active ?? true)
+  const [type, setType] = useState<'RECRUITING_PARTNER' | 'REFERRAL_NETWORK'>(defaultValues.type ?? 'RECRUITING_PARTNER')
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -43,6 +45,7 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
       phone: phone || null,
       notes: notes || null,
       active,
+      type,
     }
 
     const url = mode === 'edit' ? `/api/vendors/${defaultValues.id}` : '/api/vendors'
@@ -81,6 +84,27 @@ export function VendorForm({ mode, defaultValues = {} }: VendorFormProps) {
       )}
 
       <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <Label htmlFor="type">Partner Type</Label>
+          <div className="flex gap-3 mt-1">
+            {(['RECRUITING_PARTNER', 'REFERRAL_NETWORK'] as const).map((t) => (
+              <label key={t} className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition-colors ${type === t ? 'border-[#8DF000] bg-[#F5FBE8]' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input
+                  type="radio"
+                  name="type"
+                  value={t}
+                  checked={type === t}
+                  onChange={() => setType(t)}
+                  className="accent-[#8DF000]"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  {t === 'RECRUITING_PARTNER' ? 'Recruiting Partner' : 'Referral Network'}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="col-span-2">
           <Label htmlFor="name">Partner Name *</Label>
           <Input

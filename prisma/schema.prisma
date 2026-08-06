@@ -63,6 +63,12 @@ enum SourceType {
   VENDOR
   DIRECT
   OTHER
+  REFERRAL
+}
+
+enum VendorType {
+  RECRUITING_PARTNER
+  REFERRAL_NETWORK
 }
 
 enum PipelineStage {
@@ -169,16 +175,18 @@ model VerificationToken {
 }
 
 model Vendor {
-  id          String   @id @default(cuid())
-  name        String
-  pocName     String?
-  pocEmail    String?
-  phone       String?
-  notes       String?  @db.Text
-  active      Boolean  @default(true)
-  portalToken String?  @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String     @id @default(cuid())
+  name           String
+  pocName        String?
+  pocEmail       String?
+  phone          String?
+  notes          String?    @db.Text
+  active         Boolean    @default(true)
+  type           VendorType @default(RECRUITING_PARTNER)
+  portalToken    String?    @unique
+  referralToken  String?    @unique
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   candidates      Candidate[]
   positionVendors PositionVendor[]
