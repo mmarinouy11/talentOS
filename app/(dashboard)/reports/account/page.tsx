@@ -27,9 +27,15 @@ const DASH_COL_LABELS: Record<string, string> = {
   TECHNICAL_INTERVIEW: 'Tech', SCREENING: 'Screen', APPLIED: 'Applied',
 }
 
-const DASH_FUNNEL_LABELS: Record<string, string> = {
-  OFFER: 'Offer', CLIENT_INTERVIEW: 'Client Interview', MANAGER_INTERVIEW: 'Manager Interview',
-  TECHNICAL_INTERVIEW: 'Technical Interview', SCREENING: 'Screening', APPLIED: 'Applied',
+// ─── Analytics tab types ─────────────────────────────────────────────────────
+interface AnalyticsFunnelRow { stage: string; label: string; count: number; conversionFromPrevious: number | null }
+interface AnalyticsVelocityRow { stage: string; label: string; avgDays: number | null; sampleSize: number }
+interface AnalyticsData {
+  client: string
+  funnel: AnalyticsFunnelRow[]
+  timeToStage: AnalyticsVelocityRow[]
+  timeInStage: AnalyticsVelocityRow[]
+  generatedAt: string
 }
 
 function formatIvTime(iso: string, timezone: string): string {
@@ -130,59 +136,55 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
   )
 }
 
-function PipelineFunnel({ positions }: { positions: DashboardPosition[] }) {
-  const totals = DASH_STAGES.map((s) =>
-    positions.reduce((sum, p) => sum + (p.stageCounts[s] ?? 0), 0)
-  )
-  const maxVal = Math.max(...totals, 1)
-  // Label column is 160px wide; funnel starts at x=170, centered at CX=370
-  const LABEL_X = 155, CX = 370, MAX_HW = 170, MIN_HW = 12, ROW_H = 52, GAP = 5
-  const VW = 560
-  const opacities = [0.14, 0.26, 0.42, 0.58, 0.76, 1.0]
-  const widths = totals.map((v) => MIN_HW + (v / maxVal) * (MAX_HW - MIN_HW))
-
+function MetricTable({ title, rows, valueCol, note }: {
+  title: string
+  rows: { label: string; value: string; sample: number }[]
+  valueCol: string
+  note?: string
+}) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Pipeline Funnel</p>
-      <svg width="100%" viewBox={`0 0 ${VW} ${DASH_STAGES.length * (ROW_H + GAP) + 10}`} className="max-w-[560px] mx-auto">
-        {DASH_STAGES.map((s, i) => {
-          const hw = widths[i]
-          const y = i * (ROW_H + GAP)
-          const nextHw = i < widths.length - 1 ? widths[i + 1] : hw
-          const points = `${CX - hw},${y} ${CX + hw},${y} ${CX + nextHw},${y + ROW_H} ${CX - nextHw},${y + ROW_H}`
-          const count = totals[i]
-          const highOpacity = opacities[i] >= 0.58
-          return (
-            <g key={s}>
-              <polygon points={points} fill={`rgba(132,204,22,${opacities[i]})`} />
-              {count > 0 && (
-                <text x={CX} y={y + ROW_H / 2 + 5} textAnchor="middle" fontSize={13} fontWeight={600}
-                  fill={highOpacity ? '#fff' : '#3a4a10'}>
-                  {count}
-                </text>
-              )}
-              <text x={LABEL_X} y={y + ROW_H / 2 + 5} textAnchor="end" fontSize={11} fill="#6b7280">
-                {DASH_FUNNEL_LABELS[s]}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</p>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-gray-50 border-b border-gray-100">
+            <th className="py-2 pl-4 pr-3 text-left text-xs font-medium text-gray-500">Stage</th>
+            <th className="py-2 px-3 text-right text-xs font-medium text-gray-500">{valueCol}</th>
+            <th className="py-2 pl-3 pr-4 text-right text-xs font-medium text-gray-500">Sample</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label} className="border-b border-gray-50 last:border-0">
+              <td className="py-2 pl-4 pr-3 text-xs text-gray-700">{r.label}</td>
+              <td className="py-2 px-3 text-right text-xs font-medium text-gray-900">{r.value}</td>
+              <td className="py-2 pl-3 pr-4 text-right text-xs text-gray-400">{r.sample > 0 ? `n=${r.sample}` : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {note && <p className="px-4 py-2 text-[11px] text-gray-400 border-t border-gray-50">{note}</p>}
     </div>
   )
 }
 
 function DashboardTab({ client }: { client: string }) {
   const [data, setData] = useState<DashboardData | null>(null)
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!client) return
     setLoading(true); setError(null)
-    fetch(`/api/reports/account-status?client=${encodeURIComponent(client)}&mode=dashboard`)
-      .then((r) => r.json())
-      .then(setData)
+    const base = `/api/reports/account-status?client=${encodeURIComponent(client)}`
+    Promise.all([
+      fetch(`${base}&mode=dashboard`).then((r) => r.json()),
+      fetch(`${base}&mode=analytics`).then((r) => r.json()),
+    ])
+      .then(([d, a]) => { setData(d); setAnalytics(a) })
       .catch(() => setError('Failed to load dashboard data'))
       .finally(() => setLoading(false))
   }, [client])
@@ -200,6 +202,7 @@ function DashboardTab({ client }: { client: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Position table */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead>
@@ -219,7 +222,6 @@ function DashboardTab({ client }: { client: string }) {
             {data.positions.map((pos) => (
               <DashboardRow key={pos.id} pos={pos} />
             ))}
-            {/* Totals row */}
             <tr className="bg-gray-50 border-t border-gray-200">
               <td className="py-2.5 pl-4 pr-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Totals</td>
               {DASH_STAGES.map((s) => (
@@ -234,7 +236,42 @@ function DashboardTab({ client }: { client: string }) {
           </tbody>
         </table>
       </div>
-      {data.positions.length > 0 && <PipelineFunnel positions={data.positions} />}
+
+      {/* Analytics tables */}
+      {analytics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <MetricTable
+            title="Candidate Funnel"
+            valueCol="Count / Conv %"
+            note="Conversion % shows rate from previous stage."
+            rows={analytics.funnel.map((r) => ({
+              label: r.label,
+              value: r.conversionFromPrevious != null
+                ? `${r.count} · ${r.conversionFromPrevious}%`
+                : String(r.count),
+              sample: r.count,
+            }))}
+          />
+          <MetricTable
+            title="Time to Stage"
+            valueCol="Avg Days"
+            rows={analytics.timeToStage.map((r) => ({
+              label: r.label,
+              value: r.avgDays != null ? `${r.avgDays}d` : '—',
+              sample: r.sampleSize,
+            }))}
+          />
+          <MetricTable
+            title="Time in Stage"
+            valueCol="Avg Days"
+            rows={analytics.timeInStage.map((r) => ({
+              label: r.label,
+              value: r.avgDays != null ? `${r.avgDays}d` : '—',
+              sample: r.sampleSize,
+            }))}
+          />
+        </div>
+      )}
     </div>
   )
 }

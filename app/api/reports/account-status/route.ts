@@ -154,6 +154,90 @@ export async function GET(request: Request) {
     return NextResponse.json({ client, positions: result, generatedAt: new Date().toISOString() })
   }
 
+  // Analytics mode — funnel snapshot + time-to-stage + time-in-stage
+  if (mode === 'analytics') {
+    const ANALYTICS_STAGES: Stage[] = ['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED']
+
+    const positions = await db.position.findMany({
+      where: { client, status: 'OPEN', deletedAt: null },
+      select: { id: true },
+    })
+    const positionIds = positions.map((p) => p.id)
+
+    if (positionIds.length === 0) {
+      return NextResponse.json({ client, funnel: [], timeToStage: [], timeInStage: [], generatedAt: new Date().toISOString() })
+    }
+
+    // 1. Funnel — current snapshot counts of active candidates per stage
+    const cps = await db.candidatePosition.findMany({
+      where: { positionId: { in: positionIds }, candidate: { deletedAt: null } },
+      select: { stage: true, status: true },
+    })
+    const activeCps = cps.filter((cp) => !isCandidateInactive(cp))
+    const stageCountMap = new Map<string, number>()
+    for (const cp of activeCps) {
+      stageCountMap.set(cp.stage, (stageCountMap.get(cp.stage) ?? 0) + 1)
+    }
+    const funnel = ANALYTICS_STAGES.map((stage, i) => {
+      const count = stageCountMap.get(stage) ?? 0
+      const prevCount = i > 0 ? (stageCountMap.get(ANALYTICS_STAGES[i - 1]) ?? 0) : null
+      const conversionFromPrevious = prevCount != null && prevCount > 0
+        ? Math.round((count / prevCount) * 100)
+        : null
+      return { stage, label: STAGE_LABELS[stage], count, conversionFromPrevious }
+    })
+
+    // 2+3. Time-to-stage and time-in-stage from StageHistory
+    const histories = await db.stageHistory.findMany({
+      where: { candidatePosition: { positionId: { in: positionIds } } },
+      orderBy: { movedAt: 'asc' },
+    })
+
+    const byCp = new Map<string, typeof histories>()
+    for (const h of histories) {
+      if (!byCp.has(h.candidatePositionId)) byCp.set(h.candidatePositionId, [])
+      byCp.get(h.candidatePositionId)!.push(h)
+    }
+
+    function msToDays(ms: number) { return ms / (1000 * 60 * 60 * 24) }
+    function round1(n: number) { return Math.round(n * 10) / 10 }
+
+    // Time to stage
+    const ttsAccum = new Map<Stage, number[]>()
+    ANALYTICS_STAGES.slice(1).forEach((s) => ttsAccum.set(s, []))
+    for (const [, entries] of byCp) {
+      const startEntry = entries.find((e) => e.toStage === 'APPLIED')
+      if (!startEntry) continue
+      const startMs = startEntry.movedAt.getTime()
+      for (const stage of ANALYTICS_STAGES.slice(1)) {
+        const reached = entries.find((e) => e.toStage === stage)
+        if (reached) ttsAccum.get(stage)!.push(msToDays(reached.movedAt.getTime() - startMs))
+      }
+    }
+    const timeToStage = ANALYTICS_STAGES.slice(1).map((stage) => {
+      const days = ttsAccum.get(stage)!
+      return { stage, label: STAGE_LABELS[stage], avgDays: days.length > 0 ? round1(days.reduce((a, b) => a + b, 0) / days.length) : null, sampleSize: days.length }
+    })
+
+    // Time in stage
+    const tisAccum = new Map<Stage, number[]>()
+    ANALYTICS_STAGES.forEach((s) => tisAccum.set(s, []))
+    for (const [, entries] of byCp) {
+      for (let i = 0; i < entries.length - 1; i++) {
+        const stage = entries[i].toStage as Stage
+        if (tisAccum.has(stage)) {
+          tisAccum.get(stage)!.push(msToDays(entries[i + 1].movedAt.getTime() - entries[i].movedAt.getTime()))
+        }
+      }
+    }
+    const timeInStage = ANALYTICS_STAGES.map((stage) => {
+      const days = tisAccum.get(stage)!
+      return { stage, label: STAGE_LABELS[stage], avgDays: days.length > 0 ? round1(days.reduce((a, b) => a + b, 0) / days.length) : null, sampleSize: days.length }
+    })
+
+    return NextResponse.json({ client, funnel, timeToStage, timeInStage, generatedAt: new Date().toISOString() })
+  }
+
   // Activity mode
   if (mode === 'activity') {
     const fromParam = searchParams.get('from')
