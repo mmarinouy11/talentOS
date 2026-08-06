@@ -92,7 +92,12 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
                 <div key={sg.stage} className="mb-2">
                   <p className="text-xs font-medium text-gray-600 mb-1">{sg.label}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {sg.candidates.map((c) => (
+                    {[...sg.candidates].sort((a, b) => {
+                      const aHas = a.scheduledAt ? 1 : 0
+                      const bHas = b.scheduledAt ? 1 : 0
+                      if (bHas !== aHas) return bHas - aHas
+                      return b.daysInStage - a.daysInStage
+                    }).map((c) => (
                       <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
                         className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 hover:border-gray-400">
                         {c.name} <AgingBadge days={c.daysInStage} />
@@ -133,7 +138,6 @@ function PipelineFunnel({ positions }: { positions: DashboardPosition[] }) {
           const points = `${CX - hw},${y} ${CX + hw},${y} ${CX + nextHw},${y + ROW_H} ${CX - nextHw},${y + ROW_H}`
           const count = totals[i]
           const highOpacity = opacities[i] >= 0.58
-          const convRate = i > 0 && totals[i - 1] > 0 ? Math.round((count / totals[i - 1]) * 100) : null
           return (
             <g key={s}>
               <polygon points={points} fill={`rgba(132,204,22,${opacities[i]})`} />
@@ -146,11 +150,6 @@ function PipelineFunnel({ positions }: { positions: DashboardPosition[] }) {
               <text x={CX - hw - 8} y={y + ROW_H / 2 + 5} textAnchor="end" fontSize={11} fill="#6b7280">
                 {DASH_COL_LABELS[s]}
               </text>
-              {convRate !== null && (
-                <text x={CX + MAX_HW + 16} y={y + 5} fontSize={10} fill="#9ca3af">
-                  → {convRate}%
-                </text>
-              )}
             </g>
           )
         })}
@@ -198,7 +197,7 @@ function DashboardTab({ client }: { client: string }) {
                 </th>
               ))}
               <th className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
-              <th className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Today</th>
+              <th className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Int. Today</th>
               <th className="py-2.5 pl-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide"></th>
             </tr>
           </thead>
