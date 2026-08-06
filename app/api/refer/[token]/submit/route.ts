@@ -44,6 +44,18 @@ export async function POST(
   const linkedinUrl = (formData.get('linkedinUrl') as string | null)?.trim() ?? ''
   const note = (formData.get('note') as string | null)?.trim() ?? ''
 
+  // Parse optional availability slots
+  const slotsRaw = formData.get('availabilitySlots') as string | null
+  let availabilitySlots: Date[] = []
+  if (slotsRaw) {
+    try {
+      const parsed = JSON.parse(slotsRaw)
+      if (Array.isArray(parsed)) {
+        availabilitySlots = parsed.map((s: string) => new Date(s)).filter((d) => !isNaN(d.getTime()))
+      }
+    } catch { /* ignore */ }
+  }
+
   if (!cvFile || !positionId || !referrerName || !firstName || !lastName || !emailRaw || !countryRaw) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
@@ -224,7 +236,9 @@ export async function POST(
         roundLabel: 'Screening',
         roundNumber: 1,
         isInternal: false,
-        status: 'AWAITING_SCHEDULE',
+        status: availabilitySlots.length > 0 ? 'PENDING' : 'AWAITING_SCHEDULE',
+        schedulingMode: availabilitySlots.length > 0 ? 'MANUAL_SLOTS' : null,
+        proposedSlots: availabilitySlots,
       },
     })
   } catch (err) {
