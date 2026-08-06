@@ -103,7 +103,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
                         {c.name} <AgingBadge days={c.daysInStage} />
                         {c.scheduledAt && c.scheduledStageLabel && (
                           <span className="text-gray-400 ml-0.5">
-                            — {c.scheduledStageLabel}: {formatIvTime(c.scheduledAt, pos.timezone)}
+                            — {formatIvTime(c.scheduledAt, pos.timezone)}
                           </span>
                         )}
                       </Link>
