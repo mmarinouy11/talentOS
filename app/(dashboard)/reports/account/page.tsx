@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { FunnelChart } from '@/components/app/FunnelChart'
+import { VelocityTable } from '@/components/app/VelocityTable'
 
 // ─── Dashboard tab types ─────────────────────────────────────────────────────
 interface DashboardCandidateEntry {
@@ -136,39 +138,6 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
   )
 }
 
-function MetricTable({ title, rows, valueCol, note }: {
-  title: string
-  rows: { label: string; value: string; sample: number }[]
-  valueCol: string
-  note?: string
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</p>
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-100">
-            <th className="py-2 pl-4 pr-3 text-left text-xs font-medium text-gray-500">Stage</th>
-            <th className="py-2 px-3 text-right text-xs font-medium text-gray-500">{valueCol}</th>
-            <th className="py-2 pl-3 pr-4 text-right text-xs font-medium text-gray-500">Sample</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.label} className="border-b border-gray-50 last:border-0">
-              <td className="py-2 pl-4 pr-3 text-xs text-gray-700">{r.label}</td>
-              <td className="py-2 px-3 text-right text-xs font-medium text-gray-900">{r.value}</td>
-              <td className="py-2 pl-3 pr-4 text-right text-xs text-gray-400">{r.sample > 0 ? `n=${r.sample}` : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {note && <p className="px-4 py-2 text-[11px] text-gray-400 border-t border-gray-50">{note}</p>}
-    </div>
-  )
-}
 
 function DashboardTab({ client }: { client: string }) {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -237,40 +206,47 @@ function DashboardTab({ client }: { client: string }) {
         </table>
       </div>
 
-      {/* Analytics tables */}
+      {/* Analytics sections — same styling as /reports page */}
       {analytics && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <MetricTable
-            title="Candidate Funnel"
-            valueCol="Count / Conv %"
-            note="Conversion % shows rate from previous stage."
-            rows={analytics.funnel.map((r) => ({
-              label: r.label,
-              value: r.conversionFromPrevious != null
-                ? `${r.count} · ${r.conversionFromPrevious}%`
-                : String(r.count),
-              sample: r.count,
-            }))}
-          />
-          <MetricTable
-            title="Time to Stage"
-            valueCol="Avg Days"
-            rows={analytics.timeToStage.map((r) => ({
-              label: r.label,
-              value: r.avgDays != null ? `${r.avgDays}d` : '—',
-              sample: r.sampleSize,
-            }))}
-          />
-          <MetricTable
-            title="Time in Stage"
-            valueCol="Avg Days"
-            rows={analytics.timeInStage.map((r) => ({
-              label: r.label,
-              value: r.avgDays != null ? `${r.avgDays}d` : '—',
-              sample: r.sampleSize,
-            }))}
-          />
-        </div>
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Candidate Funnel</h2>
+            <FunnelChart
+              data={analytics.funnel.map((r) => ({
+                stage: r.stage as Parameters<typeof FunnelChart>[0]['data'][number]['stage'],
+                count: r.count,
+                conversionFromPrevious: r.conversionFromPrevious,
+              }))}
+              size="large"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Time to Stage</h2>
+              <p className="text-xs text-gray-400 mb-3">Average days from APPLIED to first reaching each stage.</p>
+              <VelocityTable
+                data={analytics.timeToStage.map((r) => ({
+                  stage: r.stage as Parameters<typeof VelocityTable>[0]['data'][number]['stage'],
+                  avgDays: r.avgDays ?? 0,
+                  sampleSize: r.sampleSize,
+                }))}
+                label="Avg Days to Reach"
+              />
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Time in Stage</h2>
+              <p className="text-xs text-gray-400 mb-3">Average days candidates spend in each stage before moving on.</p>
+              <VelocityTable
+                data={analytics.timeInStage.map((r) => ({
+                  stage: r.stage as Parameters<typeof VelocityTable>[0]['data'][number]['stage'],
+                  avgDays: r.avgDays ?? 0,
+                  sampleSize: r.sampleSize,
+                }))}
+                label="Avg Days in Stage"
+              />
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
