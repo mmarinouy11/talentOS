@@ -35,14 +35,21 @@ const DASH_FUNNEL_LABELS: Record<string, string> = {
 function formatIvTime(iso: string, timezone: string): string {
   try {
     const d = new Date(iso)
-    const time = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone, month: 'short', day: 'numeric',
-      hour: 'numeric', minute: '2-digit',
-    }).format(d)
     const tzAbbr = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone, timeZoneName: 'short',
     }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value ?? ''
-    return tzAbbr ? `${time} ${tzAbbr}` : time
+    const toDateStr = (date: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date) // YYYY-MM-DD
+    const isToday = toDateStr(d) === toDateStr(new Date())
+    const timeOnly = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone, hour: 'numeric', minute: '2-digit',
+    }).format(d)
+    if (isToday) return tzAbbr ? `TODAY ${timeOnly} ${tzAbbr}` : `TODAY ${timeOnly}`
+    const full = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone, month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    }).format(d)
+    return tzAbbr ? `${full} ${tzAbbr}` : full
   } catch {
     return iso
   }
