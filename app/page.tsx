@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth'
 import Link from 'next/link'
 import {
   Briefcase, Users, Calendar, Building2, FileText,
-  BarChart2, Mail, Sparkles,
+  BarChart2, Mail, Sparkles, Upload,
 } from 'lucide-react'
 
 const features = [
@@ -19,10 +19,16 @@ const features = [
       'Full candidate lifecycle tracking with stage management, fit scoring, aging alerts, and grouped active/on-hold views.',
   },
   {
-    icon: Calendar,
-    title: 'Interview Coordination',
+    icon: Upload,
+    title: 'Bulk Import & Sourcing',
     description:
-      'Schedule interviews with magic link feedback for technical panels, skill-based evaluation forms, and automated notifications.',
+      'Import candidate profiles in bulk from LinkedIn exports with automatic CV parsing, duplicate detection, and multi-source tracking — internal, partner, or direct application.',
+  },
+  {
+    icon: FileText,
+    title: 'Direct Applications',
+    description:
+      'Public application portal with AI-generated screening questions, fit scoring, budget validation, and privacy consent.',
   },
   {
     icon: Building2,
@@ -31,10 +37,16 @@ const features = [
       'Dedicated portal for recruiting partners to submit candidates, view pipeline status, and track their submissions with real-time validation.',
   },
   {
-    icon: FileText,
-    title: 'Direct Applications',
+    icon: Calendar,
+    title: 'Interview Coordination',
     description:
-      'Public application portal with AI-generated screening questions, fit scoring, budget validation, and privacy consent.',
+      'Schedule interviews with magic link feedback for technical panels, skill-based evaluation forms, and automated notifications.',
+  },
+  {
+    icon: Sparkles,
+    title: 'AI-Powered',
+    description:
+      'Claude AI for CV parsing, fit scoring with core skill weighting, JD analysis, Tenarai-branded CV generation, and feedback summarization.',
   },
   {
     icon: BarChart2,
@@ -47,12 +59,6 @@ const features = [
     title: 'Email Automation',
     description:
       'Gmail-based email sending with customizable system templates for scheduling, feedback requests, partner notifications, and invitations.',
-  },
-  {
-    icon: Sparkles,
-    title: 'AI-Powered',
-    description:
-      'Claude AI for CV parsing, fit scoring with core skill weighting, JD analysis, Tenarai-branded CV generation, and feedback summarization.',
   },
 ]
 
