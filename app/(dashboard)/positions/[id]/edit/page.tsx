@@ -59,6 +59,7 @@ export default async function EditPositionPage({
             internalCostBudget: position.internalCostBudget,
             vendorMinFitScore: position.vendorMinFitScore,
             directMinFitScore: position.directMinFitScore,
+            headcount: position.headcount,
             talentId: position.talentId,
             timezone: position.timezone,
             reportingEmails: position.reportingEmails,

@@ -22,6 +22,7 @@ const positionSchema = z.object({
   internalCostBudget: z.number().optional().nullable(),
   vendorMinFitScore: z.number().int().min(0).max(100).optional().nullable(),
   directMinFitScore: z.number().int().min(0).max(100).optional().nullable(),
+  headcount: z.number().int().min(1).optional().nullable(),
   talentId: z.string().optional().nullable(),
   timezone: z.string().optional().nullable(),
   reportingEmails: z.array(z.string().email()).optional(),

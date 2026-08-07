@@ -222,6 +222,7 @@ model Position {
   internalCostBudget  Float?
   vendorMinFitScore   Int?
   directMinFitScore   Int?
+  headcount           Int?     @default(1)
   applicationToken    String?  @unique
   screeningQuestions  String[]
   dgm                 Float?

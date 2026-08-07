@@ -62,6 +62,7 @@ export interface PositionRow {
   createdAt: string
   dgm: number | null
   dgmAtRisk: boolean
+  headcount: number | null
   recruiter: { name: string | null; email: string } | null
   _count: { candidatePositions: number; positionVendors: number }
 }
@@ -192,6 +193,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
                 {sh('Aging', '_agingMs', 'text-right')}
                 {sh('Candidates', '_candidates', 'text-right')}
                 {sh('Partners', '_partners', 'text-right')}
+                {sh('HC', 'headcount', 'text-right')}
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -215,6 +217,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
                     <td className="px-4 py-3 text-right font-medium text-gray-600">{days}d</td>
                     <td className="px-4 py-3 text-right text-gray-600">{p._count.candidatePositions}</td>
                     <td className="px-4 py-3 text-right text-gray-600">{p._partners > 0 ? p._partners : '—'}</td>
+                    <td className="px-4 py-3 text-right text-gray-600">{p.headcount ?? 1}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {isAdmin && (

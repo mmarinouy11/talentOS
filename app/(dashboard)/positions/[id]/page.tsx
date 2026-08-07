@@ -216,6 +216,10 @@ export default async function PositionDetailPage({
             <p className="text-sm text-gray-900 mt-0.5">{position.sales_contact_email ?? '—'}</p>
           </div>
           <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Headcount</p>
+            <p className="text-sm text-gray-900 mt-0.5">{position.headcount ?? 1} position{(position.headcount ?? 1) !== 1 ? 's' : ''}</p>
+          </div>
+          <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">TalentID</p>
             <p className="text-sm text-gray-900 mt-0.5">{position.talentId ?? '—'}</p>
           </div>

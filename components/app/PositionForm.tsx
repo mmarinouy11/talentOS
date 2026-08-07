@@ -62,6 +62,7 @@ interface PositionFormProps {
     internalCostBudget?: number | null
     vendorMinFitScore?: number | null
     directMinFitScore?: number | null
+    headcount?: number | null
     talentId?: string | null
     timezone?: string | null
     reportingEmails?: string[]
@@ -186,6 +187,7 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
       internalCostBudget: internalCostBudget !== '' && !isNaN(icbNum) ? icbNum : null,
       vendorMinFitScore: vendorMinFitScore !== '' && !isNaN(parseInt(vendorMinFitScore)) ? parseInt(vendorMinFitScore) : null,
       directMinFitScore: directMinFitScore !== '' && !isNaN(parseInt(directMinFitScore)) ? parseInt(directMinFitScore) : null,
+      headcount: fd.get('headcount') ? parseInt(fd.get('headcount') as string) || 1 : 1,
       talentId: (fd.get('talentId') as string) || null,
       timezone,
       reportingEmails,
@@ -255,6 +257,19 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             defaultValue={defaultValues.client}
             placeholder="e.g. Acme Corp"
           />
+        </div>
+
+        {/* Headcount */}
+        <div>
+          <Label htmlFor="headcount">Headcount</Label>
+          <Input
+            id="headcount"
+            name="headcount"
+            type="number"
+            min={1}
+            defaultValue={defaultValues.headcount ?? 1}
+          />
+          <p className="text-xs text-gray-400 mt-1">Number of hires needed for this role</p>
         </div>
 
         {/* TalentID */}

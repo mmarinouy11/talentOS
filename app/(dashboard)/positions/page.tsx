@@ -26,6 +26,7 @@ export default async function PositionsPage() {
       createdAt: true,
       dgm: true,
       dgmAtRisk: true,
+      headcount: true,
       recruiter: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true, positionVendors: true } },
     },
@@ -46,6 +47,7 @@ export default async function PositionsPage() {
     createdAt: p.createdAt.toISOString(),
     dgm: p.dgm,
     dgmAtRisk: p.dgmAtRisk,
+    headcount: p.headcount,
     recruiter: p.recruiter,
     _count: p._count,
   }))
