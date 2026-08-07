@@ -301,6 +301,7 @@ export default async function PositionDetailPage({
       {/* Candidates */}
       <PositionCandidatesPanel
         positionId={id}
+        positionTitle={position.title}
         positionTimezone={position.timezone ?? 'America/Montevideo'}
         candidatePositions={sortedCandidatePositions.map((cp) => ({
           id: cp.id,
