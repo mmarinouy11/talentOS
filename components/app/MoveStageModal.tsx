@@ -28,7 +28,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   WITHDRAWN: 'On Hold',
 }
 
-type SelectionValue = Stage
+type SelectionValue = Stage | 'DROPPED'
 
 interface MoveStageModalProps {
   candidatePositionId: string
@@ -52,7 +52,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     setLoading(true)
     setError('')
 
-    const body = { newStage: selected, notes: notes || null }
+    const body = { newStage: selected === 'DROPPED' ? 'WITHDRAWN' : selected, notes: notes || null }
 
     const res = await fetch(`/api/candidate-positions/${candidatePositionId}/stage`, {
       method: 'PATCH',
@@ -137,6 +137,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
 
             <Option value="HIRED" label="Hired" colorClass="text-green-700" />
             <Option value="WITHDRAWN" label="On Hold" colorClass="text-amber-600" />
+            <Option value="DROPPED" label="Dropped" colorClass="text-gray-500" />
             <Option value="REJECTED" label="Rejected" colorClass="text-red-600" />
           </div>
 
@@ -154,7 +155,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Saving…' : selected === 'WITHDRAWN' ? 'Put On Hold' : 'Move Stage'}
+              {loading ? 'Saving…' : selected === 'WITHDRAWN' ? 'Put On Hold' : selected === 'DROPPED' ? 'Mark as Dropped' : 'Move Stage'}
             </Button>
           </div>
         </form>
