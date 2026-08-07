@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddCandidateToPositionModal } from './AddCandidateToPositionModal'
+import { TalentSearchModal } from './TalentSearchModal'
 import type { Stage, CandidateStatus } from '@prisma/client'
 import { isCandidateInactive } from '@/lib/candidate-status'
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
@@ -223,15 +224,17 @@ interface CandidatePosition {
 
 interface Props {
   positionId: string
+  positionTitle?: string
   positionTimezone?: string
   candidatePositions: CandidatePosition[]
   activeCandidates: number
   currentUserId?: string
 }
 
-export function PositionCandidatesPanel({ positionId, positionTimezone = 'America/Montevideo', candidatePositions: initial, activeCandidates, currentUserId }: Props) {
+export function PositionCandidatesPanel({ positionId, positionTitle = '', positionTimezone = 'America/Montevideo', candidatePositions: initial, activeCandidates, currentUserId }: Props) {
   const [rows, setRows] = useState<CandidatePosition[]>(initial)
   const [showModal, setShowModal] = useState(false)
+  const [showTalentSearch, setShowTalentSearch] = useState(false)
   const [liveScores, setLiveScores] = useState<Record<string, number | null>>({})
   const [scoringIds, setScoringIds] = useState<Set<string>>(new Set())
   const [inactiveExpanded, setInactiveExpanded] = useState(false)
@@ -269,6 +272,21 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
   function handleCandidateAdded(newRow: CandidatePosition) {
     setRows((prev) => [...prev, newRow])
     startPolling(newRow.id)
+  }
+
+  function handleTalentAdded(added: { id: string; candidateId: string; candidate: { id: string; firstName: string; lastName: string; email: string; country: string | null; seniority: string | null } }[]) {
+    for (const cp of added) {
+      const row: CandidatePosition = {
+        id: cp.id,
+        stage: 'APPLIED',
+        status: 'ACTIVE',
+        fitScore: null,
+        createdAt: new Date().toISOString(),
+        candidate: cp.candidate,
+      }
+      setRows((prev) => prev.some((r) => r.id === cp.id) ? prev : [...prev, row])
+      startPolling(cp.id)
+    }
   }
 
   async function handleRemove(cpId: string, name: string) {
@@ -494,7 +512,10 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
           <span className="text-sm font-medium text-gray-900">Candidates ({rows.length})</span>
           <span className="ml-4 text-sm text-gray-500">{activeCandidates} active</span>
         </div>
-        <Button size="sm" onClick={() => setShowModal(true)}>Add Candidate</Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowTalentSearch(true)}>Find Candidates</Button>
+          <Button size="sm" onClick={() => setShowModal(true)}>Add Candidate</Button>
+        </div>
       </div>
 
       {/* Search + Filters */}
@@ -633,6 +654,15 @@ export function PositionCandidatesPanel({ positionId, positionTimezone = 'Americ
           currentUserId={currentUserId}
           onCandidateAdded={handleCandidateAdded}
           onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {showTalentSearch && (
+        <TalentSearchModal
+          positionId={positionId}
+          positionTitle={positionTitle}
+          onClose={() => setShowTalentSearch(false)}
+          onAdded={handleTalentAdded}
         />
       )}
     </div>
