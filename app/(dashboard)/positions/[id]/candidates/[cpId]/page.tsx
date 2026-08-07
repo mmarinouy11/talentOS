@@ -25,7 +25,21 @@ export default async function CandidateInPositionPage({
   const cp = await db.candidatePosition.findFirst({
     where: { id: cpId },
     include: {
-      candidate: true,
+      candidate: {
+        include: {
+          candidatePositions: {
+            where: { id: { not: cpId } },
+            include: {
+              position: { select: { id: true, title: true } },
+              interviews: {
+                orderBy: { createdAt: 'desc' },
+                select: { stage: true, status: true, decision: true, scheduledAt: true },
+              },
+            },
+            orderBy: { updatedAt: 'desc' },
+          },
+        },
+      },
       position: { select: { id: true, title: true, client: true, internalCostBudget: true, jdSkills: true, coreSkills: true, timezone: true } },
       recruiter: { select: { name: true, email: true } },
       stageHistory: {
@@ -39,6 +53,31 @@ export default async function CandidateInPositionPage({
 
   const { candidate, position } = cp
   const hoursBaseline = await getMonthlyHoursBaseline()
+
+  const STAGE_LABELS: Record<string, string> = {
+    APPLIED: 'Applied', SCREENING: 'Screening', TECHNICAL_INTERVIEW: 'Technical Interview',
+    MANAGER_INTERVIEW: 'Manager Interview', CLIENT_INTERVIEW: 'Client Interview',
+    OFFER: 'Offer', HIRED: 'Hired', REJECTED: 'Rejected',
+  }
+  const INTERVIEW_STAGE_ORDER: Record<string, number> = {
+    OFFER: 6, CLIENT_INTERVIEW: 5, MANAGER_INTERVIEW: 4, TECHNICAL_INTERVIEW: 3, SCREENING: 2, APPLIED: 1,
+  }
+  function pickLatestInterview(
+    interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null }[],
+    cpStage: string
+  ) {
+    if (!interviews.length) return null
+    if (['APPLIED', 'REJECTED', 'WITHDRAWN', 'HIRED'].includes(cpStage)) {
+      const rejected = interviews.find((i) => i.decision === 'REJECT')
+      if (rejected) return rejected
+      return interviews.reduce((best, cur) =>
+        (INTERVIEW_STAGE_ORDER[cur.stage] ?? 0) >= (INTERVIEW_STAGE_ORDER[best.stage] ?? 0) ? cur : best
+      )
+    }
+    return interviews.find((i) => i.stage === cpStage) ?? null
+  }
+
+  const otherPositions = candidate.candidatePositions ?? []
 
   return (
     <div className="space-y-4">
@@ -259,6 +298,49 @@ export default async function CandidateInPositionPage({
                     <span className="text-gray-400 text-xs">by {h.movedBy.name ?? h.movedBy.email}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {otherPositions.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <h2 className="text-sm font-medium text-gray-900 mb-3">Other Positions</h2>
+              <div className="space-y-2">
+                {otherPositions.map((other) => {
+                  const latestInterview = pickLatestInterview(other.interviews, other.stage)
+                  const isActive = other.status === 'ACTIVE'
+                  let interviewLabel: string | null = null
+                  if (latestInterview) {
+                    const statusLabel: Record<string, string> = {
+                      PENDING: 'Pending', AWAITING_SCHEDULE: 'Awaiting Schedule',
+                      SCHEDULED: 'Scheduled', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+                    }
+                    const decisionLabel: Record<string, string> = { ADVANCE: 'Advance', REJECT: 'Reject', HOLD: 'Hold' }
+                    interviewLabel = statusLabel[latestInterview.status] ?? latestInterview.status
+                    if (latestInterview.decision) interviewLabel += ` / ${decisionLabel[latestInterview.decision] ?? latestInterview.decision}`
+                  }
+                  return (
+                    <div key={other.id} className="flex items-start justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
+                      <div className="min-w-0">
+                        <Link
+                          href={`/positions/${other.position.id}/candidates/${other.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-gray-900 hover:underline underline-offset-2 line-clamp-1"
+                        >
+                          {other.position.title}
+                        </Link>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {STAGE_LABELS[other.stage] ?? other.stage}
+                          {interviewLabel && <span className="text-gray-400"> · {interviewLabel}</span>}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {isActive ? 'Active' : 'Not Moving Forward'}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
