@@ -95,7 +95,7 @@ type SortKey = keyof SortRow
 
 export function PositionsTable({ positions, isAdmin = false }: { positions: PositionRow[]; isAdmin?: boolean }) {
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<PositionStatus | ''>('')
+  const [statusFilter, setStatusFilter] = useState<PositionStatus | ''>('OPEN')
   const [rows, setRows] = useState(positions)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey | undefined>(undefined)
