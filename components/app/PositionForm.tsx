@@ -407,8 +407,9 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             >
               <option value="OPEN">Open</option>
               <option value="ON_HOLD">On Hold</option>
-              <option value="CLOSED">Closed</option>
+              <option value="CANCELLED">Cancelled</option>
               <option value="FILLED">Filled</option>
+              <option value="CLOSED">Closed</option>
             </Select>
           </div>
         )}

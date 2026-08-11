@@ -16,8 +16,9 @@ enum Role {
 enum PositionStatus {
   OPEN
   ON_HOLD
-  CLOSED
+  CANCELLED
   FILLED
+  CLOSED
 }
 
 enum Priority {

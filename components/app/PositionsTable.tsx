@@ -79,7 +79,7 @@ interface SortRow extends PositionRow {
 }
 
 const PRIORITY_ORDER: Record<Priority, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, URGENT: 3 }
-const STATUS_ORDER: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 1, CLOSED: 2, FILLED: 3 }
+const STATUS_ORDER: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 1, CANCELLED: 2, FILLED: 3, CLOSED: 4 }
 
 function dgmColor(atRisk: boolean): string {
   return atRisk ? 'text-red-600' : 'text-green-600'
@@ -166,8 +166,9 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
           <option value="">All statuses</option>
           <option value="OPEN">Open</option>
           <option value="ON_HOLD">On Hold</option>
-          <option value="CLOSED">Closed</option>
+          <option value="CANCELLED">Cancelled</option>
           <option value="FILLED">Filled</option>
+          <option value="CLOSED">Closed</option>
         </Select>
       </div>
 

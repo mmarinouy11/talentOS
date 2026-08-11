@@ -33,8 +33,8 @@ export default async function PositionsPage() {
     orderBy: [{ client: 'asc' }, { createdAt: 'desc' }],
   })
 
-  const counts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CLOSED: 0, FILLED: 0 }
-  const headcounts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CLOSED: 0, FILLED: 0 }
+  const counts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CANCELLED: 0, FILLED: 0, CLOSED: 0 }
+  const headcounts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CANCELLED: 0, FILLED: 0, CLOSED: 0 }
   for (const p of positions) {
     counts[p.status]++
     headcounts[p.status] += p.headcount ?? 1
@@ -68,11 +68,12 @@ export default async function PositionsPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <PositionCard label="Open" count={headcounts.OPEN} color="text-green-600" />
-        <PositionCard label="On Hold" count={headcounts.ON_HOLD} color="text-yellow-600" />
-        <PositionCard label="Closed" count={headcounts.CLOSED} color="text-gray-600" />
+        <PositionCard label="On Hold" count={headcounts.ON_HOLD} color="text-amber-600" />
+        <PositionCard label="Cancelled" count={headcounts.CANCELLED} color="text-gray-500" />
         <PositionCard label="Filled" count={headcounts.FILLED} color="text-blue-600" />
+        <PositionCard label="Closed" count={headcounts.CLOSED} color="text-gray-600" />
       </div>
 
       <PositionsTable positions={serialized} isAdmin={isAdmin} />
