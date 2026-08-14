@@ -128,17 +128,20 @@ export async function GET(request: Request) {
               const nextIv = cp.interviews
                 .filter((iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! >= now)
                 .sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())[0] ?? null
-              // Past SCHEDULED interview with no decision = needs feedback
-              const isPastScheduledPending = cp.interviews.some(
-                (iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! < now && iv.decision === null
-              )
+              // Past SCHEDULED interview (from a previous day) with no decision = needs feedback
+              const pastPendingIv = cp.interviews
+                .filter((iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! < todayStart && iv.decision === null)
+                .sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())[0] ?? null
               return {
                 cpId: cp.id,
                 name: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
                 daysInStage: entry ? daysAgo(entry.movedAt) : daysAgo(cp.createdAt),
                 scheduledAt: nextIv?.scheduledAt?.toISOString() ?? null,
                 scheduledStageLabel: nextIv ? (STAGE_ABBREV[nextIv.stage] ?? STAGE_LABELS[nextIv.stage] ?? nextIv.stage) : null,
-                isPastScheduledPending,
+                pendingIv: pastPendingIv ? {
+                  scheduledAt: pastPendingIv.scheduledAt!.toISOString(),
+                  stageLabel: STAGE_ABBREV[pastPendingIv.stage] ?? STAGE_LABELS[pastPendingIv.stage] ?? pastPendingIv.stage,
+                } : null,
               }
             }),
         }))

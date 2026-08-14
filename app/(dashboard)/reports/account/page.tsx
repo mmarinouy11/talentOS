@@ -9,7 +9,7 @@ import { VelocityTable } from '@/components/app/VelocityTable'
 interface DashboardCandidateEntry {
   cpId: string; name: string; daysInStage: number
   scheduledAt: string | null; scheduledStageLabel: string | null
-  isPastScheduledPending: boolean
+  pendingIv: { scheduledAt: string; stageLabel: string } | null
 }
 interface DashboardStageGroup { stage: string; label: string; candidates: DashboardCandidateEntry[] }
 interface DashboardPosition {
@@ -120,14 +120,17 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
                       return b.daysInStage - a.daysInStage
                     }).map((c) => (
                       <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
-                        className={`inline-flex items-center gap-1 text-xs rounded px-2 py-0.5 hover:border-gray-400 ${c.isPastScheduledPending ? 'bg-red-50 border border-red-300 text-red-700' : 'bg-white border border-gray-200'}`}>
-                        {c.isPastScheduledPending && <span title="Past interview needs feedback">⚠</span>}
+                        className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 hover:border-gray-400">
                         {c.name} <AgingBadge days={c.daysInStage} />
-                        {c.scheduledAt && c.scheduledStageLabel && (
-                          <span className={c.isPastScheduledPending ? 'text-red-400 ml-0.5' : 'text-gray-400 ml-0.5'}>
+                        {c.pendingIv ? (
+                          <span className="text-amber-600 ml-0.5">
+                            — ⚠ {c.pendingIv.stageLabel}: {formatIvTime(c.pendingIv.scheduledAt, pos.timezone)} (feedback pending)
+                          </span>
+                        ) : c.scheduledAt && c.scheduledStageLabel ? (
+                          <span className="text-gray-400 ml-0.5">
                             — {formatIvTime(c.scheduledAt, pos.timezone)}
                           </span>
-                        )}
+                        ) : null}
                       </Link>
                     ))}
                   </div>
