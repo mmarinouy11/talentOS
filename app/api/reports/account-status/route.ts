@@ -69,8 +69,9 @@ export async function GET(request: Request) {
 
   // Dashboard mode
   if (mode === 'dashboard') {
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-    const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999)
+    // Build UTC date boundaries for "today" using explicit UTC field setters
+    const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0)
+    const todayEnd   = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
 
     const DASH_STAGES: Stage[] = ['OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
 
@@ -107,12 +108,12 @@ export async function GET(request: Request) {
         }
       }
 
-      // Interview counts — ALL interviews today (past or future) with status SCHEDULED or COMPLETED
-      const allInterviews = allCPs.flatMap((cp) => cp.interviews)
-      const interviewsToday = allInterviews.filter((iv) =>
+      // Interview counts — active candidates only, today's date window (UTC), SCHEDULED or COMPLETED
+      const activeInterviews = activeCPs.flatMap((cp) => cp.interviews)
+      const interviewsToday = activeInterviews.filter((iv) =>
         iv.scheduledAt! >= todayStart && iv.scheduledAt! <= todayEnd
       ).length
-      const interviewsTotal = allInterviews.filter((iv) => iv.scheduledAt! >= now).length
+      const interviewsTotal = activeInterviews.filter((iv) => iv.scheduledAt! >= now).length
 
       // Candidates by stage with their next upcoming SCHEDULED interview
       const candidatesByStage = DASH_STAGES
