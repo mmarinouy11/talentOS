@@ -124,7 +124,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
                         {c.name} <AgingBadge days={c.daysInStage} />
                         {c.pendingIv ? (
                           <span className="text-amber-600 ml-0.5">
-                            — ⚠ {c.pendingIv.stageLabel}: {formatIvTime(c.pendingIv.scheduledAt, pos.timezone)} (feedback pending)
+                            — ⚠ {formatIvTime(c.pendingIv.scheduledAt, pos.timezone)} (feedback pending)
                           </span>
                         ) : c.scheduledAt && c.scheduledStageLabel ? (
                           <span className="text-gray-400 ml-0.5">

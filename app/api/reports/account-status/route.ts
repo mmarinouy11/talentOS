@@ -130,7 +130,7 @@ export async function GET(request: Request) {
                 .sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())[0] ?? null
               // Past SCHEDULED interview (from a previous day) with no decision = needs feedback
               const pastPendingIv = cp.interviews
-                .filter((iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! < todayStart && iv.decision === null)
+                .filter((iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! < now && iv.decision === null)
                 .sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())[0] ?? null
               return {
                 cpId: cp.id,
