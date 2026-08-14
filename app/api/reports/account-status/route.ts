@@ -84,8 +84,8 @@ export async function GET(request: Request) {
             candidate: { select: { firstName: true, lastName: true } },
             stageHistory: { orderBy: { movedAt: 'desc' } },
             interviews: {
-              where: { scheduledAt: { not: null }, status: 'SCHEDULED' },
-              select: { stage: true, status: true, scheduledAt: true },
+              where: { scheduledAt: { not: null }, status: { in: ['SCHEDULED', 'COMPLETED'] } },
+              select: { stage: true, status: true, scheduledAt: true, decision: true },
             },
           },
         },
@@ -107,13 +107,12 @@ export async function GET(request: Request) {
         }
       }
 
-      // Interview counts (SCHEDULED + future only)
+      // Interview counts — ALL interviews today (past or future) with status SCHEDULED or COMPLETED
       const allInterviews = allCPs.flatMap((cp) => cp.interviews)
-      const futureInterviews = allInterviews.filter((iv) => iv.scheduledAt! >= now)
-      const interviewsToday = futureInterviews.filter((iv) =>
+      const interviewsToday = allInterviews.filter((iv) =>
         iv.scheduledAt! >= todayStart && iv.scheduledAt! <= todayEnd
       ).length
-      const interviewsTotal = futureInterviews.length
+      const interviewsTotal = allInterviews.filter((iv) => iv.scheduledAt! >= now).length
 
       // Candidates by stage with their next upcoming SCHEDULED interview
       const candidatesByStage = DASH_STAGES
@@ -127,14 +126,19 @@ export async function GET(request: Request) {
               const entry = cp.stageHistory.find((h) => h.toStage === cp.stage)
               // Pick the soonest upcoming SCHEDULED interview for this candidate
               const nextIv = cp.interviews
-                .filter((iv) => iv.scheduledAt! >= now)
+                .filter((iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! >= now)
                 .sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())[0] ?? null
+              // Past SCHEDULED interview with no decision = needs feedback
+              const isPastScheduledPending = cp.interviews.some(
+                (iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! < now && iv.decision === null
+              )
               return {
                 cpId: cp.id,
                 name: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
                 daysInStage: entry ? daysAgo(entry.movedAt) : daysAgo(cp.createdAt),
                 scheduledAt: nextIv?.scheduledAt?.toISOString() ?? null,
                 scheduledStageLabel: nextIv ? (STAGE_ABBREV[nextIv.stage] ?? STAGE_LABELS[nextIv.stage] ?? nextIv.stage) : null,
+                isPastScheduledPending,
               }
             }),
         }))
