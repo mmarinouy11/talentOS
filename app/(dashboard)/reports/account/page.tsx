@@ -114,10 +114,9 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
                   <p className="text-xs font-medium text-gray-600 mb-1">{sg.label}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {[...sg.candidates].sort((a, b) => {
-                      const aHas = a.scheduledAt ? 1 : 0
-                      const bHas = b.scheduledAt ? 1 : 0
-                      if (bHas !== aHas) return bHas - aHas
-                      return b.daysInStage - a.daysInStage
+                      const aMs = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Infinity
+                      const bMs = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Infinity
+                      return aMs - bMs
                     }).map((c) => (
                       <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
                         className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 hover:border-gray-400">
