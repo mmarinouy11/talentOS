@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Stage } from '@prisma/client'
 
@@ -44,6 +45,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
       : 'HIRED'
   )
   const [notes, setNotes] = useState('')
+  const [startDate, setStartDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -52,7 +54,11 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     setLoading(true)
     setError('')
 
-    const body = { newStage: selected === 'DROPPED' ? 'WITHDRAWN' : selected, notes: notes || null }
+    const body = {
+      newStage: selected === 'DROPPED' ? 'WITHDRAWN' : selected,
+      notes: notes || null,
+      startDate: selected === 'HIRED' && startDate ? startDate : null,
+    }
 
     const res = await fetch(`/api/candidate-positions/${candidatePositionId}/stage`, {
       method: 'PATCH',
@@ -140,6 +146,19 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
             <Option value="DROPPED" label="Dropped" colorClass="text-gray-500" />
             <Option value="REJECTED" label="Rejected" colorClass="text-red-600" />
           </div>
+
+          {selected === 'HIRED' && (
+            <div>
+              <Label htmlFor="startDate">Expected Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+              <p className="text-xs text-gray-500 mt-1">When is this candidate expected to join?</p>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="moveNotes">Notes</Label>

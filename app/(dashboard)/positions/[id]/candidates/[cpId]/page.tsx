@@ -140,6 +140,14 @@ export default async function CandidateInPositionPage({
                   <div className="mt-1"><SkillTags tags={candidate.languages} /></div>
                 </div>
               )}
+              {cp.stage === 'HIRED' && cp.startDate && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Expected Start Date</p>
+                  <p className="text-gray-900 mt-0.5">
+                    {new Date(cp.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Owner</p>
                 <p className="text-gray-900 mt-0.5 text-sm">

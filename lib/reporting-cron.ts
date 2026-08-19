@@ -43,7 +43,28 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+async function autoCloseStartedPositions() {
+  const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0)
+  const hired = await db.candidatePosition.findMany({
+    where: {
+      status: 'HIRED',
+      startDate: { not: null, lt: todayStart },
+      position: { status: { not: 'CLOSED' }, deletedAt: null },
+    },
+    select: { positionId: true },
+    distinct: ['positionId'],
+  })
+  if (hired.length === 0) return
+  const positionIds = hired.map((cp) => cp.positionId)
+  await db.position.updateMany({
+    where: { id: { in: positionIds } },
+    data: { status: 'CLOSED' },
+  })
+  console.log(`[reporting-cron] Auto-closed ${positionIds.length} position(s) whose start date has passed`)
+}
+
 export async function runReportingCron() {
+  await autoCloseStartedPositions()
   const today = DAY_MAP[new Date().getDay()]
 
   const positions = await db.position.findMany({

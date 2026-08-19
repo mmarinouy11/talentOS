@@ -29,15 +29,26 @@ export default async function PositionsPage() {
       headcount: true,
       recruiter: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true, positionVendors: true } },
+      candidatePositions: { select: { status: true, startDate: true } },
     },
     orderBy: [{ client: 'asc' }, { createdAt: 'desc' }],
   })
 
   const counts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CANCELLED: 0, FILLED: 0, CLOSED: 0 }
   const headcounts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CANCELLED: 0, FILLED: 0, CLOSED: 0 }
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0)
+  let ytjPositionCount = 0
+  let ytjHeadcount = 0
   for (const p of positions) {
     counts[p.status]++
     headcounts[p.status] += p.headcount ?? 1
+    const hasYtj = p.candidatePositions.some(
+      (cp) => cp.status === 'HIRED' && cp.startDate != null && cp.startDate > today
+    )
+    if (hasYtj) {
+      ytjPositionCount++
+      ytjHeadcount += p.headcount ?? 1
+    }
   }
 
   const serialized = positions.map((p) => ({
@@ -68,12 +79,13 @@ export default async function PositionsPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-6 gap-4">
         <PositionCard label="Open" count={headcounts.OPEN} color="text-green-600" />
         <PositionCard label="On Hold" count={headcounts.ON_HOLD} color="text-amber-600" />
         <PositionCard label="Cancelled" count={headcounts.CANCELLED} color="text-gray-500" />
         <PositionCard label="Filled" count={headcounts.FILLED} color="text-blue-600" />
         <PositionCard label="Closed" count={headcounts.CLOSED} color="text-gray-600" />
+        <PositionCard label="YTJ" count={ytjHeadcount} color="text-indigo-600" />
       </div>
 
       <PositionsTable positions={serialized} isAdmin={isAdmin} />

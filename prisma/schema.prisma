@@ -312,6 +312,7 @@ model CandidatePosition {
   fitStrengths          String[]
   fitGaps               String[]
   fitScoredAt           DateTime?
+  startDate             DateTime?
   noticePeriodDays      Int?
   earliestStartDate     DateTime?
   compensationRisk      CompensationRisk?
