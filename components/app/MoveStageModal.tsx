@@ -54,6 +54,12 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
     setLoading(true)
     setError('')
 
+    if (selected === 'HIRED' && !startDate) {
+      setError('Please enter the expected start date before marking as Hired.')
+      setLoading(false)
+      return
+    }
+
     const body = {
       newStage: selected === 'DROPPED' ? 'WITHDRAWN' : selected,
       notes: notes || null,
@@ -173,7 +179,7 @@ export function MoveStageModal({ candidatePositionId, currentStage, onClose }: M
 
           <div className="flex gap-3 justify-end pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || (selected === 'HIRED' && !startDate)}>
               {loading ? 'Saving…' : selected === 'WITHDRAWN' ? 'Put On Hold' : selected === 'DROPPED' ? 'Mark as Dropped' : 'Move Stage'}
             </Button>
           </div>

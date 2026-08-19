@@ -82,10 +82,10 @@ export default async function PositionsPage() {
       <div className="grid grid-cols-6 gap-4">
         <PositionCard label="Open" count={headcounts.OPEN} color="text-green-600" />
         <PositionCard label="On Hold" count={headcounts.ON_HOLD} color="text-amber-600" />
-        <PositionCard label="Cancelled" count={headcounts.CANCELLED} color="text-gray-500" />
         <PositionCard label="Filled" count={headcounts.FILLED} color="text-blue-600" />
-        <PositionCard label="Closed" count={headcounts.CLOSED} color="text-gray-600" />
         <PositionCard label="YTJ" count={ytjHeadcount} color="text-indigo-600" />
+        <PositionCard label="Closed" count={headcounts.CLOSED} color="text-gray-600" />
+        <PositionCard label="Cancelled" count={headcounts.CANCELLED} color="text-gray-500" />
       </div>
 
       <PositionsTable positions={serialized} isAdmin={isAdmin} />
