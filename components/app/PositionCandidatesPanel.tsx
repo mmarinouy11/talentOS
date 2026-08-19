@@ -239,13 +239,43 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
   const [scoringIds, setScoringIds] = useState<Set<string>>(new Set())
   const [inactiveExpanded, setInactiveExpanded] = useState(false)
 
+  const STORAGE_KEY = `pos-filters-${positionId}`
+
+  function readFilters() {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY)
+      if (!raw) return null
+      return JSON.parse(raw) as {
+        search: string
+        filterCountry: string[]
+        filterStage: string[]
+        filterRoundStatus: string[]
+        filterMinScore: string
+      }
+    } catch { return null }
+  }
+
+  const saved = readFilters()
+
   const [sortKey, setSortKey] = useState<SortKey>('stage')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [search, setSearch] = useState('')
-  const [filterCountry, setFilterCountry] = useState<Set<string>>(new Set())
-  const [filterStage, setFilterStage] = useState<Set<string>>(new Set())
-  const [filterRoundStatus, setFilterRoundStatus] = useState<Set<string>>(new Set())
-  const [filterMinScore, setFilterMinScore] = useState('')
+  const [search, setSearch] = useState(saved?.search ?? '')
+  const [filterCountry, setFilterCountry] = useState<Set<string>>(new Set(saved?.filterCountry ?? []))
+  const [filterStage, setFilterStage] = useState<Set<string>>(new Set(saved?.filterStage ?? []))
+  const [filterRoundStatus, setFilterRoundStatus] = useState<Set<string>>(new Set(saved?.filterRoundStatus ?? []))
+  const [filterMinScore, setFilterMinScore] = useState(saved?.filterMinScore ?? '')
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        search,
+        filterCountry: [...filterCountry],
+        filterStage: [...filterStage],
+        filterRoundStatus: [...filterRoundStatus],
+        filterMinScore,
+      }))
+    } catch { /* sessionStorage unavailable */ }
+  }, [STORAGE_KEY, search, filterCountry, filterStage, filterRoundStatus, filterMinScore])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
