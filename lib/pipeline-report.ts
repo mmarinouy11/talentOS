@@ -178,9 +178,11 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   if (data.clients.length === 0) return ''
 
   const colCount = SUMMARY_STAGES.length + 2
+  // Fix 2: fixed column widths so all clients align in one table
+  const STAGE_COL_W = '72px'
 
-  const thStyle = `padding:5px 8px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:11px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:#f9fafb;`
-  const thStyleLeft = thStyle.replace('text-align:center', 'text-align:left')
+  const thBase = `padding:5px 8px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:11px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:#f9fafb;`
+  const thLeft = thBase.replace('text-align:center', 'text-align:left')
 
   const totals: Record<string, number> = {}
   let grandTotal = 0
@@ -203,35 +205,44 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
 
       const stageCells = SUMMARY_STAGES.map((s) => {
         const n = stageMap[s.key] ?? 0
-        return `<td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
+        return `<td style="width:${STAGE_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
       }).join('')
 
       const posLink = emailMode
         ? `<span style="font-size:13px;font-weight:500;color:#111827;">${esc(pos.title)}</span>`
         : `<a href="/positions/${pos.id}" style="font-size:13px;font-weight:500;color:#111827;text-decoration:none;" target="_blank">${esc(pos.title)}</a>`
 
+      // Fix 1: Total column in gray
       bodyRows.push(`<tr>
         <td style="padding:5px 8px 5px 14px;border:1px solid #e5e7eb;">${posLink}</td>
         ${stageCells}
-        <td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:600;color:#111827;">${rowTotal || '—'}</td>
+        <td style="width:${STAGE_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:500;color:#9ca3af;">${rowTotal || '—'}</td>
       </tr>`)
     }
   }
 
   const totalCells = SUMMARY_STAGES.map((s) => {
     const n = totals[s.key] ?? 0
-    return `<td style="padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
+    return `<td style="width:${STAGE_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
   }).join('')
+
+  // Fix 2: single table with colgroup for consistent widths
+  const colgroup = `<colgroup>
+    <col style="min-width:160px;">
+    ${SUMMARY_STAGES.map(() => `<col style="width:${STAGE_COL_W};">`).join('')}
+    <col style="width:${STAGE_COL_W};">
+  </colgroup>`
 
   return `
     <div style="margin-bottom:32px;overflow-x:auto;">
       <h2 style="margin:0 0 10px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">All Open Positions</h2>
-      <table style="border-collapse:collapse;width:100%;min-width:520px;">
+      <table style="border-collapse:collapse;width:100%;table-layout:fixed;">
+        ${colgroup}
         <thead>
           <tr>
-            <th style="${thStyleLeft}">Position</th>
-            ${SUMMARY_STAGES.map((s) => `<th style="${thStyle}">${esc(s.label)}</th>`).join('')}
-            <th style="${thStyle}">Total</th>
+            <th style="${thLeft}">Position</th>
+            ${SUMMARY_STAGES.map((s) => `<th style="${thBase}">${esc(s.label)}</th>`).join('')}
+            <th style="${thBase}">Total</th>
           </tr>
         </thead>
         <tbody>${bodyRows.join('')}</tbody>
@@ -239,7 +250,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
           <tr>
             <td style="padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;font-weight:700;color:#111827;background:#f9fafb;">Totals</td>
             ${totalCells}
-            <td style="padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${grandTotal}</td>
+            <td style="width:${STAGE_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#9ca3af;background:#f9fafb;">${grandTotal}</td>
           </tr>
         </tfoot>
       </table>
