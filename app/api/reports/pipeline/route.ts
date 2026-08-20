@@ -46,6 +46,7 @@ function candidateInitial(firstName: string, lastName: string): string {
 export async function GET(request: Request) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if ((session.user as { role?: string }).role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const fromParam = searchParams.get('from')
@@ -135,7 +136,7 @@ export async function GET(request: Request) {
           newCandidates.push({ name, source: sourceLabel(cp.candidate.sourcedByType) })
         }
         for (const h of cp.stageHistory) {
-          if (h.movedAt >= fromDate && h.movedAt <= toDate && h.fromStage) {
+          if (h.movedAt >= fromDate && h.movedAt <= toDate && h.fromStage && h.fromStage !== h.toStage) {
             stageChanges.push({
               name,
               from: STAGE_LABELS[h.fromStage as Stage] ?? h.fromStage,

@@ -91,7 +91,7 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
         if (cp.createdAt >= fromDate && cp.createdAt <= toDate)
           newCandidates.push({ name, source: sourceLabel(cp.candidate.sourcedByType) })
         for (const h of cp.stageHistory)
-          if (h.movedAt >= fromDate && h.movedAt <= toDate && h.fromStage)
+          if (h.movedAt >= fromDate && h.movedAt <= toDate && h.fromStage && h.fromStage !== h.toStage)
             stageChanges.push({ name, from: STAGE_LABELS[h.fromStage as Stage] ?? h.fromStage, to: STAGE_LABELS[h.toStage as Stage] ?? h.toStage })
         for (const iv of cp.interviews)
           if (iv.decidedAt && iv.decidedAt >= fromDate && iv.decidedAt <= toDate)

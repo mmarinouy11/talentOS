@@ -52,6 +52,83 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+const SUMMARY_STAGES: { key: string; label: string }[] = [
+  { key: 'OFFER', label: 'Offer' },
+  { key: 'CLIENT_INTERVIEW', label: 'Client Int.' },
+  { key: 'MANAGER_INTERVIEW', label: 'Mgr Int.' },
+  { key: 'TECHNICAL_INTERVIEW', label: 'Tech' },
+  { key: 'SCREENING', label: 'Screen' },
+  { key: 'APPLIED', label: 'Applied' },
+]
+
+function buildOverviewTable(data: PipelineReportData, emailMode: boolean): string {
+  const allPositions = data.clients.flatMap((c) =>
+    c.positions.map((p) => ({ ...p, client: c.client }))
+  )
+  if (allPositions.length === 0) return ''
+
+  const th = (label: string, align = 'left') =>
+    `<th style="padding:5px 8px;border:1px solid #e5e7eb;font-size:11px;text-align:${align};color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:#f9fafb;">${esc(label)}</th>`
+
+  const totals: Record<string, number> = {}
+  let grandTotal = 0
+
+  const rows = allPositions.map((pos) => {
+    const stageMap: Record<string, number> = {}
+    for (const s of pos.pipelineStages) stageMap[s.stage] = s.count
+    const rowTotal = pos.pipelineStages.reduce((sum, s) => sum + s.count, 0)
+    grandTotal += rowTotal
+    for (const s of SUMMARY_STAGES) {
+      totals[s.key] = (totals[s.key] ?? 0) + (stageMap[s.key] ?? 0)
+    }
+
+    const stageCells = SUMMARY_STAGES.map((s) => {
+      const n = stageMap[s.key] ?? 0
+      return `<td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
+    }).join('')
+
+    const posLink = emailMode
+      ? `<span style="font-size:13px;font-weight:500;color:#111827;">${esc(pos.title)}</span>`
+      : `<a href="/positions/${pos.id}" style="font-size:13px;font-weight:500;color:#111827;text-decoration:none;" target="_blank">${esc(pos.title)}</a>`
+
+    return `<tr>
+      <td style="padding:5px 8px;border:1px solid #e5e7eb;">${posLink}</td>
+      <td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;white-space:nowrap;">${esc(pos.client)}</td>
+      ${stageCells}
+      <td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:600;color:#111827;">${rowTotal || '—'}</td>
+      <td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;white-space:nowrap;">${esc(pos.recruiter)}</td>
+    </tr>`
+  }).join('')
+
+  const totalCells = SUMMARY_STAGES.map((s) => {
+    const n = totals[s.key] ?? 0
+    return `<td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
+  }).join('')
+
+  return `
+    <div style="margin-bottom:32px;overflow-x:auto;">
+      <h2 style="margin:0 0 10px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">All Open Positions</h2>
+      <table style="border-collapse:collapse;width:100%;min-width:600px;">
+        <thead>
+          <tr>
+            ${th('Position')}${th('Client')}
+            ${SUMMARY_STAGES.map((s) => th(s.label, 'center')).join('')}
+            ${th('Total', 'center')}${th('Lead Recruiter')}
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;font-weight:700;color:#111827;background:#f9fafb;">Totals</td>
+            ${totalCells}
+            <td style="padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${grandTotal}</td>
+            <td style="padding:5px 8px;border:1px solid #e5e7eb;background:#f9fafb;"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`
+}
+
 export function renderPipelineHtml(
   data: PipelineReportData,
   opts: { printMode?: boolean; emailMode?: boolean } = {},
@@ -62,6 +139,8 @@ export function renderPipelineHtml(
   const generated = fmtDate(data.generatedAt)
 
   const font = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+
+  const overviewTable = buildOverviewTable(data, emailMode ?? false)
 
   const clientBlocks = data.clients.map((c) => {
     const posBlocks = c.positions.map((pos) => {
@@ -165,6 +244,7 @@ export function renderPipelineHtml(
         <h1 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#111827;">Pipeline Report — Tenarai LATAM</h1>
         <p style="margin:0;font-size:13px;color:#6b7280;">Generated: ${generated} · Activity: ${from} – ${to}</p>
       </div>
+      ${overviewTable}
       ${clientBlocks || '<p style="color:#9ca3af;font-size:14px;">No open positions.</p>'}
       ${summaryBlock}
       ${emailMode ? '<p style="margin-top:24px;font-size:12px;color:#9ca3af;">Sent by TalentOS · Tenarai LATAM</p>' : ''}

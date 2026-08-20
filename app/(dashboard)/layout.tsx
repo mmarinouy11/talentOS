@@ -12,7 +12,6 @@ const navItems = [
   { href: '/candidates', label: 'Candidates' },
   { href: '/vendors', label: 'Partners' },
   { href: '/reports', label: 'Reports' },
-  { href: '/reports/pipeline', label: 'Pipeline Report' },
   { href: '/profile', label: 'My Profile' },
 ]
 
