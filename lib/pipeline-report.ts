@@ -31,6 +31,27 @@ export interface PipelineClient {
   positions: PipelinePosition[]
 }
 
+export interface PipelineAtAGlance {
+  openPositions: number
+  totalHeadcount: number
+  activeCandidates: number
+  offerCount: number
+  clientCount: number
+  managerCount: number
+  techCount: number
+  interviewsToday: number
+}
+
+export interface PipelinePeriodHighlights {
+  interviewsConducted: number
+  interviewsByStage: { stage: string; label: string; count: number }[]
+  candidatesAdvanced: number
+  newCandidates: number
+  newCandidatePositions: number
+  movedToOffer: number
+  notMovingForward: number
+}
+
 export interface PipelineReportData {
   from: string
   to: string
@@ -41,6 +62,8 @@ export interface PipelineReportData {
     totalHeadcount: number
     interviewsToday: number
   }
+  atAGlance: PipelineAtAGlance
+  periodHighlights: PipelinePeriodHighlights
   clients: PipelineClient[]
 }
 
@@ -52,7 +75,6 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-// Fix 3: "Applied" → "Pipeline" everywhere
 const STAGE_DISPLAY: Record<string, string> = {
   APPLIED: 'Pipeline',
 }
@@ -67,19 +89,95 @@ const SUMMARY_STAGES: { key: string; label: string }[] = [
   { key: 'MANAGER_INTERVIEW', label: 'Mgr Int.' },
   { key: 'TECHNICAL_INTERVIEW', label: 'Tech' },
   { key: 'SCREENING', label: 'Screen' },
-  { key: 'APPLIED', label: 'Pipeline' }, // Fix 3
+  { key: 'APPLIED', label: 'Pipeline' },
 ]
 
 const LIME = '#8CF000'
 
+function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): string {
+  const from = fmtDate(data.from)
+  const to = fmtDate(data.to)
+  const generated = fmtDate(data.generatedAt)
+  const ag = data.atAGlance
+  const ph = data.periodHighlights
+
+  const advancedTotal = ag.offerCount + ag.clientCount + ag.managerCount + ag.techCount
+  const advancedParts = [
+    ag.offerCount > 0 ? `${ag.offerCount} Offer` : '',
+    ag.clientCount > 0 ? `${ag.clientCount} Client` : '',
+    ag.managerCount > 0 ? `${ag.managerCount} Manager` : '',
+    ag.techCount > 0 ? `${ag.techCount} Tech` : '',
+  ].filter(Boolean)
+  const advancedDetail = advancedParts.join(' · ') || 'none'
+
+  const bullets: string[] = []
+
+  if (ph.interviewsConducted > 0) {
+    const byStage = ph.interviewsByStage
+      .filter((s) => s.count > 0)
+      .map((s) => `${s.count} ${s.label.toLowerCase()}`)
+      .join(', ')
+    bullets.push(`📅 ${ph.interviewsConducted} interview${ph.interviewsConducted !== 1 ? 's' : ''} conducted${byStage ? ` — ${byStage}` : ''}`)
+  }
+  bullets.push(`➡️ ${ph.candidatesAdvanced} candidate${ph.candidatesAdvanced !== 1 ? 's' : ''} advanced to next stage`)
+  bullets.push(`🆕 ${ph.newCandidates} new candidate${ph.newCandidates !== 1 ? 's' : ''} added across ${ph.newCandidatePositions} position${ph.newCandidatePositions !== 1 ? 's' : ''}`)
+  if (ph.movedToOffer > 0) {
+    bullets.push(`✉️ ${ph.movedToOffer} candidate${ph.movedToOffer !== 1 ? 's' : ''} moved to Offer`)
+  }
+  bullets.push(`❌ ${ph.notMovingForward} candidate${ph.notMovingForward !== 1 ? 's' : ''} not moving forward`)
+
+  const cardStyle = `padding:12px 16px;border:1px solid #e5e7eb;border-radius:6px;vertical-align:top;`
+
+  return `
+    <div style="margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #e5e7eb;">
+      <div style="border-left:4px solid ${LIME};padding-left:12px;margin-bottom:20px;">
+        <h1 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#2F2C29;letter-spacing:.02em;">TENARAI LATAM — PIPELINE REPORT</h1>
+        <p style="margin:0;font-size:12px;color:#6b7280;">Generated ${esc(generated)} · Period: ${esc(from)} – ${esc(to)}</p>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <h2 style="margin:0 0 8px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;">At a Glance</h2>
+        <table style="border-collapse:separate;border-spacing:8px;width:100%;">
+          <tr>
+            <td style="${cardStyle}">
+              <div style="font-size:22px;font-weight:700;color:#111827;">${ag.openPositions}</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Open Positions</div>
+              <div style="font-size:11px;color:#9ca3af;">${ag.totalHeadcount} HC</div>
+            </td>
+            <td style="${cardStyle}">
+              <div style="font-size:22px;font-weight:700;color:#111827;">${ag.activeCandidates}</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Active Candidates</div>
+              <div style="font-size:11px;color:#9ca3af;">across all positions</div>
+            </td>
+            <td style="${cardStyle}">
+              <div style="font-size:22px;font-weight:700;color:#111827;">${advancedTotal}</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Advanced Stages</div>
+              <div style="font-size:11px;color:#9ca3af;">${esc(advancedDetail)}</div>
+            </td>
+            <td style="${cardStyle}">
+              <div style="font-size:22px;font-weight:700;color:#111827;">${ag.interviewsToday}</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Interviews Today</div>
+              <div style="font-size:11px;color:#9ca3af;">scheduled</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div>
+        <h2 style="margin:0 0 8px;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;">
+          Period Highlights <span style="font-weight:400;text-transform:none;letter-spacing:0;">(${esc(from)} – ${esc(to)})</span>
+        </h2>
+        <ul style="margin:0;padding-left:0;list-style:none;">
+          ${bullets.map((b) => `<li style="padding:5px 0;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${esc(b)}</li>`).join('')}
+        </ul>
+      </div>
+    </div>`
+}
+
 function buildOverviewTable(data: PipelineReportData, emailMode: boolean): string {
   if (data.clients.length === 0) return ''
 
-  // Fix 1: no Lead Recruiter column
-  // Fix 2: group by client with separator rows
-  // Fix 4: lime bottom border on column headers, lime left border on client rows, lime top border on totals
-
-  const colCount = SUMMARY_STAGES.length + 2 // Position + stage cols + Total
+  const colCount = SUMMARY_STAGES.length + 2
 
   const thStyle = `padding:5px 8px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:11px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:#f9fafb;`
   const thStyleLeft = thStyle.replace('text-align:center', 'text-align:left')
@@ -90,7 +188,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   const bodyRows: string[] = []
 
   for (const client of data.clients) {
-    // Client separator row — Fix 2, Fix 4
     bodyRows.push(`<tr>
       <td colspan="${colCount}" style="padding:6px 10px;border:1px solid #e5e7eb;background:#f9fafb;border-left:3px solid ${LIME};font-size:12px;font-weight:700;color:#374151;">${esc(client.client)}</td>
     </tr>`)
@@ -154,19 +251,16 @@ export function renderPipelineHtml(
   opts: { printMode?: boolean; emailMode?: boolean } = {},
 ): string {
   const { printMode, emailMode } = opts
-  const from = fmtDate(data.from)
-  const to = fmtDate(data.to)
-  const generated = fmtDate(data.generatedAt)
 
   const font = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
 
+  const headerSection = buildHeaderSection(data, emailMode ?? false)
   const overviewTable = buildOverviewTable(data, emailMode ?? false)
 
   const clientBlocks = data.clients.map((c) => {
     const posBlocks = c.positions.map((pos) => {
-      // Pipeline detail table — Fix 3: relabel Applied → Pipeline
       const stageRows = pos.pipelineStages.map((s) => {
-        const displayLabel = stageLabel(s.label) // s.label is already the human label from API
+        const displayLabel = stageLabel(s.label)
         const names = s.candidates.map((cand) => `${esc(cand.name)} (${cand.days}d)`).join(', ')
         return `
           <tr>
@@ -189,7 +283,6 @@ export function renderPipelineHtml(
             <tbody>${stageRows}</tbody>
           </table>`
 
-      // Activity — Fix 3: relabel "Applied" in stage changes/decisions
       const { newCandidates, stageChanges, decisions } = pos.activity
       const hasActivity = newCandidates.length + stageChanges.length + decisions.length > 0
 
@@ -214,7 +307,6 @@ export function renderPipelineHtml(
         ? `<ul style="margin:6px 0 0;padding-left:18px;">${activityLines.join('')}</ul>`
         : `<p style="font-size:13px;color:#9ca3af;margin:4px 0 0;">No activity in this period.</p>`
 
-      // Fix 4: lime left border on position blocks
       return `
         <div style="margin-bottom:18px;padding-left:10px;border-left:3px solid ${LIME};">
           <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#111827;">
@@ -230,7 +322,6 @@ export function renderPipelineHtml(
 
     const pageBreak = printMode ? 'page-break-after:always;' : ''
 
-    // Fix 4: lime underline on client section headers
     return `
       <div style="${pageBreak}margin-bottom:32px;">
         <h2 style="margin:0 0 12px;font-size:16px;font-weight:700;color:#111827;border-bottom:2px solid ${LIME};padding-bottom:6px;">${esc(c.client)}</h2>
@@ -263,14 +354,10 @@ export function renderPipelineHtml(
     ? `style="max-width:600px;margin:0 auto;padding:24px;${font};"`
     : `style="max-width:820px;margin:0 auto;padding:32px 24px;${font};"`
 
-  // Fix 4: lime accent on page title
   return `
     ${printStyles}
     <div ${container}>
-      <div style="margin-bottom:28px;border-left:4px solid ${LIME};padding-left:12px;">
-        <h1 style="margin:0 0 4px;font-size:20px;font-weight:700;color:#111827;">Pipeline Report — Tenarai LATAM</h1>
-        <p style="margin:0;font-size:13px;color:#6b7280;">Generated: ${generated} · Activity: ${from} – ${to}</p>
-      </div>
+      ${headerSection}
       ${overviewTable}
       ${clientBlocks || '<p style="color:#9ca3af;font-size:14px;">No open positions.</p>'}
       ${summaryBlock}

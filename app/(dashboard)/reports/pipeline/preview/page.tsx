@@ -59,6 +59,7 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
   }
 
   let totalPositions = 0, totalActive = 0, totalHeadcount = 0
+  let offerCount = 0, clientCount = 0, managerCount = 0, techCount = 0
 
   const clients = [...byClient.entries()].map(([clientName, clientPositions]) => ({
     client: clientName,
@@ -76,6 +77,11 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
         const days = entry ? daysAgo(entry.movedAt) : daysAgo(cp.createdAt)
         if (!stageCounts.has(s)) stageCounts.set(s, [])
         stageCounts.get(s)!.push({ cpId: cp.id, name: `${cp.candidate.firstName} ${cp.candidate.lastName.charAt(0)}.`, days })
+
+        if (s === 'OFFER') offerCount++
+        else if (s === 'CLIENT_INTERVIEW') clientCount++
+        else if (s === 'MANAGER_INTERVIEW') managerCount++
+        else if (s === 'TECHNICAL_INTERVIEW') techCount++
       }
 
       const pipelineStages = STAGE_ORDER.filter((s) => stageCounts.has(s)).map((s) => ({
@@ -102,11 +108,50 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
     }),
   }))
 
-  const interviewsToday = await db.interview.count({
-    where: { scheduledAt: { gte: todayStart, lte: todayEnd }, status: { in: ['SCHEDULED', 'COMPLETED'] }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
-  })
+  const [interviewsToday, conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount] = await Promise.all([
+    db.interview.count({
+      where: { scheduledAt: { gte: todayStart, lte: todayEnd }, status: { in: ['SCHEDULED', 'COMPLETED'] }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
+    }),
+    db.interview.findMany({
+      where: { scheduledAt: { gte: fromDate, lte: toDate }, status: 'COMPLETED', candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
+      select: { stage: true },
+    }),
+    db.interview.count({
+      where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'ADVANCE', candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
+    }),
+    db.candidatePosition.findMany({
+      where: { createdAt: { gte: fromDate, lte: toDate }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } },
+      select: { positionId: true },
+    }),
+    db.stageHistory.count({
+      where: { toStage: 'OFFER', movedAt: { gte: fromDate, lte: toDate }, candidatePosition: { position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
+    }),
+    db.interview.count({
+      where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'REJECT', candidatePosition: { position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
+    }),
+  ])
 
-  return { from: fromDate.toISOString(), to: toDate.toISOString(), generatedAt: now.toISOString(), summary: { totalPositions, totalActive, totalHeadcount, interviewsToday }, clients }
+  const INTERVIEW_STAGE_LABELS: Partial<Record<string, string>> = {
+    SCREENING: 'screening', TECHNICAL_INTERVIEW: 'technical',
+    MANAGER_INTERVIEW: 'manager', CLIENT_INTERVIEW: 'client',
+  }
+  const stageBuckets: Record<string, number> = {}
+  for (const iv of conductedInterviews) {
+    const label = INTERVIEW_STAGE_LABELS[iv.stage] ?? iv.stage.toLowerCase()
+    stageBuckets[label] = (stageBuckets[label] ?? 0) + 1
+  }
+  const interviewsByStage = Object.entries(stageBuckets).map(([label, count]) => ({ stage: label, label, count }))
+  const newCPPositionIds = new Set(newCPsRaw.map((cp) => cp.positionId))
+
+  return {
+    from: fromDate.toISOString(),
+    to: toDate.toISOString(),
+    generatedAt: now.toISOString(),
+    summary: { totalPositions, totalActive, totalHeadcount, interviewsToday },
+    atAGlance: { openPositions: totalPositions, totalHeadcount, activeCandidates: totalActive, offerCount, clientCount, managerCount, techCount, interviewsToday },
+    periodHighlights: { interviewsConducted: conductedInterviews.length, interviewsByStage, candidatesAdvanced: advancedCount, newCandidates: newCPsRaw.length, newCandidatePositions: newCPPositionIds.size, movedToOffer: movedToOfferCount, notMovingForward: rejectedCount },
+    clients,
+  }
 }
 
 export default async function PipelinePreviewPage({
