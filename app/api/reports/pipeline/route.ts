@@ -5,7 +5,7 @@ import { isCandidateInactive } from '@/lib/candidate-status'
 import type { Stage, SourceType, InterviewDecision } from '@prisma/client'
 
 const STAGE_LABELS: Record<Stage, string> = {
-  APPLIED: 'Applied',
+  APPLIED: 'Pipeline',
   SCREENING: 'Screening',
   TECHNICAL_INTERVIEW: 'Technical Interview',
   MANAGER_INTERVIEW: 'Manager Interview',

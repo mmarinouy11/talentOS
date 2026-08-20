@@ -116,7 +116,7 @@ export default function PipelineReportPage() {
 
   function openPdf() {
     const params = new URLSearchParams({ from: `${fromDate}T00:00:00.000Z`, to: `${toDate}T23:59:59.999Z` })
-    window.open(`/reports/pipeline/preview?${params}`, '_blank')
+    window.open(`/print/pipeline?${params}`, '_blank')
   }
 
   async function sendReport(to: string) {

@@ -10,7 +10,7 @@ const STAGE_SEQUENCE: Stage[] = [
 ]
 
 const STAGE_LABELS: Record<Stage, string> = {
-  APPLIED: 'Applied',
+  APPLIED: 'Pipeline',
   SCREENING: 'Screening',
   TECHNICAL_INTERVIEW: 'Technical Interview',
   MANAGER_INTERVIEW: 'Manager Interview',

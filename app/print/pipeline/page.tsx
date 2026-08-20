@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { isCandidateInactive } from '@/lib/candidate-status'
 import { renderPipelineHtml } from '@/lib/pipeline-report'
 import type { PipelineReportData } from '@/lib/pipeline-report'
-import type { Stage, SourceType, InterviewDecision } from '@prisma/client'
+import type { Stage, SourceType, InterviewDecision, Role } from '@prisma/client'
 
 const STAGE_LABELS: Record<Stage, string> = {
   APPLIED: 'Pipeline', SCREENING: 'Screening', TECHNICAL_INTERVIEW: 'Technical Interview',
@@ -109,13 +109,14 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
   return { from: fromDate.toISOString(), to: toDate.toISOString(), generatedAt: now.toISOString(), summary: { totalPositions, totalActive, totalHeadcount, interviewsToday }, clients }
 }
 
-export default async function PipelinePreviewPage({
+export default async function PrintPipelinePage({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string; to?: string }>
 }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
+  if ((session.user as { role?: Role }).role !== 'ADMIN') redirect('/reports')
 
   const { from, to } = await searchParams
   const now = new Date()
@@ -130,9 +131,15 @@ export default async function PipelinePreviewPage({
 
   return (
     <>
-      <style>{`@media print { .no-print { display: none !important; } } body { margin: 0; }`}</style>
-      <div className="no-print p-3 bg-gray-100 flex gap-3 items-center border-b border-gray-200">
-        <span className="text-sm text-gray-600 font-medium">Pipeline Report — Tenarai LATAM</span>
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { margin: 0; }
+        }
+        body { margin: 0; font-family: sans-serif; }
+      `}</style>
+      <div className="no-print" style={{ padding: '12px 16px', background: '#f3f4f6', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #e5e7eb' }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Pipeline Report — Tenarai LATAM</span>
         <PrintButton />
       </div>
       <div dangerouslySetInnerHTML={{ __html: html }} />

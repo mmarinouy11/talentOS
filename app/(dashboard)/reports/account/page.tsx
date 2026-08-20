@@ -27,7 +27,7 @@ interface DashboardData {
 const DASH_STAGES = ['OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED'] as const
 const DASH_COL_LABELS: Record<string, string> = {
   OFFER: 'Offer', CLIENT_INTERVIEW: 'Client', MANAGER_INTERVIEW: 'Mgr',
-  TECHNICAL_INTERVIEW: 'Tech', SCREENING: 'Screen', APPLIED: 'Applied',
+  TECHNICAL_INTERVIEW: 'Tech', SCREENING: 'Screen', APPLIED: 'Pipeline',
 }
 
 // ─── Analytics tab types ─────────────────────────────────────────────────────
@@ -264,7 +264,7 @@ const STAGE_COLORS: Record<string, string> = {
   'Manager Interview':   'bg-indigo-100 text-indigo-800',
   'Technical Interview': 'bg-violet-100 text-violet-800',
   'Screening':           'bg-amber-100 text-amber-800',
-  'Applied':             'bg-gray-100 text-gray-700',
+  'Pipeline':            'bg-gray-100 text-gray-700',
 }
 
 // Ordered most-advanced first (HIRED excluded from cross-position summary)
