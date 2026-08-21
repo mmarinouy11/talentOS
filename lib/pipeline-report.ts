@@ -340,17 +340,6 @@ export function renderPipelineHtml(
       </div>`
   }).join('')
 
-  const summary = data.summary
-  const summaryBlock = `
-    <div style="margin-top:32px;padding:16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};">
-      <h2 style="margin:0 0 12px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Summary</h2>
-      <table style="border-collapse:collapse;">
-        <tr><td style="padding:3px 16px 3px 0;font-size:13px;color:#6b7280;">Open positions</td><td style="padding:3px 0;font-size:13px;font-weight:600;color:#111827;">${summary.totalPositions}</td></tr>
-        <tr><td style="padding:3px 16px 3px 0;font-size:13px;color:#6b7280;">Active candidates</td><td style="padding:3px 0;font-size:13px;font-weight:600;color:#111827;">${summary.totalActive}</td></tr>
-        <tr><td style="padding:3px 16px 3px 0;font-size:13px;color:#6b7280;">Total headcount</td><td style="padding:3px 0;font-size:13px;font-weight:600;color:#111827;">${summary.totalHeadcount}</td></tr>
-        <tr><td style="padding:3px 16px 3px 0;font-size:13px;color:#6b7280;">Interviews today</td><td style="padding:3px 0;font-size:13px;font-weight:600;color:#111827;">${summary.interviewsToday}</td></tr>
-      </table>
-    </div>`
 
   const printStyles = printMode ? `
     <style>
@@ -371,7 +360,6 @@ export function renderPipelineHtml(
       ${headerSection}
       ${overviewTable}
       ${clientBlocks || '<p style="color:#9ca3af;font-size:14px;">No open positions.</p>'}
-      ${summaryBlock}
       ${emailMode ? '<p style="margin-top:24px;font-size:12px;color:#9ca3af;">Sent by TalentOS · Tenarai LATAM</p>' : ''}
     </div>`
 }
