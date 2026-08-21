@@ -88,7 +88,7 @@ function stageLabel(raw: string): string {
 const SUMMARY_STAGES: { key: string; label: string }[] = [
   { key: 'OFFER', label: 'Offer' },
   { key: 'CLIENT_INTERVIEW', label: 'Client' },
-  { key: 'MANAGER_INTERVIEW', label: 'Manager' },
+  { key: 'MANAGER_INTERVIEW', label: 'Mgr' },
   { key: 'TECHNICAL_INTERVIEW', label: 'Tech' },
   { key: 'SCREENING', label: 'Screen' },
   { key: 'APPLIED', label: 'Pipeline' },
