@@ -162,6 +162,9 @@ export async function GET(request: Request) {
         }
       }
 
+      const nmf = allCPs.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN').length
+      const activeCount = activeCPs.length
+
       return {
         id: pos.id,
         title: pos.title,
@@ -169,6 +172,8 @@ export async function GET(request: Request) {
         headcount: pos.headcount ?? 1,
         pipelineStages,
         activity: { newCandidates, stageChanges, decisions },
+        notMovingForward: nmf,
+        totalProcessed: activeCount + nmf,
       }
     })
 

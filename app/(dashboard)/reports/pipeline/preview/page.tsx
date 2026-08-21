@@ -104,7 +104,8 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
             decisions.push({ name, decision: DECISION_LABELS[iv.decision!] ?? iv.decision!, stage: STAGE_LABELS[iv.stage as Stage] ?? iv.stage, notes: iv.decisionNotes ?? null })
       }
 
-      return { id: pos.id, title: pos.title, recruiter: pos.recruiter.name ?? pos.recruiter.email, headcount: pos.headcount ?? 1, pipelineStages, activity: { newCandidates, stageChanges, decisions } }
+      const nmf = pos.candidatePositions.filter((cp) => cp.status === 'REJECTED' || cp.status === 'WITHDRAWN').length
+      return { id: pos.id, title: pos.title, recruiter: pos.recruiter.name ?? pos.recruiter.email, headcount: pos.headcount ?? 1, pipelineStages, activity: { newCandidates, stageChanges, decisions }, notMovingForward: nmf, totalProcessed: activeCPs.length + nmf }
     }),
   }))
 

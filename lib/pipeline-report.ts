@@ -24,6 +24,8 @@ export interface PipelinePosition {
   headcount: number
   pipelineStages: PipelineStage[]
   activity: PipelineActivity
+  notMovingForward: number
+  totalProcessed: number
 }
 
 export interface PipelineClient {
@@ -177,15 +179,15 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
 function buildOverviewTable(data: PipelineReportData, emailMode: boolean): string {
   if (data.clients.length === 0) return ''
 
-  const colCount = SUMMARY_STAGES.length + 2
-  // Fix 2: fixed column widths so all clients align in one table
+  const colCount = SUMMARY_STAGES.length + 4 // Position + stage cols + Active + NMF + Total Processed
   const STAGE_COL_W = '72px'
+  const SUMMARY_COL_W = '76px'
 
   const thBase = `padding:5px 8px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:11px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;background:#f9fafb;`
   const thLeft = thBase.replace('text-align:center', 'text-align:left')
 
   const totals: Record<string, number> = {}
-  let grandTotal = 0
+  let totalActive = 0, totalNmf = 0, totalProcessed = 0
 
   const bodyRows: string[] = []
 
@@ -197,8 +199,10 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
     for (const pos of client.positions) {
       const stageMap: Record<string, number> = {}
       for (const s of pos.pipelineStages) stageMap[s.stage] = s.count
-      const rowTotal = pos.pipelineStages.reduce((sum, s) => sum + s.count, 0)
-      grandTotal += rowTotal
+      const activeCount = pos.pipelineStages.reduce((sum, s) => sum + s.count, 0)
+      totalActive += activeCount
+      totalNmf += pos.notMovingForward
+      totalProcessed += pos.totalProcessed
       for (const s of SUMMARY_STAGES) {
         totals[s.key] = (totals[s.key] ?? 0) + (stageMap[s.key] ?? 0)
       }
@@ -212,11 +216,12 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         ? `<span style="font-size:13px;font-weight:500;color:#111827;">${esc(pos.title)}</span>`
         : `<a href="/positions/${pos.id}" style="font-size:13px;font-weight:500;color:#111827;text-decoration:none;" target="_blank">${esc(pos.title)}</a>`
 
-      // Fix 1: Total column in gray
       bodyRows.push(`<tr>
         <td style="padding:5px 8px 5px 14px;border:1px solid #e5e7eb;">${posLink}</td>
         ${stageCells}
-        <td style="width:${STAGE_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:500;color:#9ca3af;">${rowTotal || '—'}</td>
+        <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:700;color:#111827;">${activeCount || '—'}</td>
+        <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
+        <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
       </tr>`)
     }
   }
@@ -226,11 +231,12 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
     return `<td style="width:${STAGE_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
   }).join('')
 
-  // Fix 2: single table with colgroup for consistent widths
   const colgroup = `<colgroup>
     <col style="min-width:160px;">
     ${SUMMARY_STAGES.map(() => `<col style="width:${STAGE_COL_W};">`).join('')}
-    <col style="width:${STAGE_COL_W};">
+    <col style="width:${SUMMARY_COL_W};">
+    <col style="width:${SUMMARY_COL_W};">
+    <col style="width:${SUMMARY_COL_W};">
   </colgroup>`
 
   return `
@@ -242,6 +248,8 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
           <tr>
             <th style="${thLeft}">Position</th>
             ${SUMMARY_STAGES.map((s) => `<th style="${thBase}">${esc(s.label)}</th>`).join('')}
+            <th style="${thBase}">Active</th>
+            <th style="${thBase}">Not Fwd</th>
             <th style="${thBase}">Total</th>
           </tr>
         </thead>
@@ -250,7 +258,9 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
           <tr>
             <td style="padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;font-weight:700;color:#111827;background:#f9fafb;">Totals</td>
             ${totalCells}
-            <td style="width:${STAGE_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#9ca3af;background:#f9fafb;">${grandTotal}</td>
+            <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${totalActive}</td>
+            <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
+            <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
           </tr>
         </tfoot>
       </table>
