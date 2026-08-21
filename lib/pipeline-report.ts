@@ -179,7 +179,7 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
 function buildOverviewTable(data: PipelineReportData, emailMode: boolean): string {
   if (data.clients.length === 0) return ''
 
-  const colCount = SUMMARY_STAGES.length + 4 // Position + stage cols + Active + NMF + Total Processed
+  const colCount = SUMMARY_STAGES.length + 3 // Position + stage cols + NMF + Total Processed
   const STAGE_COL_W = '72px'
   const SUMMARY_COL_W = '76px'
 
@@ -219,7 +219,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
       bodyRows.push(`<tr>
         <td style="padding:5px 8px 5px 14px;border:1px solid #e5e7eb;">${posLink}</td>
         ${stageCells}
-        <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:700;color:#111827;">${activeCount || '—'}</td>
         <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
         <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
       </tr>`)
@@ -236,7 +235,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
     ${SUMMARY_STAGES.map(() => `<col style="width:${STAGE_COL_W};">`).join('')}
     <col style="width:${SUMMARY_COL_W};">
     <col style="width:${SUMMARY_COL_W};">
-    <col style="width:${SUMMARY_COL_W};">
   </colgroup>`
 
   return `
@@ -248,7 +246,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
           <tr>
             <th style="${thLeft}">Position</th>
             ${SUMMARY_STAGES.map((s) => `<th style="${thBase}">${esc(s.label)}</th>`).join('')}
-            <th style="${thBase}">Active</th>
             <th style="${thBase}">Not Fwd</th>
             <th style="${thBase}">Total</th>
           </tr>
@@ -258,7 +255,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
           <tr>
             <td style="padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;font-weight:700;color:#111827;background:#f9fafb;">Totals</td>
             ${totalCells}
-            <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${totalActive}</td>
             <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
             <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
           </tr>
