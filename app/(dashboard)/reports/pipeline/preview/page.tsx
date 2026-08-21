@@ -110,10 +110,10 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
 
   const [interviewsToday, conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount] = await Promise.all([
     db.interview.count({
-      where: { scheduledAt: { gte: todayStart, lte: todayEnd }, status: { in: ['SCHEDULED', 'COMPLETED'] }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
+      where: { scheduledAt: { gte: todayStart, lte: todayEnd }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
     }),
     db.interview.findMany({
-      where: { scheduledAt: { gte: fromDate, lte: toDate }, status: 'COMPLETED', candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
+      where: { scheduledAt: { gte: fromDate, lte: toDate }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
       select: { stage: true },
     }),
     db.interview.count({

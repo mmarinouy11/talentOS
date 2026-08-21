@@ -117,7 +117,7 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
       .filter((s) => s.count > 0)
       .map((s) => `${s.count} ${s.label.toLowerCase()}`)
       .join(', ')
-    bullets.push(`📅 ${ph.interviewsConducted} interview${ph.interviewsConducted !== 1 ? 's' : ''} conducted${byStage ? ` — ${byStage}` : ''}`)
+    bullets.push(`📅 ${ph.interviewsConducted} interview${ph.interviewsConducted !== 1 ? 's' : ''} scheduled${byStage ? ` — ${byStage}` : ''}`)
   }
   bullets.push(`➡️ ${ph.candidatesAdvanced} candidate${ph.candidatesAdvanced !== 1 ? 's' : ''} advanced to next stage`)
   bullets.push(`🆕 ${ph.newCandidates} new candidate${ph.newCandidates !== 1 ? 's' : ''} added across ${ph.newCandidatePositions} position${ph.newCandidatePositions !== 1 ? 's' : ''}`)
@@ -140,9 +140,9 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
         <table style="border-collapse:separate;border-spacing:8px;width:100%;">
           <tr>
             <td style="${cardStyle}">
-              <div style="font-size:22px;font-weight:700;color:#111827;">${ag.openPositions}</div>
-              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Open Positions</div>
-              <div style="font-size:11px;color:#9ca3af;">${ag.totalHeadcount} HC</div>
+              <div style="font-size:22px;font-weight:700;color:#111827;">${ag.totalHeadcount}</div>
+              <div style="font-size:11px;color:#6b7280;margin-top:2px;">Open Headcount</div>
+              <div style="font-size:11px;color:#9ca3af;">across ${ag.openPositions} position${ag.openPositions !== 1 ? 's' : ''}</div>
             </td>
             <td style="${cardStyle}">
               <div style="font-size:22px;font-weight:700;color:#111827;">${ag.activeCandidates}</div>

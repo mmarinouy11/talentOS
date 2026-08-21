@@ -175,11 +175,10 @@ export async function GET(request: Request) {
     return { client: clientName, positions: positionData }
   })
 
-  // Interviews today (UTC boundaries, active candidates only)
+  // Interviews today — any status, scheduledAt date = today
   const interviewsToday = await db.interview.count({
     where: {
       scheduledAt: { gte: todayStart, lte: todayEnd },
-      status: { in: ['SCHEDULED', 'COMPLETED'] },
       candidatePosition: {
         status: { in: ['ACTIVE', 'HIRED'] },
         position: { status: 'OPEN', deletedAt: null },
@@ -190,11 +189,10 @@ export async function GET(request: Request) {
 
   // Period highlights — additional queries
   const [conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount] = await Promise.all([
-    // Interviews conducted (COMPLETED) in period
+    // Interviews scheduled in period — any status
     db.interview.findMany({
       where: {
         scheduledAt: { gte: fromDate, lte: toDate },
-        status: 'COMPLETED',
         candidatePosition: {
           status: { in: ['ACTIVE', 'HIRED'] },
           position: { status: 'OPEN', deletedAt: null },
