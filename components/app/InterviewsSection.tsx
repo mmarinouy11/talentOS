@@ -1137,7 +1137,7 @@ function EditInterviewModal({
                   const d = new Date(s)
                   const pad = (n: number) => String(n).padStart(2, '0')
                   const localVal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-                  const label = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                  const label = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: positionTimezone, timeZoneName: 'short' })
                   return (
                     <button
                       key={s}
@@ -1392,7 +1392,7 @@ export function InterviewsSection({
   }
 
   function formatSlot(iso: string) {
-    return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: positionTimezone, timeZoneName: 'short' })
   }
 
   return (
