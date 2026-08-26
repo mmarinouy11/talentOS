@@ -8,16 +8,34 @@ import type { PipelineReportData } from '@/lib/pipeline-report'
 
 type Preset = '7' | '14' | '30' | 'custom'
 
+// Convert a YYYY-MM-DD string (from a date input) to a UTC ISO string
+// treating the typed date as a local calendar day, not UTC.
+function localDateToUtcIso(dateStr: string, bound: 'start' | 'end'): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const local = bound === 'start'
+    ? new Date(y, m - 1, d, 0, 0, 0, 0)
+    : new Date(y, m - 1, d, 23, 59, 59, 999)
+  return local.toISOString()
+}
+
+function fmtUtcDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+}
+
 function toDateInput(date: Date): string {
-  return date.toISOString().slice(0, 10)
+  // Use local date parts so the input shows the correct local calendar day
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function presetDates(preset: Preset): { from: string; to: string } {
-  const to = new Date(); to.setUTCHours(23, 59, 59, 999)
-  const from = new Date(); from.setUTCHours(0, 0, 0, 0)
-  if (preset === '7') from.setUTCDate(from.getUTCDate() - 6)
-  if (preset === '14') from.setUTCDate(from.getUTCDate() - 13)
-  if (preset === '30') from.setUTCDate(from.getUTCDate() - 29)
+  const to = new Date()
+  const from = new Date()
+  if (preset === '7') from.setDate(from.getDate() - 6)
+  if (preset === '14') from.setDate(from.getDate() - 13)
+  if (preset === '30') from.setDate(from.getDate() - 29)
   return { from: toDateInput(from), to: toDateInput(to) }
 }
 
@@ -105,7 +123,7 @@ export default function PipelineReportPage() {
   const fetchReport = useCallback(async () => {
     setLoading(true); setError(''); setData(null)
     try {
-      const params = new URLSearchParams({ from: `${fromDate}T00:00:00.000Z`, to: `${toDate}T23:59:59.999Z` })
+      const params = new URLSearchParams({ from: localDateToUtcIso(fromDate, 'start'), to: localDateToUtcIso(toDate, 'end') })
       const res = await fetch(`/api/reports/pipeline?${params}`)
       if (!res.ok) throw new Error('Failed to load report')
       setData(await res.json())
@@ -122,8 +140,7 @@ export default function PipelineReportPage() {
   async function sendReport(to: string) {
     if (!data) return
     const html = renderPipelineHtml(data, { emailMode: true })
-    const from = new Date(data.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    const subject = `Pipeline Report — Tenarai LATAM — ${from}`
+    const subject = `Pipeline Report — Tenarai LATAM — ${fmtUtcDate(data.from)}`
     const res = await fetch('/api/reports/pipeline/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -137,7 +154,7 @@ export default function PipelineReportPage() {
 
   const previewHtml = data ? renderPipelineHtml(data) : null
   const emailSubject = data
-    ? `Pipeline Report — Tenarai LATAM — ${new Date(data.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    ? `Pipeline Report — Tenarai LATAM — ${fmtUtcDate(data.from)}`
     : ''
 
   return (
