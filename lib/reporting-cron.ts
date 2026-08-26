@@ -143,6 +143,12 @@ export async function runReportingCron() {
 
 async function runPipelineReportCron() {
   try {
+    // Skip weekends in GMT-3 (Montevideo)
+    const dayGmt3 = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCDay()
+    if (dayGmt3 === 0 || dayGmt3 === 6) {
+      console.log('[pipeline-report-cron] Skipping weekend send')
+      return
+    }
     const sendTimeSetting = await db.systemSettings.findUnique({ where: { key: 'PIPELINE_REPORT_SEND_TIME' } })
     const sendTime = sendTimeSetting?.value ?? '22:00'
     if (!isWithinSendWindow(sendTime)) return
