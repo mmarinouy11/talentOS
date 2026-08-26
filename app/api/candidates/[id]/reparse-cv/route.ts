@@ -62,7 +62,7 @@ export async function POST(
       ...(parsed.phone !== undefined ? { phone: parsed.phone } : {}),
       ...(parsed.country !== undefined ? { country: parsed.country } : {}),
       ...(parsed.seniority ? { seniority: parsed.seniority } : {}),
-      ...(parsed.yearsOfExperience !== undefined ? { yearsOfExperience: parsed.yearsOfExperience } : {}),
+      ...(parsed.yearsOfExperience != null ? { yearsOfExperience: Math.round(parsed.yearsOfExperience) } : {}),
       skills: parsed.skills ?? [],
       languages: parsed.languages ?? [],
       summary: parsed.summary ?? null,

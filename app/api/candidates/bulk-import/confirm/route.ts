@@ -81,7 +81,7 @@ export async function POST(request: Request) {
               phone: c.phone ?? null,
               country: c.country ?? null,
               seniority: c.seniority ?? null,
-              yearsOfExperience: c.yearsOfExperience ?? null,
+              yearsOfExperience: c.yearsOfExperience != null ? Math.round(c.yearsOfExperience) : null,
               skills: c.skills ?? [],
               languages: c.languages ?? [],
               summary: c.summary ?? null,

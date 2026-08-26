@@ -11,7 +11,7 @@ const patchSchema = z.object({
   country: z.string().optional().nullable(),
   linkedinUrl: z.string().refine((v) => !v || v.includes('linkedin.com') || v.startsWith('/in/'), { message: 'Invalid LinkedIn URL' }).optional().nullable(),
   seniority: z.enum(['JUNIOR', 'MID', 'SENIOR', 'STAFF', 'PRINCIPAL']).optional(),
-  yearsOfExperience: z.number().int().optional().nullable(),
+  yearsOfExperience: z.number().transform(Math.round).optional().nullable(),
   skills: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   notes: z.string().optional().nullable(),
