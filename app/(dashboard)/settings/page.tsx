@@ -5,6 +5,7 @@ import { SettingsForm } from '@/components/app/SettingsForm'
 import { SettingsNav } from '@/components/app/SettingsNav'
 import { EmailHeaderImageSection } from '@/components/app/EmailHeaderImageSection'
 import { SystemGmailSection } from '@/components/app/SystemGmailSection'
+import { PipelineReportDistributionSection } from '@/components/app/PipelineReportDistributionSection'
 
 export default async function SettingsPage({
   searchParams,
@@ -31,6 +32,26 @@ export default async function SettingsPage({
       update: {},
       create: { key: 'DIRECT_MIN_FIT_SCORE', value: '30', description: 'Minimum fit score (0–100) for direct (portal) applications. Applications below this threshold are automatically rejected.' },
     }),
+    db.systemSettings.upsert({
+      where: { key: 'PIPELINE_REPORT_ENABLED' },
+      update: {},
+      create: { key: 'PIPELINE_REPORT_ENABLED', value: 'false', description: 'Enable daily pipeline report email' },
+    }),
+    db.systemSettings.upsert({
+      where: { key: 'PIPELINE_REPORT_EMAILS' },
+      update: {},
+      create: { key: 'PIPELINE_REPORT_EMAILS', value: '[]', description: 'JSON array of recipient emails for the daily pipeline report' },
+    }),
+    db.systemSettings.upsert({
+      where: { key: 'PIPELINE_REPORT_SEND_TIME' },
+      update: {},
+      create: { key: 'PIPELINE_REPORT_SEND_TIME', value: '22:00', description: 'Daily send time for pipeline report (HH:MM, GMT-3 Montevideo)' },
+    }),
+    db.systemSettings.upsert({
+      where: { key: 'PIPELINE_REPORT_PERIOD_DAYS' },
+      update: {},
+      create: { key: 'PIPELINE_REPORT_PERIOD_DAYS', value: '7', description: 'Number of days of activity to include in the pipeline report' },
+    }),
   ])
 
   const [settings, headerSetting, systemEmailAccount] = await Promise.all([
@@ -56,6 +77,12 @@ export default async function SettingsPage({
         }))}
       />
       <EmailHeaderImageSection currentUrl={headerImageUrl} />
+      <PipelineReportDistributionSection
+        enabled={settings.find((s) => s.key === 'PIPELINE_REPORT_ENABLED')?.value === 'true'}
+        emails={JSON.parse(settings.find((s) => s.key === 'PIPELINE_REPORT_EMAILS')?.value ?? '[]')}
+        sendTime={settings.find((s) => s.key === 'PIPELINE_REPORT_SEND_TIME')?.value ?? '22:00'}
+        periodDays={Number(settings.find((s) => s.key === 'PIPELINE_REPORT_PERIOD_DAYS')?.value ?? '7')}
+      />
       <SystemGmailSection
         connectedEmail={systemEmailAccount?.connectedEmail ?? null}
         toast={systemGmail ?? null}

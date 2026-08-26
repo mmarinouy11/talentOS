@@ -3,6 +3,7 @@ import { db } from './db'
 import { sendEmailViaSystemGmail } from './email'
 import type { Stage, InterviewDecision } from '@prisma/client'
 import { isCandidateInactive } from './candidate-status'
+import { sendPipelineReportEmail, isWithinSendWindow } from './pipeline-report-cron'
 
 // Railway containers run UTC. 11:00 UTC = 08:00 Montevideo (UTC-3, no DST in winter;
 // UTC-2 in summer — adjust schedule seasonally if needed, or use a timezone-aware cron lib).
@@ -140,6 +141,19 @@ export async function runReportingCron() {
   }
 }
 
+async function runPipelineReportCron() {
+  try {
+    const sendTimeSetting = await db.systemSettings.findUnique({ where: { key: 'PIPELINE_REPORT_SEND_TIME' } })
+    const sendTime = sendTimeSetting?.value ?? '22:00'
+    if (!isWithinSendWindow(sendTime)) return
+    const result = await sendPipelineReportEmail()
+    if (result.ok) console.log(`[pipeline-report-cron] Sent to ${result.sent} recipient(s)`)
+    else console.log(`[pipeline-report-cron] Skipped: ${result.reason}`)
+  } catch (err) {
+    console.error('[pipeline-report-cron] Error:', err)
+  }
+}
+
 let cronStarted = false
 
 export function startReportingCron() {
@@ -150,6 +164,9 @@ export function startReportingCron() {
   cronStarted = true
   cron.schedule(CRON_SCHEDULE, runReportingCron)
   console.log(`[reporting-cron] Scheduled at ${CRON_SCHEDULE} UTC (≈08:00 Montevideo)`)
+  // Pipeline report: poll every 15 min, fire when within the configured send window
+  cron.schedule('*/15 * * * *', runPipelineReportCron)
+  console.log('[pipeline-report-cron] Polling every 15 min for send window')
 }
 
 type StageHistoryEntry = {
