@@ -65,6 +65,7 @@ export interface PositionRow {
   headcount: number | null
   recruiter: { name: string | null; email: string } | null
   _count: { candidatePositions: number; positionVendors: number }
+  isYtj?: boolean
 }
 
 // Flat sort row — derived fields hoisted so useSortableData can compare them
@@ -93,9 +94,27 @@ function fmtTarget(row: PositionRow) {
 
 type SortKey = keyof SortRow
 
-export function PositionsTable({ positions, isAdmin = false }: { positions: PositionRow[]; isAdmin?: boolean }) {
+export function PositionsTable({
+  positions,
+  isAdmin = false,
+  initialStatus,
+  statusFilter: controlledStatus,
+  onStatusFilterChange,
+}: {
+  positions: PositionRow[]
+  isAdmin?: boolean
+  initialStatus?: PositionStatus | ''
+  statusFilter?: PositionStatus | '' | 'YTJ'
+  onStatusFilterChange?: (v: PositionStatus | '' | 'YTJ') => void
+}) {
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<PositionStatus | ''>('OPEN')
+  const [statusFilter, setInternalStatus] = useState<PositionStatus | ''>(initialStatus ?? 'OPEN')
+
+  const statusFilter_ = controlledStatus !== undefined ? controlledStatus : statusFilter
+  function setStatusFilter(v: PositionStatus | '' | 'YTJ') {
+    if (onStatusFilterChange) onStatusFilterChange(v)
+    else setInternalStatus(v as PositionStatus | '')
+  }
   const [rows, setRows] = useState(positions)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey | undefined>(undefined)
@@ -124,9 +143,9 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
       !search ||
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.client.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = !statusFilter || p.status === statusFilter
+    const matchesStatus = !statusFilter_ || (statusFilter_ === 'YTJ' ? p.isYtj : p.status === statusFilter_)
     return matchesSearch && matchesStatus
-  }), [sortRows, search, statusFilter])
+  }), [sortRows, search, statusFilter_])
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
@@ -162,7 +181,7 @@ export function PositionsTable({ positions, isAdmin = false }: { positions: Posi
     <div className="space-y-4">
       <div className="flex gap-3">
         <Input placeholder="Search by title or client…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PositionStatus | '')} className="w-40">
+        <Select value={statusFilter_} onChange={(e) => setStatusFilter(e.target.value as PositionStatus | '')} className="w-40">
           <option value="">All statuses</option>
           <option value="OPEN">Open</option>
           <option value="ON_HOLD">On Hold</option>

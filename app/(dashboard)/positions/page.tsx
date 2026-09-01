@@ -3,8 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { PositionCard } from '@/components/app/PositionCard'
-import { PositionsTable } from '@/components/app/PositionsTable'
+import { PositionsDashboard } from '@/components/app/PositionsDashboard'
 import type { PositionStatus, Role } from '@prisma/client'
 
 export default async function PositionsPage() {
@@ -65,6 +64,9 @@ export default async function PositionsPage() {
     headcount: p.headcount,
     recruiter: p.recruiter,
     _count: p._count,
+    isYtj: p.candidatePositions.some(
+      (cp) => cp.status === 'HIRED' && cp.startDate != null && cp.startDate > today
+    ),
   }))
 
   return (
@@ -79,16 +81,12 @@ export default async function PositionsPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-6 gap-4">
-        <PositionCard label="Open" count={headcounts.OPEN} color="text-green-600" />
-        <PositionCard label="On Hold" count={headcounts.ON_HOLD} color="text-amber-600" />
-        <PositionCard label="Filled" count={headcounts.FILLED} color="text-blue-600" />
-        <PositionCard label="YTJ" count={ytjHeadcount} color="text-indigo-600" />
-        <PositionCard label="Closed" count={headcounts.CLOSED} color="text-gray-900" />
-        <PositionCard label="Cancelled" count={headcounts.CANCELLED} color="text-gray-400" />
-      </div>
-
-      <PositionsTable positions={serialized} isAdmin={isAdmin} />
+      <PositionsDashboard
+        positions={serialized}
+        isAdmin={isAdmin}
+        counts={{ OPEN: counts.OPEN, ON_HOLD: counts.ON_HOLD, FILLED: counts.FILLED, CLOSED: counts.CLOSED, CANCELLED: counts.CANCELLED, ytjCount: ytjPositionCount }}
+        headcounts={{ OPEN: headcounts.OPEN, ON_HOLD: headcounts.ON_HOLD, FILLED: headcounts.FILLED, CLOSED: headcounts.CLOSED, CANCELLED: headcounts.CANCELLED, ytj: ytjHeadcount }}
+      />
     </div>
   )
 }
