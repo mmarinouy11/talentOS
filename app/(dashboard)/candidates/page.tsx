@@ -3,8 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { CandidatesTable } from '@/components/app/CandidatesTable'
-import { PositionCard } from '@/components/app/PositionCard'
+import { CandidatesDashboard } from '@/components/app/CandidatesDashboard'
 
 export default async function CandidatesPage() {
   const session = await auth()
@@ -44,22 +43,30 @@ export default async function CandidatesPage() {
     else rejected++
   }
 
-  const serialized = candidates.map((c) => ({
-    id: c.id,
-    firstName: c.firstName,
-    lastName: c.lastName,
-    email: c.email,
-    phone: c.phone,
-    country: c.country,
-    seniority: c.seniority,
-    skills: c.skills,
-    createdAt: c.createdAt.toISOString(),
-    _count: { candidatePositions: c.candidatePositions.filter((cp) => cp.stage !== 'HIRED' && cp.stage !== 'REJECTED').length },
-    sourcedByType: c.sourcedByType,
-    sourcedByOther: c.sourcedByOther,
-    sourcedByUser: c.sourcedByUser,
-    sourcedByVendor: c.sourcedByVendor,
-  }))
+  const serialized = candidates.map((c) => {
+    const stages = c.candidatePositions.map((cp) => cp.stage)
+    const hasHired = stages.includes('HIRED')
+    const hasActive = stages.some((s) => s !== 'HIRED' && s !== 'REJECTED')
+    const candidateStatus: 'active' | 'hired' | 'rejected' =
+      hasHired ? 'hired' : (stages.length === 0 || hasActive) ? 'active' : 'rejected'
+    return {
+      id: c.id,
+      firstName: c.firstName,
+      lastName: c.lastName,
+      email: c.email,
+      phone: c.phone,
+      country: c.country,
+      seniority: c.seniority,
+      skills: c.skills,
+      createdAt: c.createdAt.toISOString(),
+      _count: { candidatePositions: c.candidatePositions.filter((cp) => cp.stage !== 'HIRED' && cp.stage !== 'REJECTED').length },
+      sourcedByType: c.sourcedByType,
+      sourcedByOther: c.sourcedByOther,
+      sourcedByUser: c.sourcedByUser,
+      sourcedByVendor: c.sourcedByVendor,
+      candidateStatus,
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -78,14 +85,10 @@ export default async function CandidatesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <PositionCard label="Total" count={candidates.length} color="text-gray-600" />
-        <PositionCard label="Active" count={active} color="text-blue-600" />
-        <PositionCard label="Hired" count={hired} color="text-green-600" />
-        <PositionCard label="Rejected" count={rejected} color="text-red-600" />
-      </div>
-
-      <CandidatesTable candidates={serialized} />
+      <CandidatesDashboard
+        candidates={serialized}
+        counts={{ total: candidates.length, active, hired, rejected }}
+      />
     </div>
   )
 }

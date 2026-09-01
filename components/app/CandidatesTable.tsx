@@ -57,6 +57,7 @@ export interface CandidateRow {
   sourcedByOther: string | null
   sourcedByUser: { name: string | null; email: string } | null
   sourcedByVendor: { id: string; name: string } | null
+  candidateStatus?: 'active' | 'hired' | 'rejected'
 }
 
 interface SortRow extends CandidateRow {
@@ -121,7 +122,15 @@ function TrashIcon() {
   )
 }
 
-export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) {
+export function CandidatesTable({
+  candidates,
+  statusFilter: controlledStatus,
+  onStatusFilterChange,
+}: {
+  candidates: CandidateRow[]
+  statusFilter?: 'active' | 'hired' | 'rejected' | ''
+  onStatusFilterChange?: (v: 'active' | 'hired' | 'rejected' | '') => void
+}) {
   const [search, setSearch] = useState('')
   const [filterCountry, setFilterCountry] = useState('')
   const [filterSource, setFilterSource] = useState('')
@@ -165,6 +174,8 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
     _createdAt: new Date(c.createdAt).getTime(),
   })), [rows])
 
+  const statusFilter_ = controlledStatus !== undefined ? controlledStatus : ''
+
   // Filter first, then sort
   const filtered = useMemo(() => sortRows.filter((c) => {
     if (search) {
@@ -179,8 +190,9 @@ export function CandidatesTable({ candidates }: { candidates: CandidateRow[] }) 
     }
     if (filterCountry && c.country !== filterCountry) return false
     if (filterSource && c.sourcedByType !== filterSource) return false
+    if (statusFilter_ && c.candidateStatus !== statusFilter_) return false
     return true
-  }), [sortRows, search, filterCountry, filterSource])
+  }), [sortRows, search, filterCountry, filterSource, statusFilter_])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
