@@ -12,7 +12,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   MANAGER_INTERVIEW: 'Manager Interview', CLIENT_INTERVIEW: 'Client Interview',
   OFFER: 'Offer', HIRED: 'Hired', REJECTED: 'Rejected', WITHDRAWN: 'On Hold',
 }
-const STAGE_ORDER: Stage[] = ['OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
+const STAGE_ORDER: Stage[] = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
 const DECISION_LABELS: Record<InterviewDecision, string> = { ADVANCE: 'Advance', REJECT: 'Reject', HOLD: 'Hold' }
 
 function sourceLabel(type: SourceType | null | undefined): string {

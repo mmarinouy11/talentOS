@@ -24,9 +24,9 @@ interface DashboardData {
   generatedAt: string
 }
 
-const DASH_STAGES = ['OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED'] as const
+const DASH_STAGES = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED'] as const
 const DASH_COL_LABELS: Record<string, string> = {
-  OFFER: 'Offer', CLIENT_INTERVIEW: 'Client', MANAGER_INTERVIEW: 'Mgr',
+  HIRED: 'Hired', OFFER: 'Offer', CLIENT_INTERVIEW: 'Client', MANAGER_INTERVIEW: 'Mgr',
   TECHNICAL_INTERVIEW: 'Tech', SCREENING: 'Screen', APPLIED: 'Pipeline',
 }
 

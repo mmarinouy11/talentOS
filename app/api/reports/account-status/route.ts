@@ -73,7 +73,7 @@ export async function GET(request: Request) {
     const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0)
     const todayEnd   = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
 
-    const DASH_STAGES: Stage[] = ['OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
+    const DASH_STAGES: Stage[] = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
 
     const positions = await db.position.findMany({
       where: { client, status: 'OPEN', deletedAt: null },
