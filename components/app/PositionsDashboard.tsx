@@ -20,10 +20,10 @@ function StatusCard({ label, count, color, filterValue, active, onClick }: Statu
     <button
       type="button"
       onClick={() => onClick(filterValue)}
-      className={`text-left w-full bg-white rounded-xl border px-5 py-4 border-t-[2px] border-t-[#8CF000] transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8CF000] ${
+      className={`text-left w-full bg-white rounded-xl px-5 py-4 transition-all cursor-pointer focus:outline-none ${
         active
-          ? 'border-l-4 border-l-[#8CF000] shadow-sm'
-          : 'border-gray-200 hover:border-gray-300'
+          ? 'border-2 border-[#8CF000] shadow-sm'
+          : 'border border-t-[2px] border-t-[#8CF000] border-gray-200 hover:border-gray-300'
       }`}
     >
       <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
