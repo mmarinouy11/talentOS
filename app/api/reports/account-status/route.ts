@@ -59,7 +59,7 @@ export async function GET(request: Request) {
   // No client param → return list of unique clients
   if (!client) {
     const positions = await db.position.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, status: { not: 'ON_HOLD' } },
       select: { client: true },
       distinct: ['client'],
       orderBy: { client: 'asc' },
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     const DASH_STAGES: Stage[] = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
 
     const positions = await db.position.findMany({
-      where: { client, deletedAt: null },
+      where: { client, deletedAt: null, status: { not: 'ON_HOLD' } },
       include: {
         recruiter: { select: { name: true, email: true } },
         candidatePositions: {
@@ -171,7 +171,7 @@ export async function GET(request: Request) {
     const ANALYTICS_STAGES: Stage[] = ['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED']
 
     const positions = await db.position.findMany({
-      where: { client, deletedAt: null },
+      where: { client, deletedAt: null, status: { not: 'ON_HOLD' } },
       select: { id: true },
     })
     const positionIds = positions.map((p) => p.id)
@@ -258,7 +258,7 @@ export async function GET(request: Request) {
     const toDate = toParam ? new Date(toParam) : new Date(new Date().setHours(23, 59, 59, 999))
 
     const positions = await db.position.findMany({
-      where: { client, deletedAt: null },
+      where: { client, deletedAt: null, status: { not: 'ON_HOLD' } },
       select: { id: true, title: true },
     })
     const positionIds = positions.map((p) => p.id)
@@ -348,7 +348,7 @@ export async function GET(request: Request) {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
   const positions = await db.position.findMany({
-    where: { client, deletedAt: null },
+    where: { client, deletedAt: null, status: { not: 'ON_HOLD' } },
     include: {
       recruiter: { select: { name: true, email: true } },
       positionVendors: {
