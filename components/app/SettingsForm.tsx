@@ -89,7 +89,7 @@ const DISPLAY_ORDER = [
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {
-  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS'])
+  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS', 'PIPELINE_REPORT_CADENCE'])
   const ordered = [
     ...DISPLAY_ORDER.map((key) => settings.find((s) => s.key === key)).filter(Boolean) as Setting[],
     ...settings.filter((s) => !excluded.has(s.key) && !DISPLAY_ORDER.includes(s.key)),

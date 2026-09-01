@@ -143,14 +143,29 @@ export async function runReportingCron() {
 
 async function runPipelineReportCron() {
   try {
-    // Skip weekends in GMT-3 (Montevideo)
+    const settings = await db.systemSettings.findMany({
+      where: { key: { in: ['PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_SEND_TIME'] } },
+    })
+    const get = (key: string) => settings.find((s) => s.key === key)?.value
+    const cadence = (get('PIPELINE_REPORT_CADENCE') ?? 'daily') as 'daily' | 'weekly' | 'custom'
+    const sendTime = get('PIPELINE_REPORT_SEND_TIME') ?? '17:00'
+
+    // Determine current GMT-3 day (0=Sun, 1=Mon … 6=Sat)
     const dayGmt3 = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCDay()
-    if (dayGmt3 === 0 || dayGmt3 === 6) {
-      console.log('[pipeline-report-cron] Skipping weekend send')
-      return
+
+    if (cadence === 'weekly') {
+      // Only send on Monday
+      if (dayGmt3 !== 1) {
+        return
+      }
+    } else {
+      // daily or custom: send Mon–Fri only
+      if (dayGmt3 === 0 || dayGmt3 === 6) {
+        console.log('[pipeline-report-cron] Skipping weekend send')
+        return
+      }
     }
-    const sendTimeSetting = await db.systemSettings.findUnique({ where: { key: 'PIPELINE_REPORT_SEND_TIME' } })
-    const sendTime = sendTimeSetting?.value ?? '22:00'
+
     if (!isWithinSendWindow(sendTime)) return
     const result = await sendPipelineReportEmail()
     if (result.ok) console.log(`[pipeline-report-cron] Sent to ${result.sent} recipient(s)`)
