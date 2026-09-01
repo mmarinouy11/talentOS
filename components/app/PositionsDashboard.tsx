@@ -55,7 +55,6 @@ export function PositionsDashboard({ positions, isAdmin, counts: _counts, headco
   const cards: { label: string; color: string; filterValue: FilterValue; count: number }[] = [
     { label: 'Open', color: 'text-green-600', filterValue: 'OPEN', count: headcounts.OPEN },
     { label: 'On Hold', color: 'text-amber-600', filterValue: 'ON_HOLD', count: headcounts.ON_HOLD },
-    { label: 'Filled', color: 'text-blue-600', filterValue: 'FILLED', count: headcounts.FILLED },
     { label: 'YTJ', color: 'text-indigo-600', filterValue: 'YTJ', count: headcounts.ytj },
     { label: 'Closed', color: 'text-gray-900', filterValue: 'CLOSED', count: headcounts.CLOSED },
     { label: 'Cancelled', color: 'text-gray-400', filterValue: 'CANCELLED', count: headcounts.CANCELLED },
@@ -63,7 +62,7 @@ export function PositionsDashboard({ positions, isAdmin, counts: _counts, headco
 
   return (
     <>
-      <div className="grid grid-cols-6 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         {cards.map((c) => (
           <StatusCard
             key={c.filterValue}
