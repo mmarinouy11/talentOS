@@ -59,7 +59,7 @@ export async function GET(request: Request) {
   // No client param → return list of unique clients
   if (!client) {
     const positions = await db.position.findMany({
-      where: { status: 'OPEN', deletedAt: null },
+      where: { deletedAt: null },
       select: { client: true },
       distinct: ['client'],
       orderBy: { client: 'asc' },
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     const DASH_STAGES: Stage[] = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
 
     const positions = await db.position.findMany({
-      where: { client, status: 'OPEN', deletedAt: null },
+      where: { client, deletedAt: null },
       include: {
         recruiter: { select: { name: true, email: true } },
         candidatePositions: {
@@ -167,7 +167,7 @@ export async function GET(request: Request) {
     const ANALYTICS_STAGES: Stage[] = ['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED']
 
     const positions = await db.position.findMany({
-      where: { client, status: 'OPEN', deletedAt: null },
+      where: { client, deletedAt: null },
       select: { id: true },
     })
     const positionIds = positions.map((p) => p.id)
@@ -344,7 +344,7 @@ export async function GET(request: Request) {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
   const positions = await db.position.findMany({
-    where: { client, status: 'OPEN', deletedAt: null },
+    where: { client, deletedAt: null },
     include: {
       recruiter: { select: { name: true, email: true } },
       positionVendors: {
