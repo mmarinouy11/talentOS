@@ -10,6 +10,7 @@ interface DashboardCandidateEntry {
   cpId: string; name: string; daysInStage: number
   scheduledAt: string | null; scheduledStageLabel: string | null
   pendingIv: { scheduledAt: string; stageLabel: string } | null
+  onHold?: boolean
 }
 interface DashboardStageGroup { stage: string; label: string; candidates: DashboardCandidateEntry[] }
 interface DashboardPosition {
@@ -120,7 +121,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
                     }).map((c) => (
                       <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
                         className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5 hover:border-gray-400">
-                        {c.name} <AgingBadge days={c.daysInStage} />
+                        {c.onHold && <span className="text-amber-500 mr-1">⏸</span>}{c.name} <AgingBadge days={c.daysInStage} />
                         {c.pendingIv ? (
                           <span className="text-amber-600 ml-0.5">
                             — ⚠ {formatIvTime(c.pendingIv.scheduledAt, pos.timezone)} (feedback pending)

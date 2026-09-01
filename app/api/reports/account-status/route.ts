@@ -133,6 +133,9 @@ export async function GET(request: Request) {
               const pastPendingIv = cp.interviews
                 .filter((iv) => iv.status === 'SCHEDULED' && iv.scheduledAt! < now && iv.decision === null)
                 .sort((a, b) => a.scheduledAt!.getTime() - b.scheduledAt!.getTime())[0] ?? null
+              const latestDecision = cp.interviews
+                .filter((iv) => iv.decision !== null)
+                .sort((a, b) => (b.scheduledAt?.getTime() ?? 0) - (a.scheduledAt?.getTime() ?? 0))[0]?.decision ?? null
               return {
                 cpId: cp.id,
                 name: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
@@ -143,6 +146,7 @@ export async function GET(request: Request) {
                   scheduledAt: pastPendingIv.scheduledAt!.toISOString(),
                   stageLabel: STAGE_ABBREV[pastPendingIv.stage] ?? STAGE_LABELS[pastPendingIv.stage] ?? pastPendingIv.stage,
                 } : null,
+                onHold: latestDecision === 'HOLD',
               }
             }),
         }))
