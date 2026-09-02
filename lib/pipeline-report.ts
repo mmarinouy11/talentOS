@@ -52,6 +52,7 @@ export interface PipelinePeriodHighlights {
   newCandidatePositions: number
   movedToOffer: number
   notMovingForward: number
+  filledThisPeriod: number
 }
 
 export interface PipelineReportData {
@@ -86,7 +87,6 @@ function stageLabel(raw: string): string {
 }
 
 const SUMMARY_STAGES: { key: string; label: string }[] = [
-  { key: 'HIRED', label: 'Hired' },
   { key: 'OFFER', label: 'Offer' },
   { key: 'CLIENT_INTERVIEW', label: 'Client' },
   { key: 'MANAGER_INTERVIEW', label: 'Mgr' },
@@ -128,6 +128,9 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
     bullets.push(`✉️ ${ph.movedToOffer} candidate${ph.movedToOffer !== 1 ? 's' : ''} moved to Offer`)
   }
   bullets.push(`❌ ${ph.notMovingForward} candidate${ph.notMovingForward !== 1 ? 's' : ''} not moving forward`)
+  if (ph.filledThisPeriod > 0) {
+    bullets.push(`✅ ${ph.filledThisPeriod} position${ph.filledThisPeriod !== 1 ? 's' : ''} filled this period`)
+  }
 
   const cardStyle = `padding:12px 16px;border:1px solid #e5e7eb;border-radius:6px;vertical-align:top;`
 

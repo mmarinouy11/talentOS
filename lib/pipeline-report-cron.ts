@@ -109,13 +109,14 @@ async function buildPipelineData(fromDate: Date, toDate: Date): Promise<Pipeline
     }),
   }))
 
-  const [interviewsToday, conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount] = await Promise.all([
+  const [interviewsToday, conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount, filledPositionsRaw] = await Promise.all([
     db.interview.count({ where: { scheduledAt: { gte: todayStart, lte: todayEnd }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } } }),
     db.interview.findMany({ where: { scheduledAt: { gte: fromDate, lte: toDate }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } }, select: { stage: true } }),
     db.interview.count({ where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'ADVANCE', candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } } }),
     db.candidatePosition.findMany({ where: { createdAt: { gte: fromDate, lte: toDate }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } }, select: { positionId: true } }),
     db.stageHistory.count({ where: { toStage: 'OFFER', movedAt: { gte: fromDate, lte: toDate }, candidatePosition: { position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } } }),
     db.interview.count({ where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'REJECT', candidatePosition: { position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } } }),
+    db.stageHistory.findMany({ where: { toStage: 'HIRED', movedAt: { gte: fromDate, lte: toDate }, candidatePosition: { candidate: { deletedAt: null } } }, select: { candidatePosition: { select: { positionId: true } } }, distinct: ['candidatePositionId'] }),
   ])
 
   const stageBuckets: Record<string, number> = {}
@@ -125,6 +126,7 @@ async function buildPipelineData(fromDate: Date, toDate: Date): Promise<Pipeline
   }
   const interviewsByStage = Object.entries(stageBuckets).map(([label, count]) => ({ stage: label, label, count }))
   const newCPPositionIds = new Set(newCPsRaw.map((cp) => cp.positionId))
+  const filledPositionIds = new Set(filledPositionsRaw.map((h) => h.candidatePosition.positionId))
 
   return {
     from: fromDate.toISOString(),
@@ -132,7 +134,7 @@ async function buildPipelineData(fromDate: Date, toDate: Date): Promise<Pipeline
     generatedAt: now.toISOString(),
     summary: { totalPositions, totalActive, totalHeadcount, interviewsToday },
     atAGlance: { openPositions: totalPositions, totalHeadcount, activeCandidates: totalActive, offerCount, clientCount, managerCount, techCount, interviewsToday },
-    periodHighlights: { interviewsConducted: conductedInterviews.length, interviewsByStage, candidatesAdvanced: advancedCount, newCandidates: newCPsRaw.length, newCandidatePositions: newCPPositionIds.size, movedToOffer: movedToOfferCount, notMovingForward: rejectedCount },
+    periodHighlights: { interviewsConducted: conductedInterviews.length, interviewsByStage, candidatesAdvanced: advancedCount, newCandidates: newCPsRaw.length, newCandidatePositions: newCPPositionIds.size, movedToOffer: movedToOfferCount, notMovingForward: rejectedCount, filledThisPeriod: filledPositionIds.size },
     clients,
   }
 }

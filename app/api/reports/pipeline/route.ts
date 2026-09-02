@@ -193,7 +193,7 @@ export async function GET(request: Request) {
   })
 
   // Period highlights — additional queries
-  const [conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount] = await Promise.all([
+  const [conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount, filledPositionsRaw] = await Promise.all([
     // Interviews scheduled in period — any status
     db.interview.findMany({
       where: {
@@ -249,6 +249,16 @@ export async function GET(request: Request) {
         },
       },
     }),
+    // Positions filled this period — distinct positions with a candidate who moved to HIRED
+    db.stageHistory.findMany({
+      where: {
+        toStage: 'HIRED',
+        movedAt: { gte: fromDate, lte: toDate },
+        candidatePosition: { candidate: { deletedAt: null } },
+      },
+      select: { candidatePosition: { select: { positionId: true } } },
+      distinct: ['candidatePositionId'],
+    }),
   ])
 
   const INTERVIEW_STAGE_LABELS: Partial<Record<string, string>> = {
@@ -265,6 +275,7 @@ export async function GET(request: Request) {
   const interviewsByStage = Object.entries(stageBuckets).map(([label, count]) => ({ stage: label, label, count }))
 
   const newCPPositionIds = new Set(newCPsRaw.map((cp) => cp.positionId))
+  const filledPositionIds = new Set(filledPositionsRaw.map((h) => h.candidatePosition.positionId))
 
   return NextResponse.json({
     from: fromDate.toISOString(),
@@ -289,6 +300,7 @@ export async function GET(request: Request) {
       newCandidatePositions: newCPPositionIds.size,
       movedToOffer: movedToOfferCount,
       notMovingForward: rejectedCount,
+      filledThisPeriod: filledPositionIds.size,
     },
     clients,
   })
