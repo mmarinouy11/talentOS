@@ -14,7 +14,8 @@ const patchSchema = z.object({
   title: z.string().min(1).optional(),
   client: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
-  status: z.enum(['OPEN', 'ON_HOLD', 'CLOSED', 'FILLED']).optional(),
+  status: z.enum(['OPEN', 'ON_HOLD', 'CLOSED', 'FILLED', 'CANCELLED']).optional(),
+  cancelledReason: z.string().min(1).optional().nullable(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   target_date_asap: z.boolean().optional(),
   target_date: z.string().datetime().optional().nullable(),
@@ -84,10 +85,19 @@ export async function PATCH(
   const existing = await db.position.findFirst({ where: { id, deletedAt: null } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const isAdmin = (session.user as { role?: string }).role === 'ADMIN'
+
   const body = await request.json()
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+  }
+
+  if (parsed.data.status === 'CANCELLED') {
+    if (!isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!parsed.data.cancelledReason) {
+      return NextResponse.json({ error: 'cancelledReason is required when cancelling a position' }, { status: 400 })
+    }
   }
 
   const clientRate = parsed.data.clientRate !== undefined ? parsed.data.clientRate : existing.clientRate
@@ -95,9 +105,17 @@ export async function PATCH(
     parsed.data.internalCostBudget !== undefined ? parsed.data.internalCostBudget : existing.internalCostBudget
   const { dgm, dgmAtRisk } = await computePositionDGM(clientRate, internalCostBudget)
 
+  const { cancelledReason, ...restData } = parsed.data
+  const cancelledAt = parsed.data.status === 'CANCELLED' ? new Date() : undefined
+
   const position = await db.position.update({
     where: { id },
-    data: { ...parsed.data, dgm, dgmAtRisk },
+    data: {
+      ...restData,
+      dgm,
+      dgmAtRisk,
+      ...(parsed.data.status === 'CANCELLED' ? { cancelledReason, cancelledAt } : {}),
+    },
   })
 
   if (parsed.data.description) parseJDInBackground(position.id)

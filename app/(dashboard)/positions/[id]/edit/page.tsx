@@ -11,6 +11,7 @@ export default async function EditPositionPage({
 }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
+  const isAdmin = (session.user as { role?: string }).role === 'ADMIN'
 
   const { id } = await params
 

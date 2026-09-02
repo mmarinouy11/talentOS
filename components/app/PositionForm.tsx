@@ -42,6 +42,13 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 const REPORTING_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'] as const
 const REPORTING_DAY_LABELS: Record<string, string> = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri' }
 
+const CANCELLATION_REASONS = [
+  'Fulfilled from other geo',
+  'Taken by another vendor',
+  'Budget cut',
+  'Other',
+]
+
 interface PositionFormProps {
   users: UserOption[]
   defaultValues?: {
@@ -69,12 +76,17 @@ interface PositionFormProps {
     reportingDays?: string[]
   }
   mode: 'create' | 'edit'
+  isAdmin?: boolean
 }
 
-export function PositionForm({ users, defaultValues = {}, mode }: PositionFormProps) {
+export function PositionForm({ users, defaultValues = {}, mode, isAdmin = false }: PositionFormProps) {
   const router = useRouter()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState<string>(CANCELLATION_REASONS[0])
+  const [cancelCustom, setCancelCustom] = useState('')
+  const [statusValue, setStatusValue] = useState<string>(defaultValues.status ?? 'OPEN')
   const [isAsap, setIsAsap] = useState(defaultValues.target_date_asap ?? false)
   const [locations, setLocations] = useState<string[]>(defaultValues.location ?? [])
   const [clientRate, setClientRate] = useState<string>(
@@ -195,7 +207,10 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
     }
 
     if (mode === 'edit') {
-      payload.status = fd.get('status') as string
+      payload.status = statusValue
+      if (statusValue === 'CANCELLED') {
+        payload.cancelledReason = cancelReason === 'Other' ? cancelCustom.trim() : cancelReason
+      }
     }
 
     const url = mode === 'edit' ? `/api/positions/${defaultValues.id}` : '/api/positions'
@@ -403,14 +418,77 @@ export function PositionForm({ users, defaultValues = {}, mode }: PositionFormPr
             <Select
               id="status"
               name="status"
-              defaultValue={defaultValues.status ?? 'OPEN'}
+              value={statusValue}
+              onChange={(e) => {
+                const next = e.target.value
+                if (next === 'CANCELLED' && isAdmin) {
+                  setPendingStatus(next)
+                } else {
+                  setStatusValue(next)
+                }
+              }}
             >
               <option value="OPEN">Open</option>
               <option value="ON_HOLD">On Hold</option>
-              <option value="CANCELLED">Cancelled</option>
+              {isAdmin && <option value="CANCELLED">Cancelled</option>}
               <option value="FILLED">Filled</option>
               <option value="CLOSED">Closed</option>
             </Select>
+          </div>
+        )}
+
+        {/* Cancellation reason modal */}
+        {pendingStatus === 'CANCELLED' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+              <h2 className="text-base font-semibold text-gray-900">Cancellation Reason</h2>
+              <p className="text-sm text-gray-500">Select a reason for cancelling this position.</p>
+              <div className="space-y-2">
+                {CANCELLATION_REASONS.map((r) => (
+                  <label key={r} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="cancelReason"
+                      value={r}
+                      checked={cancelReason === r}
+                      onChange={() => setCancelReason(r)}
+                      className="accent-[#8CF000]"
+                    />
+                    {r}
+                  </label>
+                ))}
+              </div>
+              {cancelReason === 'Other' && (
+                <input
+                  type="text"
+                  value={cancelCustom}
+                  onChange={(e) => setCancelCustom(e.target.value)}
+                  placeholder="Describe the reason…"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
+                />
+              )}
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setPendingStatus(null)}
+                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (cancelReason === 'Other' && !cancelCustom.trim()) return
+                    setStatusValue('CANCELLED')
+                    setPendingStatus(null)
+                  }}
+                  disabled={cancelReason === 'Other' && !cancelCustom.trim()}
+                  className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40"
+                >
+                  Confirm Cancellation
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

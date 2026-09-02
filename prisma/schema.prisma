@@ -247,6 +247,8 @@ model Position {
   lastReportSentAt        DateTime?
   timezone                String?
   createdAt            DateTime       @default(now())
+  cancelledReason      String?        @db.Text
+  cancelledAt          DateTime?
   updatedAt            DateTime       @updatedAt
   deletedAt            DateTime?
 
