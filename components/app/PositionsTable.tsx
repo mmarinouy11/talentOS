@@ -66,6 +66,8 @@ export interface PositionRow {
   recruiter: { name: string | null; email: string } | null
   _count: { candidatePositions: number; positionVendors: number }
   isYtj?: boolean
+  cancelledReason?: string | null
+  cancelledAt?: string | null
 }
 
 // Flat sort row — derived fields hoisted so useSortableData can compare them
@@ -227,7 +229,12 @@ export function PositionsTable({
                       {p.title}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{p.client}</td>
-                    <td className="px-4 py-3"><PositionStatusBadge status={p.status} /></td>
+                    <td className="px-4 py-3">
+                      <PositionStatusBadge status={p.status} />
+                      {p.status === 'CANCELLED' && p.cancelledReason && (
+                        <p className="text-xs text-gray-400 mt-0.5 max-w-[160px] truncate" title={p.cancelledReason}>{p.cancelledReason}</p>
+                      )}
+                    </td>
                     <td className="px-4 py-3"><PriorityBadge priority={p.priority} /></td>
                     <td className="px-4 py-3 text-right">
                       {p.dgm != null ? <span className={`font-medium ${dgmColor(p.dgmAtRisk)}`}>{(p.dgm * 100).toFixed(0)}%</span> : <span className="text-gray-400">—</span>}

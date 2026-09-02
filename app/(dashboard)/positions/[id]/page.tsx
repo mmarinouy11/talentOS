@@ -161,6 +161,12 @@ export default async function PositionDetailPage({
             <PriorityBadge priority={position.priority} />
           </div>
           <p className="text-sm text-gray-500 mt-1">{position.client}</p>
+          {position.status === 'CANCELLED' && (position.cancelledAt || position.cancelledReason) && (
+            <p className="text-sm text-red-600 mt-1">
+              Cancelled{position.cancelledAt ? ` on ${fmt(position.cancelledAt)}` : ''}
+              {position.cancelledReason ? ` · ${position.cancelledReason}` : ''}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (

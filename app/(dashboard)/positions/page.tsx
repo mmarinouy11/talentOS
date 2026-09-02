@@ -26,6 +26,8 @@ export default async function PositionsPage() {
       dgm: true,
       dgmAtRisk: true,
       headcount: true,
+      cancelledReason: true,
+      cancelledAt: true,
       recruiter: { select: { id: true, name: true, email: true } },
       _count: { select: { candidatePositions: true, positionVendors: true } },
       candidatePositions: { select: { status: true, startDate: true } },
@@ -62,6 +64,8 @@ export default async function PositionsPage() {
     dgm: p.dgm,
     dgmAtRisk: p.dgmAtRisk,
     headcount: p.headcount,
+    cancelledReason: p.cancelledReason,
+    cancelledAt: p.cancelledAt?.toISOString() ?? null,
     recruiter: p.recruiter,
     _count: p._count,
     isYtj: p.candidatePositions.some(
