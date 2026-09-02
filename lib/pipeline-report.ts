@@ -183,7 +183,7 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
 function buildOverviewTable(data: PipelineReportData, emailMode: boolean): string {
   if (data.clients.length === 0) return ''
 
-  const colCount = SUMMARY_STAGES.length + 3 // Position + stage cols + NMF + Total Processed
+  const colCount = SUMMARY_STAGES.length + 4 // Position + HC + stage cols + NMF + Total Processed
   const STAGE_COL_W = '72px'
   const SUMMARY_COL_W = '76px'
 
@@ -191,7 +191,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   const thLeft = thBase.replace('text-align:center', 'text-align:left')
 
   const totals: Record<string, number> = {}
-  let totalActive = 0, totalNmf = 0, totalProcessed = 0
+  let totalActive = 0, totalNmf = 0, totalProcessed = 0, totalHired = 0, totalHeadcount = 0
 
   const bodyRows: string[] = []
 
@@ -210,6 +210,17 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
       for (const s of SUMMARY_STAGES) {
         totals[s.key] = (totals[s.key] ?? 0) + (stageMap[s.key] ?? 0)
       }
+      const posHired = stageMap['HIRED'] ?? 0
+      const posHc = pos.headcount
+      totalHired += posHired
+      totalHeadcount += posHc
+
+      const hcCell = (() => {
+        const frac = `${posHired}/${posHc}`
+        if (posHired === 0) return `<td style="width:52px;padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;color:#9ca3af;">○ ${frac}</td>`
+        if (posHired >= posHc) return `<td style="width:52px;padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;color:#2F2C29;font-weight:500;">✓ ${frac}</td>`
+        return `<td style="width:52px;padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;color:#f59e0b;">◐ ${frac}</td>`
+      })()
 
       const stageCells = SUMMARY_STAGES.map((s) => {
         const n = stageMap[s.key] ?? 0
@@ -222,6 +233,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
 
       bodyRows.push(`<tr>
         <td style="padding:5px 8px 5px 14px;border:1px solid #e5e7eb;">${posLink}</td>
+        ${hcCell}
         ${stageCells}
         <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
         <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
@@ -236,6 +248,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
 
   const colgroup = `<colgroup>
     <col style="min-width:160px;">
+    <col style="width:52px;">
     ${SUMMARY_STAGES.map(() => `<col style="width:${STAGE_COL_W};">`).join('')}
     <col style="width:${SUMMARY_COL_W};">
     <col style="width:${SUMMARY_COL_W};">
@@ -249,6 +262,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         <thead>
           <tr>
             <th style="${thLeft}">Position</th>
+            <th style="${thBase}">HC</th>
             ${SUMMARY_STAGES.map((s) => `<th style="${thBase}">${esc(s.label)}</th>`).join('')}
             <th style="${thBase}">Not Fwd</th>
             <th style="${thBase}">Total</th>
@@ -258,6 +272,12 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         <tfoot>
           <tr>
             <td style="padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;font-weight:700;color:#111827;background:#f9fafb;">Totals</td>
+            ${(() => {
+              const frac = `${totalHired}/${totalHeadcount}`
+              if (totalHired === 0) return `<td style="width:52px;padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;color:#9ca3af;background:#f9fafb;">○ ${frac}</td>`
+              if (totalHired >= totalHeadcount) return `<td style="width:52px;padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;color:#2F2C29;font-weight:500;background:#f9fafb;">✓ ${frac}</td>`
+              return `<td style="width:52px;padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;color:#f59e0b;background:#f9fafb;">◐ ${frac}</td>`
+            })()}
             ${totalCells}
             <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
             <td style="width:${SUMMARY_COL_W};padding:5px 8px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>

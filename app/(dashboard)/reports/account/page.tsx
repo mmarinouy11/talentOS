@@ -26,6 +26,12 @@ interface DashboardData {
   generatedAt: string
 }
 
+function HcCell({ hired, headcount, className = '' }: { hired: number; headcount: number; className?: string }) {
+  if (hired === 0) return <span className={`text-gray-400 ${className}`}>○ 0/{headcount}</span>
+  if (hired >= headcount) return <span className={`text-[#2F2C29] font-medium ${className}`}>✓ {hired}/{headcount}</span>
+  return <span className={`text-amber-500 ${className}`}>◐ {hired}/{headcount}</span>
+}
+
 const DASH_STAGES = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED'] as const
 const DASH_COL_LABELS: Record<string, string> = {
   HIRED: 'Hired', OFFER: 'Offer', CLIENT_INTERVIEW: 'Client', MANAGER_INTERVIEW: 'Mgr',
@@ -84,7 +90,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
           <Link href={`/positions/${pos.id}`} target="_blank" className="hover:underline">{pos.title}</Link>
           <p className="text-xs text-gray-400 font-normal">{pos.recruiter}</p>
         </td>
-        <td className="py-2.5 px-2 text-center text-sm text-gray-700">{pos.headcount}</td>
+        <td className="py-2.5 px-2 text-center text-sm"><HcCell hired={pos.stageCounts['HIRED'] ?? 0} headcount={pos.headcount} /></td>
         {DASH_STAGES.map((s) => (
           <td key={s} className="py-2.5 px-2 text-center text-sm">
             {pos.stageCounts[s] ? (
@@ -201,8 +207,11 @@ function DashboardTab({ client }: { client: string }) {
             ))}
             <tr className="bg-gray-50 border-t border-gray-200">
               <td className="py-2.5 pl-4 pr-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Totals</td>
-              <td className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
-                {data.positions.reduce((s, p) => s + p.headcount, 0)}
+              <td className="py-2.5 px-2 text-center text-xs">
+                <HcCell
+                  hired={data.positions.reduce((s, p) => s + (p.stageCounts['HIRED'] ?? 0), 0)}
+                  headcount={data.positions.reduce((s, p) => s + p.headcount, 0)}
+                />
               </td>
               {DASH_STAGES.map((s) => (
                 <td key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
