@@ -156,6 +156,7 @@ export async function GET(request: Request) {
         title: pos.title,
         recruiter: pos.recruiter.name ?? pos.recruiter.email,
         timezone: (pos as { timezone?: string | null }).timezone ?? 'America/Montevideo',
+        headcount: pos.headcount ?? 1,
         stageCounts,
         interviewsToday,
         interviewsTotal,

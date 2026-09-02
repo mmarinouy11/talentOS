@@ -15,6 +15,7 @@ interface DashboardCandidateEntry {
 interface DashboardStageGroup { stage: string; label: string; candidates: DashboardCandidateEntry[] }
 interface DashboardPosition {
   id: string; title: string; recruiter: string; timezone: string
+  headcount: number
   stageCounts: Partial<Record<string, number>>
   interviewsToday: number; interviewsTotal: number
   candidatesByStage: DashboardStageGroup[]
@@ -83,6 +84,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
           <Link href={`/positions/${pos.id}`} target="_blank" className="hover:underline">{pos.title}</Link>
           <p className="text-xs text-gray-400 font-normal">{pos.recruiter}</p>
         </td>
+        <td className="py-2.5 px-2 text-center text-sm text-gray-700">{pos.headcount}</td>
         {DASH_STAGES.map((s) => (
           <td key={s} className="py-2.5 px-2 text-center text-sm">
             {pos.stageCounts[s] ? (
@@ -106,7 +108,7 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
       </tr>
       {open && (
         <tr className="bg-gray-50 border-b border-gray-100">
-          <td colSpan={DASH_STAGES.length + 4} className="px-4 py-3">
+          <td colSpan={DASH_STAGES.length + 5} className="px-4 py-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Active Candidates</p>
             {pos.candidatesByStage.length === 0
               ? <p className="text-xs text-gray-400">No active candidates</p>
@@ -182,6 +184,7 @@ function DashboardTab({ client }: { client: string }) {
           <thead>
             <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
               <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Position</th>
+              <th className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">HC</th>
               {DASH_STAGES.map((s) => (
                 <th key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   {DASH_COL_LABELS[s]}
@@ -198,6 +201,9 @@ function DashboardTab({ client }: { client: string }) {
             ))}
             <tr className="bg-gray-50 border-t border-gray-200">
               <td className="py-2.5 pl-4 pr-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Totals</td>
+              <td className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
+                {data.positions.reduce((s, p) => s + p.headcount, 0)}
+              </td>
               {DASH_STAGES.map((s) => (
                 <td key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
                   {totals[s] || '—'}
