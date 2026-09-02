@@ -7,12 +7,21 @@ import { Label } from '@/components/ui/label'
 
 type Cadence = 'daily' | 'weekly' | 'custom'
 
+const WEEKDAY_OPTIONS = [
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+]
+
 interface Props {
   enabled: boolean
   emails: string[]
   sendTime: string
   periodDays: number
   cadence: Cadence
+  weeklyDay: number
 }
 
 async function saveSetting(key: string, value: string) {
@@ -35,15 +44,20 @@ const CADENCE_DEFAULTS: Record<Cadence, { sendTime: string; periodDays: number }
   custom: { sendTime: '17:00', periodDays: 7 },
 }
 
-function cadenceSummary(cadence: Cadence, sendTime: string): string {
-  const timeFmt = (() => {
-    const [h, m] = sendTime.split(':').map(Number)
-    const ampm = h >= 12 ? 'PM' : 'AM'
-    const h12 = h % 12 === 0 ? 12 : h % 12
-    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
-  })()
+function fmtTime(sendTime: string): string {
+  const [h, m] = sendTime.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
+function cadenceSummary(cadence: Cadence, sendTime: string, weeklyDay: number): string {
+  const timeFmt = fmtTime(sendTime)
   if (cadence === 'daily') return `Sends every weekday at ${timeFmt} (GMT-3)`
-  if (cadence === 'weekly') return `Sends every Monday at ${timeFmt} (GMT-3)`
+  if (cadence === 'weekly') {
+    const dayLabel = WEEKDAY_OPTIONS.find((d) => d.value === weeklyDay)?.label ?? 'Monday'
+    return `Sends every ${dayLabel} at ${timeFmt} (GMT-3)`
+  }
   return ''
 }
 
@@ -53,12 +67,14 @@ export function PipelineReportDistributionSection({
   sendTime: initSendTime,
   periodDays: initPeriodDays,
   cadence: initCadence,
+  weeklyDay: initWeeklyDay,
 }: Props) {
   const [enabled, setEnabled] = useState(initEnabled)
   const [emails, setEmails] = useState<string[]>(initEmails)
   const [cadence, setCadence] = useState<Cadence>(initCadence)
   const [sendTime, setSendTime] = useState(initSendTime)
   const [periodDays, setPeriodDays] = useState(initPeriodDays)
+  const [weeklyDay, setWeeklyDay] = useState(initWeeklyDay)
   const [showTimeOverride, setShowTimeOverride] = useState(false)
   const [newEmail, setNewEmail] = useState('')
   const [emailError, setEmailError] = useState('')
@@ -112,6 +128,7 @@ export function PipelineReportDistributionSection({
       saveSetting('PIPELINE_REPORT_SEND_TIME', sendTime),
       saveSetting('PIPELINE_REPORT_PERIOD_DAYS', String(periodDays)),
       saveSetting('PIPELINE_REPORT_EMAILS', JSON.stringify(emails)),
+      saveSetting('PIPELINE_REPORT_WEEKLY_DAY', String(weeklyDay)),
     ])
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2500)
@@ -131,7 +148,7 @@ export function PipelineReportDistributionSection({
     }
   }
 
-  const summary = cadence !== 'custom' ? cadenceSummary(cadence, sendTime) : ''
+  const summary = cadence !== 'custom' ? cadenceSummary(cadence, sendTime, weeklyDay) : ''
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
@@ -176,6 +193,22 @@ export function PipelineReportDistributionSection({
             </button>
           ))}
         </div>
+
+        {/* Day-of-week selector for weekly cadence */}
+        {cadence === 'weekly' && (
+          <div className="flex items-center gap-2 pt-1">
+            <Label className="shrink-0">Send on:</Label>
+            <select
+              value={weeklyDay}
+              onChange={(e) => setWeeklyDay(Number(e.target.value))}
+              className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8CF000]"
+            >
+              {WEEKDAY_OPTIONS.map((d) => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Summary for non-custom cadences */}
         {cadence !== 'custom' && (

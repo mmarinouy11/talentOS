@@ -57,6 +57,11 @@ export default async function SettingsPage({
       update: {},
       create: { key: 'PIPELINE_REPORT_CADENCE', value: 'daily', description: 'Pipeline report cadence: daily | weekly | custom' },
     }),
+    db.systemSettings.upsert({
+      where: { key: 'PIPELINE_REPORT_WEEKLY_DAY' },
+      update: {},
+      create: { key: 'PIPELINE_REPORT_WEEKLY_DAY', value: '1', description: 'Day of week for weekly pipeline report (1=Mon … 5=Fri)' },
+    }),
   ])
 
   const [settings, headerSetting, systemEmailAccount] = await Promise.all([
@@ -88,6 +93,7 @@ export default async function SettingsPage({
         sendTime={settings.find((s) => s.key === 'PIPELINE_REPORT_SEND_TIME')?.value ?? '22:00'}
         periodDays={Number(settings.find((s) => s.key === 'PIPELINE_REPORT_PERIOD_DAYS')?.value ?? '7')}
         cadence={(settings.find((s) => s.key === 'PIPELINE_REPORT_CADENCE')?.value ?? 'daily') as 'daily' | 'weekly' | 'custom'}
+        weeklyDay={Number(settings.find((s) => s.key === 'PIPELINE_REPORT_WEEKLY_DAY')?.value ?? '1')}
       />
       <SystemGmailSection
         connectedEmail={systemEmailAccount?.connectedEmail ?? null}

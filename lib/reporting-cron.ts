@@ -144,18 +144,19 @@ export async function runReportingCron() {
 async function runPipelineReportCron() {
   try {
     const settings = await db.systemSettings.findMany({
-      where: { key: { in: ['PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_SEND_TIME'] } },
+      where: { key: { in: ['PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_WEEKLY_DAY'] } },
     })
     const get = (key: string) => settings.find((s) => s.key === key)?.value
     const cadence = (get('PIPELINE_REPORT_CADENCE') ?? 'daily') as 'daily' | 'weekly' | 'custom'
     const sendTime = get('PIPELINE_REPORT_SEND_TIME') ?? '17:00'
+    const weeklyDay = parseInt(get('PIPELINE_REPORT_WEEKLY_DAY') ?? '1', 10)
 
     // Determine current GMT-3 day (0=Sun, 1=Mon … 6=Sat)
     const dayGmt3 = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCDay()
 
     if (cadence === 'weekly') {
-      // Only send on Monday
-      if (dayGmt3 !== 1) {
+      // Only send on the configured weekday
+      if (dayGmt3 !== weeklyDay) {
         return
       }
     } else {
