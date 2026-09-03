@@ -156,8 +156,9 @@ export async function sendPipelineReportEmail(): Promise<{ ok: boolean; sent?: n
 
   const data = await buildPipelineData(fromDate, toDate)
   const html = renderPipelineHtml(data, { emailMode: true })
-  const dateLabel = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
-  const subject = `Daily Pipeline Report — Tenarai LATAM — ${dateLabel}`
+  const fmtDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  const fmtYear = toDate.toLocaleDateString('en-US', { year: 'numeric', timeZone: 'UTC' })
+  const subject = `Pipeline Report — Tenarai LATAM — ${fmtDate(fromDate)} to ${fmtDate(toDate)}, ${fmtYear}`
 
   let sent = 0
   for (const to of recipients) {

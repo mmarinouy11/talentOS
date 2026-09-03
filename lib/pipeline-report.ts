@@ -269,7 +269,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
           <tr>
             <th style="${thLeft}">Position</th>
             ${SUMMARY_STAGES.map((s) => `<th class="col-stage" style="${thBase}">${esc(s.label)}</th>`).join('')}
-            <th class="col-stage" style="${thBase}">NMF</th>
+            <th class="col-stage" style="${thBase}">Not Fwd</th>
             <th class="col-stage" style="${thBase}">Total</th>
           </tr>
         </thead>
