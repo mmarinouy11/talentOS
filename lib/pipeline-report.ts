@@ -379,18 +379,19 @@ export function renderPipelineHtml(
 
 
   const styleBlock = (printMode || emailMode) ? `
-    <style>
+    <style type="text/css">
       ${printMode ? `@media print {
         body { margin: 0; }
         .no-print { display: none !important; }
         .report-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
       }
       @page { margin: 10mm 8mm; }` : ''}
-      @media (max-width: 600px) {
-        .pos-name { max-width: 35px !important; width: 35px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 8px !important; }
-        .col-stage { width: 26px !important; min-width: 26px !important; padding: 2px 1px !important; font-size: 8px !important; }
-        th { font-size: 8px !important; padding: 2px 1px !important; }
-        td { font-size: 8px !important; padding: 2px 1px !important; }
+      @media only screen and (max-width: 600px) {
+        table { font-size: 9px !important; }
+        .pos-name { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 9px !important; }
+        .col-stage { padding: 2px 1px !important; font-size: 9px !important; }
+        th { font-size: 9px !important; padding: 2px 1px !important; }
+        td { font-size: 9px !important; padding: 2px 1px !important; }
       }
     </style>` : ''
 
