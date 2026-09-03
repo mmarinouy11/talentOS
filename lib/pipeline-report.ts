@@ -184,10 +184,11 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   if (data.clients.length === 0) return ''
 
   const colCount = SUMMARY_STAGES.length + 3 // Position (w/ HC) + stage cols + NMF + Total Processed
-  const STAGE_COL_W = '52px'
-  const SUMMARY_COL_W = '64px'
+  const STAGE_COL_W = emailMode ? '40px' : '52px'
+  const SUMMARY_COL_W = emailMode ? '44px' : '64px'
+  const POS_COL_W = emailMode ? '120px' : '160px'
 
-  const thBase = `padding:4px 6px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;background:#f9fafb;`
+  const thBase = `padding:4px 4px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:#f9fafb;`
   const thLeft = thBase.replace('text-align:center', 'text-align:left')
 
   const totals: Record<string, number> = {}
@@ -222,34 +223,38 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         return `<span style="font-size:11px;color:#f59e0b;">◐ ${frac}</span>`
       })()
 
+      const stPad = emailMode ? '4px 3px' : '4px 6px'
+      const stFSize = emailMode ? '12px' : '13px'
       const stageCells = SUMMARY_STAGES.map((s) => {
         const n = stageMap[s.key] ?? 0
-        return `<td style="padding:4px 6px;border:1px solid #e5e7eb;font-size:13px;text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
+        return `<td class="col-stage" style="padding:${stPad};border:1px solid #e5e7eb;font-size:${stFSize};text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
       }).join('')
 
       const posLink = emailMode
-        ? `<span style="display:block;font-size:13px;font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}">${esc(pos.title)}</span>`
-        : `<a href="/positions/${pos.id}" style="display:block;font-size:13px;font-weight:500;color:#111827;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}" target="_blank">${esc(pos.title)}</a>`
+        ? `<span class="pos-name" style="display:block;font-size:12px;font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${POS_COL_W};" title="${esc(pos.title)}">${esc(pos.title)}</span>`
+        : `<a href="/positions/${pos.id}" class="pos-name" style="display:block;font-size:13px;font-weight:500;color:#111827;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}" target="_blank">${esc(pos.title)}</a>`
 
       bodyRows.push(`<tr>
-        <td style="padding:4px 6px 4px 12px;border:1px solid #e5e7eb;overflow:hidden;max-width:160px;">
+        <td style="padding:4px 4px 4px 8px;border:1px solid #e5e7eb;overflow:hidden;max-width:${POS_COL_W};">
           ${posLink}
           ${hcFrac}
         </td>
         ${stageCells}
-        <td style="padding:4px 6px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
-        <td style="padding:4px 6px;border:1px solid #e5e7eb;font-size:13px;text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
+        <td class="col-stage" style="padding:${stPad};border:1px solid #e5e7eb;font-size:${stFSize};text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
+        <td class="col-stage" style="padding:${stPad};border:1px solid #e5e7eb;font-size:${stFSize};text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
       </tr>`)
     }
   }
 
+  const tfPad = emailMode ? '4px 3px' : '4px 6px'
+  const tfFSize = emailMode ? '12px' : '13px'
   const totalCells = SUMMARY_STAGES.map((s) => {
     const n = totals[s.key] ?? 0
-    return `<td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
+    return `<td class="col-stage" style="padding:${tfPad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${tfFSize};text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
   }).join('')
 
   const colgroup = `<colgroup>
-    <col style="width:160px;">
+    <col style="width:${POS_COL_W};">
     ${SUMMARY_STAGES.map(() => `<col style="width:${STAGE_COL_W};">`).join('')}
     <col style="width:${SUMMARY_COL_W};">
     <col style="width:${SUMMARY_COL_W};">
@@ -263,15 +268,15 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         <thead>
           <tr>
             <th style="${thLeft}">Position</th>
-            ${SUMMARY_STAGES.map((s) => `<th style="${thBase}">${esc(s.label)}</th>`).join('')}
-            <th style="${thBase}">Not Fwd</th>
-            <th style="${thBase}">Total</th>
+            ${SUMMARY_STAGES.map((s) => `<th class="col-stage" style="${thBase}">${esc(s.label)}</th>`).join('')}
+            <th class="col-stage" style="${thBase}">NMF</th>
+            <th class="col-stage" style="${thBase}">Total</th>
           </tr>
         </thead>
         <tbody>${bodyRows.join('')}</tbody>
         <tfoot>
           <tr>
-            <td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;font-weight:700;color:#111827;background:#f9fafb;">
+            <td style="padding:${tfPad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${tfFSize};font-weight:700;color:#111827;background:#f9fafb;">
               Totals
               ${(() => {
                 const frac = `${totalHired}/${totalHeadcount}`
@@ -281,8 +286,8 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
               })()}
             </td>
             ${totalCells}
-            <td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
-            <td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
+            <td class="col-stage" style="padding:${tfPad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${tfFSize};text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
+            <td class="col-stage" style="padding:${tfPad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${tfFSize};text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
           </tr>
         </tfoot>
       </table>
@@ -373,24 +378,26 @@ export function renderPipelineHtml(
   }).join('')
 
 
-  const printStyles = printMode ? `
+  const styleBlock = (printMode || emailMode) ? `
     <style>
-      @media print {
+      ${printMode ? `@media print {
         body { margin: 0; }
         .no-print { display: none !important; }
-      }
-      @page { margin: 10mm 8mm; }
-      @media print {
         .report-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+      }
+      @page { margin: 10mm 8mm; }` : ''}
+      @media (max-width: 600px) {
+        .pos-name { max-width: 80px !important; font-size: 11px !important; }
+        .col-stage { width: 28px !important; min-width: 28px !important; padding: 3px 2px !important; font-size: 11px !important; }
       }
     </style>` : ''
 
   const container = emailMode
-    ? `style="max-width:600px;margin:0 auto;padding:16px;${font};"`
+    ? `style="max-width:600px;margin:0 auto;padding:0;${font};"`
     : `class="report-container" style="max-width:820px;margin:0 auto;padding:16px 12px;${font};"`
 
   return `
-    ${printStyles}
+    ${styleBlock}
     <div ${container}>
       ${headerSection}
       ${overviewTable}
