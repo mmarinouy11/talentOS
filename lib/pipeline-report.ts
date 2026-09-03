@@ -92,7 +92,7 @@ const SUMMARY_STAGES: { key: string; label: string }[] = [
   { key: 'MANAGER_INTERVIEW', label: 'Mgr' },
   { key: 'TECHNICAL_INTERVIEW', label: 'Tech' },
   { key: 'SCREENING', label: 'Screen' },
-  { key: 'APPLIED', label: 'Pipeline' },
+  { key: 'APPLIED', label: 'Pipe' },
 ]
 
 const LIME = '#8CF000'
@@ -232,7 +232,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         : `<a href="/positions/${pos.id}" style="display:block;font-size:13px;font-weight:500;color:#111827;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}" target="_blank">${esc(pos.title)}</a>`
 
       bodyRows.push(`<tr>
-        <td style="padding:4px 6px 4px 12px;border:1px solid #e5e7eb;overflow:hidden;max-width:220px;">
+        <td style="padding:4px 6px 4px 12px;border:1px solid #e5e7eb;overflow:hidden;max-width:160px;">
           ${posLink}
           ${hcFrac}
         </td>
@@ -249,7 +249,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   }).join('')
 
   const colgroup = `<colgroup>
-    <col style="width:220px;">
+    <col style="width:160px;">
     ${SUMMARY_STAGES.map(() => `<col style="width:${STAGE_COL_W};">`).join('')}
     <col style="width:${SUMMARY_COL_W};">
     <col style="width:${SUMMARY_COL_W};">
