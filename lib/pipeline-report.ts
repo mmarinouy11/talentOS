@@ -277,7 +277,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
     { key: 'SCREENING', label: 'Screen' },
     { key: 'APPLIED', label: 'Pipe' },
   ]
-  const emailColCount = 1 + EMAIL_COLS.length + 3  // pos + 5 stage + active + nmf + total = 9
+  const emailColCount = 1 + EMAIL_COLS.length + 2  // pos + 5 stage + nmf + total = 8
 
   const thS = `padding:3px 2px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;background:#f9fafb;white-space:nowrap;`
   const thSL = thS.replace('text-align:center', 'text-align:left')
@@ -304,7 +304,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
           ${hcSpan(posHired, pos.headcount, '10px', '0px')}
         </td>
         ${stageCells}
-        <td style="padding:${tdPad};border:${tdBorder};font-size:${tdFs};text-align:center;font-weight:600;color:#111827;">${posActive || '—'}</td>
         <td style="padding:${tdPad};border:${tdBorder};font-size:${tdFs};text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
         <td style="padding:${tdPad};border:${tdBorder};font-size:${tdFs};text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
       </tr>`)
@@ -318,8 +317,8 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
 
   const colgroup = `<colgroup>
     <col style="width:20%;">
-    ${EMAIL_COLS.map(() => `<col style="width:7%;">`).join('')}
-    <col style="width:8%;"><col style="width:8%;"><col style="width:8%;">
+    ${EMAIL_COLS.map(() => `<col style="width:9%;">`).join('')}
+    <col style="width:10%;"><col style="width:10%;">
   </colgroup>`
 
   return `
@@ -330,7 +329,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         <thead><tr>
           <th style="${thSL}">Position</th>
           ${EMAIL_COLS.map(({ label }) => `<th style="${thS}">${esc(label)}</th>`).join('')}
-          <th style="${thS}">Active</th>
           <th style="${thS}">Not Fwd</th>
           <th style="${thS}">Total</th>
         </tr></thead>
@@ -338,7 +336,6 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         <tfoot><tr>
           <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};font-weight:700;color:#111827;background:#f9fafb;">Totals${hcSpan(totalHired, totalHeadcount, '10px')}</td>
           ${emailTotalCells}
-          <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};text-align:center;font-weight:600;color:#111827;background:#f9fafb;">${totalActive || '—'}</td>
           <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
           <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
         </tr></tfoot>
