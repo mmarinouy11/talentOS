@@ -184,9 +184,9 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   if (data.clients.length === 0) return ''
 
   const colCount = SUMMARY_STAGES.length + 3 // Position (w/ HC) + stage cols + NMF + Total Processed
-  const STAGE_COL_W = emailMode ? '32px' : '52px'
-  const SUMMARY_COL_W = emailMode ? '32px' : '64px'
-  const POS_COL_W = emailMode ? '80px' : '160px'
+  const STAGE_COL_W = emailMode ? '7%' : '52px'
+  const SUMMARY_COL_W = emailMode ? '8%' : '64px'
+  const POS_COL_W = emailMode ? '25%' : '160px'
 
   const thBase = `padding:4px 4px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:#f9fafb;`
   const thLeft = thBase.replace('text-align:center', 'text-align:left')
@@ -231,7 +231,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
       }).join('')
 
       const posLink = emailMode
-        ? `<span class="pos-name" style="display:block;font-size:10px;font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${POS_COL_W};width:${POS_COL_W};" title="${esc(pos.title)}">${esc(pos.title)}</span>`
+        ? `<span class="pos-name" style="display:block;font-size:10px;font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}">${esc(pos.title)}</span>`
         : `<a href="/positions/${pos.id}" class="pos-name" style="display:block;font-size:13px;font-weight:500;color:#111827;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}" target="_blank">${esc(pos.title)}</a>`
 
       bodyRows.push(`<tr>
