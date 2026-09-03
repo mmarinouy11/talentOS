@@ -18,13 +18,13 @@
   --color-border: var(--color-border);
   --color-accent: var(--color-accent);
   --color-button-hover: var(--color-button-hover);
-  --font-sans: var(--font-open-sans), "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Segoe UI", system-ui, sans-serif;
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-text-primary);
-  font-family: var(--font-open-sans), "Segoe UI", system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
 }
 
