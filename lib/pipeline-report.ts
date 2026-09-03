@@ -279,10 +279,10 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   ]
   const emailColCount = 1 + EMAIL_COLS.length + 2  // pos + 5 stage + nmf + total = 8
 
-  const thS = `padding:3px 2px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;background:#f9fafb;white-space:nowrap;`
+  const thS = `padding:3px 2px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:9px;text-align:center;color:#6b7280;text-transform:uppercase;background:#f9fafb;white-space:nowrap;`
   const thSL = thS.replace('text-align:center', 'text-align:left')
   const tdPad = '3px 2px'
-  const tdFs = '11px'
+  const tdFs = '10px'
   const tdBorder = '1px solid #e5e7eb'
 
   const emailRows: string[] = []
