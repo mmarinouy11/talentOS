@@ -29,8 +29,7 @@ function daysAgo(date: Date): number {
 
 async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineReportData> {
   const now = new Date()
-  const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0)
-  const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
+
 
   const positions = await db.position.findMany({
     where: { status: 'OPEN', deletedAt: null },
@@ -109,10 +108,7 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
     }),
   }))
 
-  const [interviewsToday, conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount, filledPositionsRaw] = await Promise.all([
-    db.interview.count({
-      where: { scheduledAt: { gte: todayStart, lte: todayEnd }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
-    }),
+  const [conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount, filledPositionsRaw] = await Promise.all([
     db.interview.findMany({
       where: { scheduledAt: { gte: fromDate, lte: toDate }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } },
       select: { stage: true },
@@ -154,8 +150,8 @@ async function buildReportData(fromDate: Date, toDate: Date): Promise<PipelineRe
     from: fromDate.toISOString(),
     to: toDate.toISOString(),
     generatedAt: now.toISOString(),
-    summary: { totalPositions, totalActive, totalHeadcount, interviewsToday },
-    atAGlance: { openPositions: totalPositions, totalHeadcount, activeCandidates: totalActive, offerCount, clientCount, managerCount, techCount, interviewsToday },
+    summary: { totalPositions, totalActive, totalHeadcount, interviewsInPeriod: conductedInterviews.length },
+    atAGlance: { openPositions: totalPositions, totalHeadcount, activeCandidates: totalActive, offerCount, clientCount, managerCount, techCount, interviewsInPeriod: conductedInterviews.length },
     periodHighlights: { interviewsConducted: conductedInterviews.length, interviewsByStage, candidatesAdvanced: advancedCount, newCandidates: newCPsRaw.length, newCandidatePositions: newCPPositionIds.size, movedToOffer: movedToOfferCount, notMovingForward: rejectedCount, filledThisPeriod: filledPositionIds.size },
     clients,
   }

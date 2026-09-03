@@ -59,8 +59,7 @@ export async function GET(request: Request) {
   const fromDate = fromParam ? new Date(fromParam) : defaultFrom
   const toDate = toParam ? new Date(toParam) : defaultTo
 
-  const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0)
-  const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
+
 
   const positions = await db.position.findMany({
     where: { status: 'OPEN', deletedAt: null },
@@ -180,18 +179,6 @@ export async function GET(request: Request) {
     return { client: clientName, positions: positionData }
   })
 
-  // Interviews today — any status, scheduledAt date = today
-  const interviewsToday = await db.interview.count({
-    where: {
-      scheduledAt: { gte: todayStart, lte: todayEnd },
-      candidatePosition: {
-        status: { in: ['ACTIVE', 'HIRED'] },
-        position: { status: 'OPEN', deletedAt: null },
-        candidate: { deletedAt: null },
-      },
-    },
-  })
-
   // Period highlights — additional queries
   const [conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount, filledPositionsRaw] = await Promise.all([
     // Interviews scheduled in period — any status
@@ -281,7 +268,7 @@ export async function GET(request: Request) {
     from: fromDate.toISOString(),
     to: toDate.toISOString(),
     generatedAt: now.toISOString(),
-    summary: { totalPositions, totalActive, totalHeadcount, interviewsToday },
+    summary: { totalPositions, totalActive, totalHeadcount, interviewsInPeriod: conductedInterviews.length },
     atAGlance: {
       openPositions: totalPositions,
       totalHeadcount,
@@ -290,7 +277,7 @@ export async function GET(request: Request) {
       clientCount,
       managerCount,
       techCount,
-      interviewsToday,
+      interviewsInPeriod: conductedInterviews.length,
     },
     periodHighlights: {
       interviewsConducted: conductedInterviews.length,

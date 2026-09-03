@@ -41,7 +41,7 @@ export interface PipelineAtAGlance {
   clientCount: number
   managerCount: number
   techCount: number
-  interviewsToday: number
+  interviewsInPeriod: number
 }
 
 export interface PipelinePeriodHighlights {
@@ -63,7 +63,7 @@ export interface PipelineReportData {
     totalPositions: number
     totalActive: number
     totalHeadcount: number
-    interviewsToday: number
+    interviewsInPeriod: number
   }
   atAGlance: PipelineAtAGlance
   periodHighlights: PipelinePeriodHighlights
@@ -91,7 +91,7 @@ const SUMMARY_STAGES: { key: string; label: string }[] = [
   { key: 'CLIENT_INTERVIEW', label: 'Client' },
   { key: 'MANAGER_INTERVIEW', label: 'Mgr' },
   { key: 'TECHNICAL_INTERVIEW', label: 'Tech' },
-  { key: 'SCREENING', label: 'Screening' },
+  { key: 'SCREENING', label: 'Screen' },
   { key: 'APPLIED', label: 'Pipeline' },
 ]
 
@@ -161,9 +161,9 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
               <div style="font-size:11px;color:#9ca3af;">${esc(advancedDetail)}</div>
             </td>
             <td style="${cardStyle}">
-              <div style="font-size:22px;font-weight:700;color:#111827;">${ag.interviewsToday}</div>
+              <div style="font-size:22px;font-weight:700;color:#111827;">${ag.interviewsInPeriod}</div>
               <div style="font-size:11px;color:#6b7280;margin-top:2px;">Interviews</div>
-              <div style="font-size:11px;color:#9ca3af;">scheduled</div>
+              <div style="font-size:11px;color:#9ca3af;">scheduled in period</div>
             </td>
           </tr>
         </table>
