@@ -387,8 +387,10 @@ export function renderPipelineHtml(
       }
       @page { margin: 10mm 8mm; }` : ''}
       @media (max-width: 600px) {
-        .pos-name { max-width: 45px !important; width: 45px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 10px !important; }
-        .col-stage { width: 26px !important; min-width: 26px !important; padding: 3px 1px !important; font-size: 10px !important; }
+        .pos-name { max-width: 45px !important; width: 45px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 8px !important; }
+        .col-stage { width: 26px !important; min-width: 26px !important; padding: 2px 1px !important; font-size: 8px !important; }
+        th { font-size: 8px !important; padding: 2px 1px !important; }
+        td { font-size: 8px !important; padding: 2px 1px !important; }
       }
     </style>` : ''
 
