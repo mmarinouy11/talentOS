@@ -314,7 +314,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
     <col><col>
   </colgroup>`
 
-  const mThBase = `padding:2px 1px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:9px;text-align:center;color:#6b7280;text-transform:uppercase;background:#f9fafb;`
+  const mThBase = `padding:2px 1px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:7px;text-align:center;color:#6b7280;text-transform:uppercase;background:#f9fafb;`
   const mThLeft = mThBase.replace('text-align:center', 'text-align:left')
   const mColgroup = `<colgroup>
     <col style="width:22%;">
