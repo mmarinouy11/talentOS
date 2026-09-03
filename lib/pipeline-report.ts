@@ -184,9 +184,9 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   if (data.clients.length === 0) return ''
 
   const colCount = SUMMARY_STAGES.length + 3 // Position (w/ HC) + stage cols + NMF + Total Processed
-  const STAGE_COL_W = emailMode ? '40px' : '52px'
-  const SUMMARY_COL_W = emailMode ? '44px' : '64px'
-  const POS_COL_W = emailMode ? '120px' : '160px'
+  const STAGE_COL_W = emailMode ? '32px' : '52px'
+  const SUMMARY_COL_W = emailMode ? '32px' : '64px'
+  const POS_COL_W = emailMode ? '80px' : '160px'
 
   const thBase = `padding:4px 4px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:#f9fafb;`
   const thLeft = thBase.replace('text-align:center', 'text-align:left')
@@ -223,15 +223,15 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         return `<span style="font-size:11px;color:#f59e0b;">◐ ${frac}</span>`
       })()
 
-      const stPad = emailMode ? '4px 3px' : '4px 6px'
-      const stFSize = emailMode ? '12px' : '13px'
+      const stPad = emailMode ? '3px 2px' : '4px 6px'
+      const stFSize = emailMode ? '10px' : '13px'
       const stageCells = SUMMARY_STAGES.map((s) => {
         const n = stageMap[s.key] ?? 0
         return `<td class="col-stage" style="padding:${stPad};border:1px solid #e5e7eb;font-size:${stFSize};text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
       }).join('')
 
       const posLink = emailMode
-        ? `<span class="pos-name" style="display:block;font-size:12px;font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${POS_COL_W};" title="${esc(pos.title)}">${esc(pos.title)}</span>`
+        ? `<span class="pos-name" style="display:block;font-size:10px;font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${POS_COL_W};width:${POS_COL_W};" title="${esc(pos.title)}">${esc(pos.title)}</span>`
         : `<a href="/positions/${pos.id}" class="pos-name" style="display:block;font-size:13px;font-weight:500;color:#111827;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}" target="_blank">${esc(pos.title)}</a>`
 
       bodyRows.push(`<tr>
@@ -246,8 +246,8 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
     }
   }
 
-  const tfPad = emailMode ? '4px 3px' : '4px 6px'
-  const tfFSize = emailMode ? '12px' : '13px'
+  const tfPad = emailMode ? '3px 2px' : '4px 6px'
+  const tfFSize = emailMode ? '10px' : '13px'
   const totalCells = SUMMARY_STAGES.map((s) => {
     const n = totals[s.key] ?? 0
     return `<td class="col-stage" style="padding:${tfPad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${tfFSize};text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
@@ -263,7 +263,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   return `
     <div style="margin-bottom:32px;overflow-x:auto;">
       <h2 style="margin:0 0 10px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">All Open Positions</h2>
-      <table style="border-collapse:collapse;width:100%;table-layout:fixed;min-width:0;">
+      <table style="border-collapse:collapse;width:100%;table-layout:fixed;min-width:0;${emailMode ? 'font-size:10px;' : ''}">
         ${colgroup}
         <thead>
           <tr>
