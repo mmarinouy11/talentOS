@@ -387,7 +387,7 @@ export function renderPipelineHtml(
       }
       @page { margin: 10mm 8mm; }` : ''}
       @media (max-width: 600px) {
-        .pos-name { max-width: 80px !important; font-size: 11px !important; }
+        .pos-name { max-width: 60px !important; font-size: 11px !important; }
         .col-stage { width: 28px !important; min-width: 28px !important; padding: 3px 2px !important; font-size: 11px !important; }
       }
     </style>` : ''
