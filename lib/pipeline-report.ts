@@ -379,12 +379,15 @@ export function renderPipelineHtml(
         body { margin: 0; }
         .no-print { display: none !important; }
       }
-      @page { margin: 20mm 15mm; }
+      @page { margin: 10mm 8mm; }
+      @media print {
+        .report-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+      }
     </style>` : ''
 
   const container = emailMode
-    ? `style="max-width:600px;margin:0 auto;padding:24px;${font};"`
-    : `style="max-width:820px;margin:0 auto;padding:32px 24px;${font};"`
+    ? `style="max-width:600px;margin:0 auto;padding:16px;${font};"`
+    : `class="report-container" style="max-width:820px;margin:0 auto;padding:16px 12px;${font};"`
 
   return `
     ${printStyles}

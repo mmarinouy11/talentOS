@@ -69,7 +69,7 @@ export default async function DashboardLayout({
 
       <main className="flex-1 flex flex-col">
         {!gmailConnected && <GmailReminderBanner />}
-        <div className="px-4 py-6 md:p-8 flex-1">{children}</div>
+        <div className="px-2 py-4 md:px-4 md:py-8 flex-1">{children}</div>
       </main>
     </div>
   )
