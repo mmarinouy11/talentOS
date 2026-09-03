@@ -323,7 +323,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
   </colgroup>`
 
   const desktopTable = `
-    <div class="desktop-table" style="display:none;">
+    <div class="desktop-table" style="display:block;">
       ${heading}
       <table style="border-collapse:collapse;width:100%;table-layout:fixed;">
         ${dColgroup}
@@ -339,7 +339,7 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
     </div>`
 
   const mobileTable = `
-    <div class="mobile-table" style="display:block;">
+    <div class="mobile-table" style="display:none;">
       ${heading}
       <table style="border-collapse:collapse;width:100%;table-layout:fixed;font-size:9px;">
         ${mColgroup}
@@ -450,11 +450,9 @@ export function renderPipelineHtml(
       }
       @page { margin: 10mm 8mm; }` : ''}
       ${emailMode ? `
-      .desktop-table { display: none !important; }
-      .mobile-table { display: block !important; }
-      @media only screen and (min-width: 601px) {
-        .desktop-table { display: block !important; }
-        .mobile-table { display: none !important; }
+      @media only screen and (max-width: 600px) {
+        .desktop-table { display: none !important; }
+        .mobile-table { display: block !important; }
       }` : ''}
     </style>` : ''
 
