@@ -183,15 +183,16 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
 function buildOverviewTable(data: PipelineReportData, emailMode: boolean): string {
   if (data.clients.length === 0) return ''
 
-  const colCount = SUMMARY_STAGES.length + 3
+  const webColCount = SUMMARY_STAGES.length + 3  // web table column count for client header colspan
 
   // Compute totals in a single pass
   const totals: Record<string, number> = {}
-  let totalNmf = 0, totalProcessed = 0, totalHired = 0, totalHeadcount = 0
+  let totalActive = 0, totalNmf = 0, totalProcessed = 0, totalHired = 0, totalHeadcount = 0
   for (const client of data.clients) {
     for (const pos of client.positions) {
       const sm: Record<string, number> = {}
       for (const s of pos.pipelineStages) sm[s.stage] = s.count
+      totalActive += pos.pipelineStages.reduce((sum, s) => sum + s.count, 0)
       totalNmf += pos.notMovingForward
       totalProcessed += pos.totalProcessed
       for (const s of SUMMARY_STAGES) totals[s.key] = (totals[s.key] ?? 0) + (sm[s.key] ?? 0)
@@ -199,59 +200,13 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
       totalHeadcount += pos.headcount
     }
   }
+  totals['INT'] = (totals['TECHNICAL_INTERVIEW'] ?? 0) + (totals['MANAGER_INTERVIEW'] ?? 0)
 
   function hcSpan(hired: number, hc: number, fSize: string, ml = '4px'): string {
     const frac = `${hired}/${hc}`
     if (hired === 0) return `<span style="font-size:${fSize};color:#9ca3af;margin-left:${ml};">○ ${frac}</span>`
     if (hired >= hc) return `<span style="font-size:${fSize};color:#2F2C29;font-weight:500;margin-left:${ml};">✓ ${frac}</span>`
     return `<span style="font-size:${fSize};color:#f59e0b;margin-left:${ml};">◐ ${frac}</span>`
-  }
-
-  function buildRows(mobile: boolean): string {
-    const pad = mobile ? '2px 1px' : '4px 6px'
-    const fSize = mobile ? '9px' : '11px'
-    const hcFs = mobile ? '8px' : '10px'
-    const clientPad = mobile ? '3px 4px' : '6px 10px'
-    const clientFs = mobile ? '10px' : '12px'
-    const rows: string[] = []
-    for (const client of data.clients) {
-      rows.push(`<tr><td colspan="${colCount}" style="padding:${clientPad};border:1px solid #e5e7eb;background:#f9fafb;border-left:3px solid ${LIME};font-size:${clientFs};font-weight:700;color:#374151;">${esc(client.client)}</td></tr>`)
-      for (const pos of client.positions) {
-        const sm: Record<string, number> = {}
-        for (const s of pos.pipelineStages) sm[s.stage] = s.count
-        const posHired = sm['HIRED'] ?? 0
-        const stageCells = SUMMARY_STAGES.map((s) => {
-          const n = sm[s.key] ?? 0
-          return `<td style="padding:${pad};border:1px solid #e5e7eb;font-size:${fSize};text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
-        }).join('')
-        rows.push(`<tr>
-          <td style="padding:${mobile ? '2px 2px 2px 4px' : '4px 4px 4px 8px'};border:1px solid #e5e7eb;overflow:hidden;">
-            <span style="display:block;font-size:${fSize};font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}">${esc(pos.title)}</span>
-            ${hcSpan(posHired, pos.headcount, hcFs)}
-          </td>
-          ${stageCells}
-          <td style="padding:${pad};border:1px solid #e5e7eb;font-size:${fSize};text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
-          <td style="padding:${pad};border:1px solid #e5e7eb;font-size:${fSize};text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
-        </tr>`)
-      }
-    }
-    return rows.join('')
-  }
-
-  function buildTfoot(mobile: boolean): string {
-    const pad = mobile ? '2px 1px' : '4px 6px'
-    const fSize = mobile ? '9px' : '11px'
-    const hcFs = mobile ? '8px' : '10px'
-    const cells = SUMMARY_STAGES.map((s) => {
-      const n = totals[s.key] ?? 0
-      return `<td style="padding:${pad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${fSize};text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
-    }).join('')
-    return `<tfoot><tr>
-      <td style="padding:${pad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${fSize};font-weight:700;color:#111827;background:#f9fafb;">Totals${hcSpan(totalHired, totalHeadcount, hcFs)}</td>
-      ${cells}
-      <td style="padding:${pad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${fSize};text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
-      <td style="padding:${pad};border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:${fSize};text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
-    </tr></tfoot>`
   }
 
   const heading = `<h2 style="margin:0 0 8px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">All Open Positions</h2>`
@@ -265,10 +220,9 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
       ${SUMMARY_STAGES.map(() => `<col style="width:52px;">`).join('')}
       <col style="width:64px;"><col style="width:64px;">
     </colgroup>`
-    // Re-build web rows with links
     const webRows: string[] = []
     for (const client of data.clients) {
-      webRows.push(`<tr><td colspan="${colCount}" style="padding:6px 10px;border:1px solid #e5e7eb;background:#f9fafb;border-left:3px solid ${LIME};font-size:12px;font-weight:700;color:#374151;">${esc(client.client)}</td></tr>`)
+      webRows.push(`<tr><td colspan="${webColCount}" style="padding:6px 10px;border:1px solid #e5e7eb;background:#f9fafb;border-left:3px solid ${LIME};font-size:12px;font-weight:700;color:#374151;">${esc(client.client)}</td></tr>`)
       for (const pos of client.positions) {
         const sm: Record<string, number> = {}
         for (const s of pos.pipelineStages) sm[s.stage] = s.count
@@ -288,6 +242,10 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
         </tr>`)
       }
     }
+    const webTotals = SUMMARY_STAGES.map((s) => {
+      const n = totals[s.key] ?? 0
+      return `<td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
+    }).join('')
     return `
       <div style="margin-bottom:32px;overflow-x:auto;">
         ${heading}
@@ -300,61 +258,92 @@ function buildOverviewTable(data: PipelineReportData, emailMode: boolean): strin
             <th style="${thBase}">Total</th>
           </tr></thead>
           <tbody>${webRows.join('')}</tbody>
-          ${buildTfoot(false)}
+          <tfoot><tr>
+            <td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;font-weight:700;color:#111827;background:#f9fafb;">Totals${hcSpan(totalHired, totalHeadcount, '11px')}</td>
+            ${webTotals}
+            <td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
+            <td style="padding:4px 6px;border:1px solid #e5e7eb;border-top:2px solid ${LIME};font-size:13px;text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
+          </tr></tfoot>
         </table>
       </div>`
   }
 
-  // Email mode: two tables — mobile default visible, desktop hidden (shown via CSS for real clients)
-  const dThBase = `padding:4px 4px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;background:#f9fafb;`
-  const dThLeft = dThBase.replace('text-align:center', 'text-align:left')
-  const dColgroup = `<colgroup>
-    <col style="width:200px;">
-    ${SUMMARY_STAGES.map(() => `<col>`).join('')}
-    <col><col>
+  // Email mode: single table, full inline styles, no CSS classes
+  // Columns: Position | Offer | Client | Int (Tech+Mgr) | Screen | Pipe | Active | Not Fwd | Total
+  const EMAIL_COLS = [
+    { key: 'OFFER', label: 'Offer' },
+    { key: 'CLIENT_INTERVIEW', label: 'Client' },
+    { key: 'INT', label: 'Int' },
+    { key: 'SCREENING', label: 'Screen' },
+    { key: 'APPLIED', label: 'Pipe' },
+  ]
+  const emailColCount = 1 + EMAIL_COLS.length + 3  // pos + 5 stage + active + nmf + total = 9
+
+  const thS = `padding:3px 2px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:10px;text-align:center;color:#6b7280;text-transform:uppercase;background:#f9fafb;white-space:nowrap;`
+  const thSL = thS.replace('text-align:center', 'text-align:left')
+  const tdPad = '3px 2px'
+  const tdFs = '11px'
+  const tdBorder = '1px solid #e5e7eb'
+
+  const emailRows: string[] = []
+  for (const client of data.clients) {
+    emailRows.push(`<tr><td colspan="${emailColCount}" style="padding:4px 6px;border:${tdBorder};background:#f9fafb;border-left:3px solid ${LIME};font-size:11px;font-weight:700;color:#374151;">${esc(client.client)}</td></tr>`)
+    for (const pos of client.positions) {
+      const sm: Record<string, number> = {}
+      for (const s of pos.pipelineStages) sm[s.stage] = s.count
+      sm['INT'] = (sm['TECHNICAL_INTERVIEW'] ?? 0) + (sm['MANAGER_INTERVIEW'] ?? 0)
+      const posHired = sm['HIRED'] ?? 0
+      const posActive = pos.pipelineStages.reduce((sum, s) => sum + s.count, 0)
+      const stageCells = EMAIL_COLS.map(({ key }) => {
+        const n = sm[key] ?? 0
+        return `<td style="padding:${tdPad};border:${tdBorder};font-size:${tdFs};text-align:center;color:${n > 0 ? '#111827' : '#d1d5db'};font-weight:${n > 0 ? '600' : '400'};">${n > 0 ? n : '—'}</td>`
+      }).join('')
+      emailRows.push(`<tr>
+        <td style="padding:3px 3px 3px 6px;border:${tdBorder};overflow:hidden;width:20%;">
+          <span style="display:block;font-size:${tdFs};font-weight:500;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(pos.title)}">${esc(pos.title)}</span>
+          ${hcSpan(posHired, pos.headcount, '10px', '0px')}
+        </td>
+        ${stageCells}
+        <td style="padding:${tdPad};border:${tdBorder};font-size:${tdFs};text-align:center;font-weight:600;color:#111827;">${posActive || '—'}</td>
+        <td style="padding:${tdPad};border:${tdBorder};font-size:${tdFs};text-align:center;font-weight:400;color:#9ca3af;">${pos.notMovingForward || '—'}</td>
+        <td style="padding:${tdPad};border:${tdBorder};font-size:${tdFs};text-align:center;font-weight:500;color:#6b7280;">${pos.totalProcessed || '—'}</td>
+      </tr>`)
+    }
+  }
+
+  const emailTotalCells = EMAIL_COLS.map(({ key }) => {
+    const n = totals[key] ?? 0
+    return `<td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};text-align:center;font-weight:700;color:#111827;background:#f9fafb;">${n > 0 ? n : '—'}</td>`
+  }).join('')
+
+  const colgroup = `<colgroup>
+    <col style="width:20%;">
+    ${EMAIL_COLS.map(() => `<col style="width:7%;">`).join('')}
+    <col style="width:8%;"><col style="width:8%;"><col style="width:8%;">
   </colgroup>`
 
-  const mThBase = `padding:2px 1px;border:1px solid #e5e7eb;border-bottom:2px solid ${LIME};font-size:6px;text-align:center;color:#6b7280;text-transform:uppercase;background:#f9fafb;`
-  const mThLeft = mThBase.replace('text-align:center', 'text-align:left')
-  const mColgroup = `<colgroup>
-    <col style="width:22%;">
-    ${SUMMARY_STAGES.map(() => `<col style="width:6%;">`).join('')}
-    <col style="width:7%;"><col style="width:7%;">
-  </colgroup>`
-
-  const desktopTable = `
-    <div class="desktop-table" style="display:block;">
+  return `
+    <div style="margin-bottom:32px;">
       ${heading}
       <table style="border-collapse:collapse;width:100%;table-layout:fixed;">
-        ${dColgroup}
+        ${colgroup}
         <thead><tr>
-          <th style="${dThLeft}">Position</th>
-          ${SUMMARY_STAGES.map((s) => `<th style="${dThBase}">${esc(s.label)}</th>`).join('')}
-          <th style="${dThBase}">Not Fwd</th>
-          <th style="${dThBase}">Total</th>
+          <th style="${thSL}">Position</th>
+          ${EMAIL_COLS.map(({ label }) => `<th style="${thS}">${esc(label)}</th>`).join('')}
+          <th style="${thS}">Active</th>
+          <th style="${thS}">Not Fwd</th>
+          <th style="${thS}">Total</th>
         </tr></thead>
-        <tbody>${buildRows(false)}</tbody>
-        ${buildTfoot(false)}
+        <tbody>${emailRows.join('')}</tbody>
+        <tfoot><tr>
+          <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};font-weight:700;color:#111827;background:#f9fafb;">Totals${hcSpan(totalHired, totalHeadcount, '10px')}</td>
+          ${emailTotalCells}
+          <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};text-align:center;font-weight:600;color:#111827;background:#f9fafb;">${totalActive || '—'}</td>
+          <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};text-align:center;font-weight:400;color:#9ca3af;background:#f9fafb;">${totalNmf}</td>
+          <td style="padding:${tdPad};border:${tdBorder};border-top:2px solid ${LIME};font-size:${tdFs};text-align:center;font-weight:500;color:#6b7280;background:#f9fafb;">${totalProcessed}</td>
+        </tr></tfoot>
       </table>
     </div>`
-
-  const mobileTable = `
-    <div class="mobile-table" style="display:none;">
-      ${heading}
-      <table style="border-collapse:collapse;width:100%;table-layout:fixed;font-size:9px;">
-        ${mColgroup}
-        <thead><tr>
-          <th style="${mThLeft}">Position</th>
-          ${SUMMARY_STAGES.map((s) => `<th style="${mThBase}">${esc(s.label)}</th>`).join('')}
-          <th style="${mThBase}">Not Fwd</th>
-          <th style="${mThBase}">Total</th>
-        </tr></thead>
-        <tbody>${buildRows(true)}</tbody>
-        ${buildTfoot(true)}
-      </table>
-    </div>`
-
-  return `<div style="margin-bottom:32px;">${desktopTable}${mobileTable}</div>`
 }
 
 export function renderPipelineHtml(
@@ -449,11 +438,6 @@ export function renderPipelineHtml(
         .report-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
       }
       @page { margin: 10mm 8mm; }` : ''}
-      ${emailMode ? `
-      @media only screen and (max-width: 600px) {
-        .desktop-table { display: none !important; }
-        .mobile-table { display: block !important; }
-      }` : ''}
     </style>` : ''
 
   const container = emailMode
