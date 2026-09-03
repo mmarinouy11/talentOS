@@ -42,6 +42,7 @@ export default async function EditPositionPage({
         <PositionForm
           users={users}
           mode="edit"
+          isAdmin={isAdmin}
           defaultValues={{
             id: position.id,
             title: position.title,
