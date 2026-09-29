@@ -31,6 +31,17 @@ function daysAgo(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+function isPositionDone(
+  candidatePositions: { stage: string; startDate: Date | null }[],
+  headcount: number | null,
+  todayEnd: Date,
+): boolean {
+  const hc = headcount ?? 1
+  const hiredCPs = candidatePositions.filter((cp) => cp.stage === 'HIRED')
+  if (hiredCPs.length < hc) return false
+  return hiredCPs.every((cp) => cp.startDate !== null && cp.startDate <= todayEnd)
+}
+
 function sourceLabel(type: SourceType | null): string {
   if (type === 'VENDOR') return 'Partner'
   if (type === 'RECRUITER') return 'Internal'
@@ -56,15 +67,28 @@ export async function GET(request: Request) {
   const client = searchParams.get('client')
   const mode = searchParams.get('mode') // 'pipeline' (default) | 'activity' | 'dashboard'
 
-  // No client param → return list of unique clients
+  // No client param → return list of unique clients (excluding done positions)
   if (!client) {
-    const positions = await db.position.findMany({
+    const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
+    const allPositions = await db.position.findMany({
       where: { deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
-      select: { client: true },
-      distinct: ['client'],
+      select: {
+        client: true,
+        headcount: true,
+        candidatePositions: {
+          where: { stage: 'HIRED', candidate: { deletedAt: null } },
+          select: { stage: true, startDate: true },
+        },
+      },
       orderBy: { client: 'asc' },
     })
-    return NextResponse.json({ clients: positions.map((p) => p.client) })
+    const seen = new Set<string>()
+    const clients: string[] = []
+    for (const p of allPositions) {
+      if (isPositionDone(p.candidatePositions, p.headcount, todayEnd)) continue
+      if (!seen.has(p.client)) { seen.add(p.client); clients.push(p.client) }
+    }
+    return NextResponse.json({ clients })
   }
 
   // Dashboard mode
@@ -96,8 +120,10 @@ export async function GET(request: Request) {
 
     const now = new Date()
 
-    const result = positions.map((pos) => {
+    const result = positions.flatMap((pos) => {
       const allCPs = pos.candidatePositions
+      const hiredCPs = allCPs.filter((cp) => cp.stage === 'HIRED')
+      if (isPositionDone(hiredCPs, pos.headcount, todayEnd)) return []
       const activeCPs = allCPs.filter((cp) => !isCandidateInactive(cp))
 
       // Stage counts (active only, relevant stages)
@@ -151,7 +177,14 @@ export async function GET(request: Request) {
             }),
         }))
 
-      return {
+      const ytjCPs = hiredCPs.filter((cp) => cp.startDate !== null && cp.startDate > todayEnd)
+      const ytjCount = ytjCPs.length
+      const ytjCandidates = ytjCPs.map((cp) => ({
+        cpId: cp.id,
+        name: `${cp.candidate.firstName} ${cp.candidate.lastName}`,
+      }))
+
+      return [{
         id: pos.id,
         title: pos.title,
         recruiter: pos.recruiter.name ?? pos.recruiter.email,
@@ -161,7 +194,9 @@ export async function GET(request: Request) {
         interviewsToday,
         interviewsTotal,
         candidatesByStage,
-      }
+        ytjCount,
+        ytjCandidates,
+      }]
     })
 
     return NextResponse.json({ client, positions: result, generatedAt: new Date().toISOString() })
@@ -171,11 +206,21 @@ export async function GET(request: Request) {
   if (mode === 'analytics') {
     const ANALYTICS_STAGES: Stage[] = ['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED']
 
-    const positions = await db.position.findMany({
+    const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
+    const allAnalyticsPositions = await db.position.findMany({
       where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
-      select: { id: true },
+      select: {
+        id: true,
+        headcount: true,
+        candidatePositions: {
+          where: { stage: 'HIRED', candidate: { deletedAt: null } },
+          select: { stage: true, startDate: true },
+        },
+      },
     })
-    const positionIds = positions.map((p) => p.id)
+    const positionIds = allAnalyticsPositions
+      .filter((p) => !isPositionDone(p.candidatePositions, p.headcount, todayEnd))
+      .map((p) => p.id)
 
     if (positionIds.length === 0) {
       return NextResponse.json({ client, funnel: [], timeToStage: [], timeInStage: [], generatedAt: new Date().toISOString() })
@@ -258,10 +303,22 @@ export async function GET(request: Request) {
     const fromDate = fromParam ? new Date(fromParam) : new Date(new Date().setHours(0, 0, 0, 0))
     const toDate = toParam ? new Date(toParam) : new Date(new Date().setHours(23, 59, 59, 999))
 
-    const positions = await db.position.findMany({
+    const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
+    const allActivityPositions = await db.position.findMany({
       where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        headcount: true,
+        candidatePositions: {
+          where: { stage: 'HIRED', candidate: { deletedAt: null } },
+          select: { stage: true, startDate: true },
+        },
+      },
     })
+    const positions = allActivityPositions.filter(
+      (p) => !isPositionDone(p.candidatePositions, p.headcount, todayEnd)
+    )
     const positionIds = positions.map((p) => p.id)
     const posMap = new Map(positions.map((p) => [p.id, p.title]))
 
@@ -347,8 +404,9 @@ export async function GET(request: Request) {
   }
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const pipelineTodayEnd = new Date(); pipelineTodayEnd.setUTCHours(23, 59, 59, 999)
 
-  const positions = await db.position.findMany({
+  const allPipelinePositions = await db.position.findMany({
     where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
     include: {
       recruiter: { select: { name: true, email: true } },
@@ -378,6 +436,10 @@ export async function GET(request: Request) {
     },
     orderBy: { createdAt: 'desc' },
   })
+
+  const positions = allPipelinePositions.filter(
+    (p) => !isPositionDone(p.candidatePositions, p.headcount, pipelineTodayEnd)
+  )
 
   const result = positions.map((pos) => {
     const allCPs = pos.candidatePositions

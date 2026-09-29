@@ -19,6 +19,8 @@ interface DashboardPosition {
   stageCounts: Partial<Record<string, number>>
   interviewsToday: number; interviewsTotal: number
   candidatesByStage: DashboardStageGroup[]
+  ytjCount: number
+  ytjCandidates: { cpId: string; name: string }[]
 }
 interface DashboardData {
   client: string
@@ -34,7 +36,7 @@ function HcCell({ hired, headcount, className = '' }: { hired: number; headcount
 
 const DASH_STAGES = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED'] as const
 const DASH_COL_LABELS: Record<string, string> = {
-  HIRED: 'Hired', OFFER: 'Offer', CLIENT_INTERVIEW: 'Client', MANAGER_INTERVIEW: 'Mgr',
+  HIRED: 'Hired / YTJ', OFFER: 'Offer', CLIENT_INTERVIEW: 'Client', MANAGER_INTERVIEW: 'Mgr',
   TECHNICAL_INTERVIEW: 'Tech', SCREENING: 'Screen', APPLIED: 'Pipeline',
 }
 
@@ -93,11 +95,20 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
         <td className="py-2.5 px-2 text-center text-sm"><HcCell hired={pos.stageCounts['HIRED'] ?? 0} headcount={pos.headcount} /></td>
         {DASH_STAGES.map((s) => (
           <td key={s} className="py-2.5 px-2 text-center text-sm">
-            {pos.stageCounts[s] ? (
-              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-lime-100 text-lime-800 font-semibold text-xs">
-                {pos.stageCounts[s]}
-              </span>
-            ) : <span className="text-gray-300">—</span>}
+            {s === 'HIRED' ? (
+              pos.stageCounts[s] ? (
+                <span className="text-xs font-medium text-gray-700">
+                  {pos.stageCounts[s]}
+                  {pos.ytjCount > 0 && <span className="text-indigo-600"> / {pos.ytjCount}</span>}
+                </span>
+              ) : <span className="text-gray-300">—</span>
+            ) : (
+              pos.stageCounts[s] ? (
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-lime-100 text-lime-800 font-semibold text-xs">
+                  {pos.stageCounts[s]}
+                </span>
+              ) : <span className="text-gray-300">—</span>
+            )}
           </td>
         ))}
         <td className="py-2.5 px-2 text-center text-sm text-gray-700">{totalActive || '—'}</td>
@@ -116,7 +127,20 @@ function DashboardRow({ pos }: { pos: DashboardPosition }) {
         <tr className="bg-gray-50 border-b border-gray-100">
           <td colSpan={DASH_STAGES.length + 5} className="px-4 py-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Active Candidates</p>
-            {pos.candidatesByStage.length === 0
+            {pos.ytjCount > 0 && (
+              <div className="mb-2">
+                <p className="text-xs font-medium text-indigo-600 mb-1">Yet To Join ({pos.ytjCount})</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {pos.ytjCandidates.map((c) => (
+                    <Link key={c.cpId} href={`/positions/${pos.id}/candidates/${c.cpId}`} target="_blank"
+                      className="inline-flex items-center text-xs bg-indigo-50 border border-indigo-200 rounded px-2 py-0.5 hover:border-indigo-400">
+                      {c.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+            {pos.candidatesByStage.length === 0 && pos.ytjCount === 0
               ? <p className="text-xs text-gray-400">No active candidates</p>
               : pos.candidatesByStage.map((sg) => (
                 <div key={sg.stage} className="mb-2">
@@ -213,11 +237,23 @@ function DashboardTab({ client }: { client: string }) {
                   headcount={data.positions.reduce((s, p) => s + p.headcount, 0)}
                 />
               </td>
-              {DASH_STAGES.map((s) => (
-                <td key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
-                  {totals[s] || '—'}
-                </td>
-              ))}
+              {DASH_STAGES.map((s) => {
+                if (s === 'HIRED') {
+                  const totalYtj = data.positions.reduce((sum, p) => sum + p.ytjCount, 0)
+                  return (
+                    <td key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
+                      {totals[s] ? (
+                        <span>{totals[s]}{totalYtj > 0 && <span className="text-indigo-600"> / {totalYtj}</span>}</span>
+                      ) : '—'}
+                    </td>
+                  )
+                }
+                return (
+                  <td key={s} className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">
+                    {totals[s] || '—'}
+                  </td>
+                )
+              })}
               <td className="py-2.5 px-2 text-center text-xs font-semibold text-gray-700">{grandTotal || '—'}</td>
               <td className="py-2.5 px-2 text-center text-xs font-semibold text-blue-700">{ivsToday || '—'}</td>
               <td />
