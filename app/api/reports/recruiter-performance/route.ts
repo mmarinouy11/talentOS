@@ -84,6 +84,7 @@ export async function GET(req: NextRequest) {
         NOT: [
           { status: { in: ['CLOSED', 'FILLED'] }, updatedAt: { lt: monthStart } },
           { status: 'CANCELLED', cancelledAt: { lt: monthStart } },
+          { status: 'CANCELLED', cancelledAt: null },
         ],
       },
       select: {
