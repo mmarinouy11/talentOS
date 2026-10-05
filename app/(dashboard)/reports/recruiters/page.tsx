@@ -24,7 +24,7 @@ interface RecruiterKPI {
   closures: { count: number; target: number; isLowDemand: boolean; isNA: boolean }
   starts: { count: number }
   drillDown: {
-    positions: { id: string; title: string; status: string; headcount: number; kickoff: string; firstSLA: SlaResult; shortlistSLA: SlaResult }[]
+    positions: { id: string; title: string; status: string; headcount: number; kickoff: string; firstSLA: SlaResult; shortlistSLA: SlaResult; activityOnly: boolean }[]
     qualifiedCandidates: (CandRef & { date: string })[]
     closuresList: (CandRef & { hireDate: string; startDate: string | null })[]
     startsList: (CandRef & { startDate: string })[]
@@ -138,8 +138,8 @@ function DrillDown({ r }: { r: RecruiterKPI }) {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Positions (assigned)</p>
-        {d.positions.length === 0 ? <p className="text-sm text-gray-400">No assigned positions.</p> : (
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Positions (assigned + with activity)</p>
+        {d.positions.length === 0 ? <p className="text-sm text-gray-400">No positions.</p> : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-400 border-b border-gray-200">
@@ -150,7 +150,9 @@ function DrillDown({ r }: { r: RecruiterKPI }) {
             <tbody className="divide-y divide-gray-100">
               {d.positions.map((p) => (
                 <tr key={p.id}>
-                  <td className="py-1.5 pr-4"><Link href={`/positions/${p.id}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{p.title}</Link></td>
+                  <td className="py-1.5 pr-4"><Link href={`/positions/${p.id}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{p.title}</Link>
+                    {p.activityOnly && <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">activity only</span>}
+                  </td>
                   <td className="py-1.5 pr-4 text-gray-500 text-xs">{p.status}</td>
                   <td className="py-1.5 pr-4 text-gray-700">{p.headcount}</td>
                   <td className="py-1.5 pr-4 text-gray-500">{fmtDate(p.kickoff)}</td>

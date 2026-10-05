@@ -81,7 +81,10 @@ export async function GET(req: NextRequest) {
         recruiterId: { in: recruiterIds },
         deletedAt: null,
         createdAt: { lte: monthEnd },
-        status: { notIn: ['CANCELLED'] },
+        NOT: [
+          { status: { in: ['CLOSED', 'FILLED'] }, updatedAt: { lt: monthStart } },
+          { status: 'CANCELLED', cancelledAt: { lt: monthStart } },
+        ],
       },
       select: {
         id: true, title: true, status: true, headcount: true,
@@ -122,6 +125,13 @@ export async function GET(req: NextRequest) {
       if (!activityMap.has(row.recruiterId)) activityMap.set(row.recruiterId, new Set())
       activityMap.get(row.recruiterId)!.add(row.positionId)
     }
+    const activityPosIds = [...new Set([...activityMap.values()].flatMap((s) => [...s]))]
+    const activityPositions = activityPosIds.length > 0 ? await db.position.findMany({
+      where: { id: { in: activityPosIds }, deletedAt: null },
+      select: { id: true, title: true, status: true, headcount: true, createdAt: true },
+    }) : []
+    type ActivityPos = { id: string; title: string; status: string; headcount: number | null; createdAt: Date }
+    const activityPosById = new Map<string, ActivityPos>(activityPositions.map((p: ActivityPos) => [p.id, p]))
 
     // Qualified candidates in month: SCREENING ADVANCE, decidedAt fallback updatedAt in month
     const qualifiedRaw = await db.$queryRaw<{
@@ -374,8 +384,23 @@ export async function GET(req: NextRequest) {
           headcount: pos.headcount ?? 1,
           kickoff: kickoff.toISOString(),
           firstSLA, shortlistSLA,
+          activityOnly: false,
         }
       })
+      const assignedIds = new Set(myPositions.map((p) => p.id))
+      for (const pid of myActivityPosIds) {
+        if (assignedIds.has(pid)) continue
+        const pos = activityPosById.get(pid)
+        if (!pos) continue
+        drillPositions.push({
+          id: pos.id, title: pos.title, status: pos.status,
+          headcount: pos.headcount ?? 1,
+          kickoff: new Date(pos.createdAt).toISOString(),
+          firstSLA: { result: 'na', days: null },
+          shortlistSLA: { result: 'na', days: null },
+          activityOnly: true,
+        })
+      }
 
       // Activity section
       const sourcing = actSourcingMap.get(rid) ?? { manual: 0, direct: 0, partner: 0 }
