@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import type { PositionStatus } from '@prisma/client'
 
 function businessDaysBetween(from: Date, to: Date): number {
   if (to < from) return 0
@@ -131,7 +132,7 @@ export async function GET(req: NextRequest) {
       where: { id: { in: activityPosIds }, deletedAt: null },
       select: { id: true, title: true, status: true, headcount: true, createdAt: true },
     }) : []
-    type ActivityPos = { id: string; title: string; status: string; headcount: number | null; createdAt: Date }
+    type ActivityPos = { id: string; title: string; status: PositionStatus; headcount: number | null; createdAt: Date }
     const activityPosById = new Map<string, ActivityPos>(activityPositions.map((p: ActivityPos) => [p.id, p]))
 
     // Qualified candidates in month: SCREENING ADVANCE, decidedAt fallback updatedAt in month
