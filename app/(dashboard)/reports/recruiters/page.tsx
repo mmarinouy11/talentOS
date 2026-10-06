@@ -21,13 +21,16 @@ interface RecruiterKPI {
   qualified: { count: number; perActivePosition: number | null; pace: number | null; target: number }
   timeToSubmission: { first: SlaAgg; shortlist: SlaAgg }
   techPassRate: { rate: number | null; advances: number; total: number }
-  closures: { count: number; target: number; isLowDemand: boolean; isNA: boolean }
-  starts: { count: number }
+  closures: { count: number; target: number; stretch: number; isLowDemand: boolean; isNA: boolean }
+  achievement: {
+    score: number | null
+    naKpis: string[]
+    breakdown: { key: string; label: string; weight: number; attainment: number | null; effectiveWeight: number; contribution: number | null }[]
+  }
   drillDown: {
     positions: { id: string; title: string; status: string; headcount: number; kickoff: string; firstSLA: SlaResult; shortlistSLA: SlaResult; activityOnly: boolean }[]
     qualifiedCandidates: (CandRef & { date: string })[]
     closuresList: (CandRef & { hireDate: string; startDate: string | null })[]
-    startsList: (CandRef & { startDate: string })[]
   }
   activity: {
     manual: number; direct: number; partner: number
@@ -193,17 +196,34 @@ function DrillDown({ r }: { r: RecruiterKPI }) {
           )}
         </div>
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Starts this month ({d.startsList.length})</p>
-          {d.startsList.length === 0 ? <p className="text-sm text-gray-400">None.</p> : (
-            <ul className="space-y-1 text-sm">
-              {d.startsList.map((c) => (
-                <li key={c.cpId}>
-                  <Link href={`/positions/${c.positionId}/candidates/${c.cpId}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{c.name}</Link>
-                  <span className="text-gray-400"> · {c.positionTitle} · {fmtDate(c.startDate)}</span>
-                </li>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Achievement breakdown</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-400 border-b border-gray-200">
+                <th className={subTh}>KPI</th>
+                <th className="text-right py-1.5 font-medium">Attain.</th>
+                <th className="text-right py-1.5 font-medium">Weight</th>
+                <th className="text-right py-1.5 font-medium">Contrib.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {r.achievement.breakdown.map((b) => (
+                <tr key={b.key} className={b.attainment == null ? 'text-gray-400' : 'text-gray-700'}>
+                  <td className="py-1.5 pr-2">{b.label}</td>
+                  <td className="py-1.5 text-right tabular-nums">{b.attainment != null ? `${b.attainment}%` : 'N/A'}</td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {b.weight}%
+                    {b.attainment != null && b.effectiveWeight !== b.weight && <span className="text-gray-400 text-xs"> → {b.effectiveWeight}%</span>}
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums">{b.contribution != null ? `${b.contribution}` : '—'}</td>
+                </tr>
               ))}
-            </ul>
-          )}
+              <tr className="font-semibold text-gray-900">
+                <td className="py-1.5">Total</td><td /><td />
+                <td className="py-1.5 text-right tabular-nums">{r.achievement.score != null ? `${r.achievement.score}%` : 'N/A'}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -217,6 +237,7 @@ function ScorecardRow({ r, isCurrentMonth, open, onToggle }: { r: RecruiterKPI; 
     : ratioStatus(q.count, q.target)
   const t = r.techPassRate
   const c = r.closures
+  const a = r.achievement
 
   return (
     <>
@@ -249,11 +270,19 @@ function ScorecardRow({ r, isCurrentMonth, open, onToggle }: { r: RecruiterKPI; 
           {c.isNA ? <span className="text-gray-400">N/A</span> : (
             <div>
               <StatusIcon s={ratioStatus(c.count, c.target)} /> {c.count} / {c.target}
-              <div className="text-xs text-gray-400">{c.isLowDemand ? '(low demand)' : 'stretch 3'}</div>
+              {!c.isLowDemand && <span className="text-gray-400 text-xs"> · stretch {c.stretch}</span>}
+              {c.isLowDemand && <div className="text-xs text-gray-400">(low demand)</div>}
             </div>
           )}
         </td>
-        <td className="px-3 py-3 text-right tabular-nums text-gray-700">{r.starts.count || <Dash />}</td>
+        <td className="px-3 py-3 tabular-nums">
+          {a.score == null ? <span className="text-gray-400">N/A</span> : (
+            <div>
+              <StatusIcon s={a.score >= 90 ? 'met' : a.score >= 70 ? 'near' : 'below'} /> <span className="font-semibold">{a.score}%</span>
+              {a.naKpis.length > 0 && <div className="text-xs text-gray-400">N/A: {a.naKpis.join(', ')}</div>}
+            </div>
+          )}
+        </td>
         <td className="px-3 py-3 text-gray-400">{open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</td>
       </tr>
       {open && (
@@ -389,8 +418,7 @@ export default function RecruiterPerformancePage() {
   const totals = useMemo(() => data?.metrics.reduce((acc, r) => ({
     qualified: acc.qualified + r.qualified.count,
     closures: acc.closures + r.closures.count,
-    starts: acc.starts + r.starts.count,
-  }), { qualified: 0, closures: 0, starts: 0 }), [data])
+  }), { qualified: 0, closures: 0 }), [data])
 
   return (
     <div className="space-y-6">
@@ -426,20 +454,21 @@ export default function RecruiterPerformancePage() {
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th />
                     <th colSpan={3} className="px-3 pt-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest border-r border-gray-100">Demand</th>
-                    <th colSpan={5} className="px-3 pt-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">KPIs</th>
-                    <th colSpan={2} />
+                    <th className="px-3 pt-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">KPIs</th>
+                    <th colSpan={2} className="px-3 pt-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">Time to 1st submission · 25%</th>
+                    <th colSpan={4} />
                   </tr>
                   <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
                     <th className={`${th} text-left`}>Recruiter</th>
                     <th className={`${th} text-right`} title="Assigned positions open during the month">Assigned</th>
                     <th className={`${th} text-right`} title="Positions with candidate added, interview scheduled or decision in the month">Active</th>
                     <th className={`${th} text-right border-r border-gray-100`} title="Headcount of assigned positions minus hired">Open HC</th>
-                    <th className={`${th} text-left`}>Qualified</th>
-                    <th className={`${th} text-left`}>1st Submission</th>
+                    <th className={`${th} text-left`}>Qualified · 25%</th>
+                    <th className={`${th} text-left`}>1st Qualified</th>
                     <th className={`${th} text-left`}>Shortlist</th>
-                    <th className={`${th} text-left`}>Tech Pass</th>
-                    <th className={`${th} text-left`}>Closures</th>
-                    <th className={`${th} text-right`} title="Informational — hired candidates who started this month">Starts</th>
+                    <th className={`${th} text-left`} title="Passed ÷ completed tech evaluations (Advance/Reject) of recruiter-screened candidates">Tech Quality · 20%</th>
+                    <th className={`${th} text-left`}>Closures · 30%</th>
+                    <th className={`${th} text-left`} title="Weighted KPI attainment, each capped at 100%">Achievement</th>
                     <th className={th} />
                   </tr>
                 </thead>
@@ -462,8 +491,7 @@ export default function RecruiterPerformancePage() {
                       <td className="px-3 py-3 tabular-nums">{totals.qualified}</td>
                       <td /><td /><td />
                       <td className="px-3 py-3 tabular-nums">{totals.closures}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{totals.starts}</td>
-                      <td />
+                      <td /><td />
                     </tr>
                   </tfoot>
                 )}

@@ -3,6 +3,10 @@ import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import type { PositionStatus } from '@prisma/client'
 
+const QUALIFIED_TARGET = 30
+const TECH_TARGET = 0.6
+const WEIGHTS = { qualified: 0.25, sla: 0.25, tech: 0.2, closures: 0.3 }
+
 function businessDaysBetween(from: Date, to: Date): number {
   if (to < from) return 0
   let count = 0
@@ -167,7 +171,8 @@ export async function GET(req: NextRequest) {
       qualifiedByPos.get(row.positionId)!.push(new Date(row.decidedAt))
     }
 
-    // Tech pass rate: TECHNICAL_INTERVIEW decisions in month, attributed to cp.recruiterId
+    // Tech pass rate: completed tech evaluations (ADVANCE/REJECT) decided in month, for
+    // recruiter-screened candidates; excludes candidates who withdrew before the decision
     const techDecisionsRaw = await db.$queryRaw<{ recruiterId: string; decision: string }[]>`
       SELECT cp."recruiterId", i."decision"
       FROM "Interview" i
@@ -177,6 +182,17 @@ export async function GET(req: NextRequest) {
         AND COALESCE(i."decidedAt", i."updatedAt") >= ${monthStart}
         AND COALESCE(i."decidedAt", i."updatedAt") <= ${monthEnd}
         AND cp."recruiterId" IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM "Interview" s
+          WHERE s."candidatePositionId" = cp.id
+            AND s."stage" = 'SCREENING' AND s."decision" = 'ADVANCE'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM "StageHistory" sh
+          WHERE sh."candidatePositionId" = cp.id
+            AND sh."toStage" = 'WITHDRAWN'
+            AND sh."movedAt" < COALESCE(i."decidedAt", i."updatedAt")
+        )
     `
 
     // Closures: StageHistory toStage=HIRED in month
@@ -195,24 +211,6 @@ export async function GET(req: NextRequest) {
       JOIN "Position" p ON p.id = cp."positionId"
       WHERE sh."toStage" = 'HIRED'
         AND sh."movedAt" >= ${monthStart} AND sh."movedAt" <= ${monthEnd}
-        AND cp."recruiterId" IS NOT NULL
-    `
-
-    // Starts: cp.startDate in month and <= today (end of today)
-    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
-    const startsRaw = await db.$queryRaw<{
-      recruiterId: string; positionId: string; cpId: string
-      firstName: string; lastName: string; positionTitle: string; startDate: Date
-    }[]>`
-      SELECT cp."recruiterId", cp."positionId", cp.id as "cpId",
-             c."firstName", c."lastName", p."title" as "positionTitle",
-             cp."startDate"
-      FROM "CandidatePosition" cp
-      JOIN "Candidate" c ON c.id = cp."candidateId"
-      JOIN "Position" p ON p.id = cp."positionId"
-      WHERE cp."startDate" >= ${monthStart}
-        AND cp."startDate" <= ${monthEnd}
-        AND cp."startDate" <= ${todayEnd}
         AND cp."recruiterId" IS NOT NULL
     `
 
@@ -355,8 +353,32 @@ export async function GET(req: NextRequest) {
       const closureIsNA = openHeadcount === 0
       const closureIsLowDemand = !closureIsNA && openHeadcount < 2
 
-      // Starts
-      const myStarts = startsRaw.filter((s) => s.recruiterId === rid)
+      // Achievement: weighted attainment, each KPI capped at 100%, N/A weights re-normalized
+      const cap = (x: number) => Math.min(1, x)
+      const slaParts = [
+        firstTotal > 0 ? firstMet / firstTotal : null,
+        shortTotal > 0 ? shortMet / shortTotal : null,
+      ].filter((x): x is number => x != null)
+      const kpiParts: { key: string; label: string; weight: number; attainment: number | null }[] = [
+        { key: 'qualified', label: 'Qualified', weight: WEIGHTS.qualified, attainment: cap(qualifiedCount / QUALIFIED_TARGET) },
+        { key: 'sla', label: 'Time to 1st submission', weight: WEIGHTS.sla, attainment: slaParts.length > 0 ? cap(slaParts.reduce((a, b) => a + b, 0) / slaParts.length) : null },
+        { key: 'tech', label: 'Tech evaluation quality', weight: WEIGHTS.tech, attainment: techTotal > 0 ? cap(techAdvances / techTotal / TECH_TARGET) : null },
+        { key: 'closures', label: 'Closures', weight: WEIGHTS.closures, attainment: closureIsNA ? null : cap(closureCount / closureTarget) },
+      ]
+      const applicableWeight = kpiParts.reduce((s, k) => s + (k.attainment != null ? k.weight : 0), 0)
+      const breakdown = kpiParts.map((k) => {
+        const effectiveWeight = k.attainment != null && applicableWeight > 0 ? k.weight / applicableWeight : 0
+        return {
+          key: k.key, label: k.label,
+          weight: Math.round(k.weight * 100),
+          attainment: k.attainment != null ? Math.round(k.attainment * 100) : null,
+          effectiveWeight: Math.round(effectiveWeight * 1000) / 10,
+          contribution: k.attainment != null ? Math.round(k.attainment * effectiveWeight * 1000) / 10 : null,
+        }
+      })
+      const achievementScore = applicableWeight > 0
+        ? Math.round(kpiParts.reduce((s, k) => s + (k.attainment != null ? k.attainment * (k.weight / applicableWeight) : 0), 0) * 100)
+        : null
 
       // Drill-down
       const drillPositions = myPositions.map((pos) => {
@@ -434,21 +456,18 @@ export async function GET(req: NextRequest) {
           count: qualifiedCount,
           perActivePosition: qualifiedPerActive,
           pace,
-          target: 20,
+          target: QUALIFIED_TARGET,
         },
         timeToSubmission: {
           first: { pctMet: firstPctMet, avgDays: firstDaysN > 0 ? Math.round(firstDaysSum / firstDaysN * 10) / 10 : null, met: firstMet, missed: firstMissed, inProgress: firstInProgress },
           shortlist: { pctMet: shortPctMet, avgDays: shortDaysN > 0 ? Math.round(shortDaysSum / shortDaysN * 10) / 10 : null, met: shortMet, missed: shortMissed, inProgress: shortInProgress },
         },
         techPassRate: { rate: techPassRate, advances: techAdvances, total: techTotal },
-        closures: { count: closureCount, target: closureTarget, isLowDemand: closureIsLowDemand, isNA: closureIsNA },
-        starts: {
-          count: myStarts.length,
-          list: myStarts.map((s) => ({
-            name: `${s.firstName} ${s.lastName}`,
-            cpId: s.cpId, positionId: s.positionId, positionTitle: s.positionTitle,
-            startDate: new Date(s.startDate).toISOString(),
-          })),
+        closures: { count: closureCount, target: closureTarget, stretch: 3, isLowDemand: closureIsLowDemand, isNA: closureIsNA },
+        achievement: {
+          score: achievementScore,
+          naKpis: breakdown.filter((b) => b.attainment == null).map((b) => b.label),
+          breakdown,
         },
         drillDown: {
           positions: drillPositions,
@@ -462,11 +481,6 @@ export async function GET(req: NextRequest) {
             cpId: c.cpId, positionId: c.positionId, positionTitle: c.positionTitle,
             hireDate: new Date(c.hireDate).toISOString(),
             startDate: c.startDate ? new Date(c.startDate).toISOString() : null,
-          })),
-          startsList: myStarts.map((s) => ({
-            name: `${s.firstName} ${s.lastName}`,
-            cpId: s.cpId, positionId: s.positionId, positionTitle: s.positionTitle,
-            startDate: new Date(s.startDate).toISOString(),
           })),
         },
         activity: {
