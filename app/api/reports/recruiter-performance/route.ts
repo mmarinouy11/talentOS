@@ -42,6 +42,48 @@ function subtractBusinessDays(date: Date, n: number): Date {
   return result
 }
 
+type SlaEval = {
+  result: 'met' | 'partial' | 'missed' | 'in_progress' | 'na'
+  count: number
+  need: number
+  windowBd: number
+  days: number | null
+  progress: number
+  final: boolean
+}
+
+// Partial credit: share of the `need` qualified candidates delivered within `windowBd`
+// business days of kickoff. A position counts toward attainment once its window has
+// closed (or it's already complete); until then it's in progress.
+function evalSla(kickoff: Date, qualifiedDates: Date[], windowBd: number, need: number, slaRef: Date): SlaEval {
+  const count = Math.min(need, qualifiedDates.filter((d) => businessDaysBetween(kickoff, d) <= windowBd).length)
+  const closed = addBusinessDays(kickoff, windowBd) < slaRef
+  const final = closed || count === need
+  const nth = qualifiedDates[need - 1]
+  return {
+    result: count === need ? 'met' : !final ? 'in_progress' : count > 0 ? 'partial' : 'missed',
+    count, need, windowBd,
+    days: nth ? businessDaysBetween(kickoff, nth) : null,
+    progress: count / need,
+    final,
+  }
+}
+
+const NA_SLA = (windowBd: number, need: number): SlaEval =>
+  ({ result: 'na', count: 0, need, windowBd, days: null, progress: 0, final: false })
+
+function aggregateSla(evals: SlaEval[]) {
+  const finals = evals.filter((e) => e.final)
+  const withDays = evals.filter((e) => e.days != null)
+  return {
+    attainment: finals.length > 0 ? Math.round((finals.reduce((s, e) => s + e.progress, 0) / finals.length) * 100) : null,
+    met: evals.filter((e) => e.result === 'met').length,
+    decided: finals.length,
+    inProgress: evals.length - finals.length,
+    avgDays: withDays.length > 0 ? Math.round((withDays.reduce((s, e) => s + e.days!, 0) / withDays.length) * 10) / 10 : null,
+  }
+}
+
 function monthBounds(month: string): { start: Date; end: Date } {
   const [year, mon] = month.split('-').map(Number)
   const start = new Date(year, mon - 1, 1)
@@ -171,38 +213,60 @@ export async function GET(req: NextRequest) {
       qualifiedByPos.get(row.positionId)!.push(new Date(row.decidedAt))
     }
 
-    // Tech pass rate: completed tech evaluations (ADVANCE/REJECT) decided in month, for
-    // recruiter-screened candidates; excludes candidates who withdrew before the decision
-    const techDecisionsRaw = await db.$queryRaw<{ recruiterId: string; decision: string }[]>`
-      SELECT cp."recruiterId", i."decision"
-      FROM "Interview" i
-      JOIN "CandidatePosition" cp ON cp.id = i."candidatePositionId"
-      WHERE i."stage" = 'TECHNICAL_INTERVIEW'
-        AND i."decision" IN ('ADVANCE', 'REJECT')
-        AND COALESCE(i."decidedAt", i."updatedAt") >= ${monthStart}
-        AND COALESCE(i."decidedAt", i."updatedAt") <= ${monthEnd}
-        AND cp."recruiterId" IS NOT NULL
+    // Tech evaluation events in month for recruiter-screened candidates:
+    // pass = tech ADVANCE, or a stage move out of TECHNICAL_INTERVIEW to a later stage
+    // (covers rounds advanced without a recorded decision); fail = tech REJECT.
+    // Events after a withdrawal are dropped; HOLD/pending never produce an event.
+    const techEventsRaw = await db.$queryRaw<{ cpId: string; recruiterId: string; kind: 'pass' | 'fail'; at: Date }[]>`
+      WITH events AS (
+        SELECT i."candidatePositionId" AS "cpId",
+               CASE WHEN i."decision" = 'ADVANCE' THEN 'pass' ELSE 'fail' END AS kind,
+               COALESCE(i."decidedAt", i."updatedAt") AS at
+        FROM "Interview" i
+        WHERE i."stage" = 'TECHNICAL_INTERVIEW'
+          AND i."decision" IN ('ADVANCE', 'REJECT')
+          AND COALESCE(i."decidedAt", i."updatedAt") >= ${monthStart}
+          AND COALESCE(i."decidedAt", i."updatedAt") <= ${monthEnd}
+        UNION ALL
+        SELECT sh."candidatePositionId" AS "cpId", 'pass' AS kind, sh."movedAt" AS at
+        FROM "StageHistory" sh
+        WHERE sh."fromStage" = 'TECHNICAL_INTERVIEW'
+          AND sh."toStage" IN ('MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED')
+          AND sh."movedAt" >= ${monthStart} AND sh."movedAt" <= ${monthEnd}
+      )
+      SELECT e."cpId", cp."recruiterId", e.kind, e.at
+      FROM events e
+      JOIN "CandidatePosition" cp ON cp.id = e."cpId"
+      WHERE cp."recruiterId" IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM "Interview" s
           WHERE s."candidatePositionId" = cp.id
             AND s."stage" = 'SCREENING' AND s."decision" = 'ADVANCE'
         )
         AND NOT EXISTS (
-          SELECT 1 FROM "StageHistory" sh
-          WHERE sh."candidatePositionId" = cp.id
-            AND sh."toStage" = 'WITHDRAWN'
-            AND sh."movedAt" < COALESCE(i."decidedAt", i."updatedAt")
+          SELECT 1 FROM "StageHistory" w
+          WHERE w."candidatePositionId" = cp.id
+            AND w."toStage" = 'WITHDRAWN'
+            AND w."movedAt" < e.at
         )
     `
+    // One outcome per candidate-position: the latest event in the month wins
+    const techOutcomeByCp = new Map<string, { recruiterId: string; kind: 'pass' | 'fail'; at: Date }>()
+    for (const ev of techEventsRaw) {
+      const at = new Date(ev.at)
+      const prev = techOutcomeByCp.get(ev.cpId)
+      if (!prev || at > prev.at) techOutcomeByCp.set(ev.cpId, { recruiterId: ev.recruiterId, kind: ev.kind, at })
+    }
+    const techOutcomes = [...techOutcomeByCp.values()]
 
-    // Closures: StageHistory toStage=HIRED in month
+    // Closures: distinct candidate-positions moved to HIRED in month (earliest move = hire date)
     const closuresRaw = await db.$queryRaw<{
       recruiterId: string; positionId: string; cpId: string
       hireDate: Date; firstName: string; lastName: string
       positionTitle: string; startDate: Date | null
     }[]>`
       SELECT cp."recruiterId", cp."positionId", cp.id as "cpId",
-             sh."movedAt" as "hireDate",
+             MIN(sh."movedAt") as "hireDate",
              c."firstName", c."lastName", p."title" as "positionTitle",
              cp."startDate"
       FROM "StageHistory" sh
@@ -212,6 +276,8 @@ export async function GET(req: NextRequest) {
       WHERE sh."toStage" = 'HIRED'
         AND sh."movedAt" >= ${monthStart} AND sh."movedAt" <= ${monthEnd}
         AND cp."recruiterId" IS NOT NULL
+      GROUP BY cp.id, cp."recruiterId", cp."positionId", cp."startDate",
+               c."firstName", c."lastName", p."title"
     `
 
     // === Activity section (existing metrics, period = month) ===
@@ -310,39 +376,17 @@ export async function GET(req: NextRequest) {
         const k = new Date(p.createdAt)
         return k >= slaWindowStart && k <= monthEnd
       })
-      let firstMet = 0, firstMissed = 0, firstInProgress = 0, firstDaysSum = 0, firstDaysN = 0
-      let shortMet = 0, shortMissed = 0, shortInProgress = 0, shortDaysSum = 0, shortDaysN = 0
-      for (const pos of slaPositions) {
+      const slaById = new Map(slaPositions.map((pos) => {
         const kickoff = new Date(pos.createdAt)
-        const qualified = qualifiedByPos.get(pos.id) ?? []
-        const firstQ = qualified[0] ?? null
-        const thirdQ = qualified[2] ?? null
-        const firstDeadline = addBusinessDays(kickoff, 3)
-        const shortDeadline = addBusinessDays(kickoff, 5)
+        const q = qualifiedByPos.get(pos.id) ?? []
+        return [pos.id, { first: evalSla(kickoff, q, 3, 1, slaRef), shortlist: evalSla(kickoff, q, 5, 3, slaRef) }]
+      }))
+      const firstAgg = aggregateSla([...slaById.values()].map((s) => s.first))
+      const shortAgg = aggregateSla([...slaById.values()].map((s) => s.shortlist))
 
-        if (firstQ) {
-          const d = businessDaysBetween(kickoff, firstQ)
-          firstDaysSum += d; firstDaysN++
-          if (d <= 3) firstMet++; else firstMissed++
-        } else {
-          if (firstDeadline >= slaRef) firstInProgress++; else firstMissed++
-        }
-        if (thirdQ) {
-          const d = businessDaysBetween(kickoff, thirdQ)
-          shortDaysSum += d; shortDaysN++
-          if (d <= 5) shortMet++; else shortMissed++
-        } else {
-          if (shortDeadline >= slaRef) shortInProgress++; else shortMissed++
-        }
-      }
-      const firstTotal = firstMet + firstMissed
-      const shortTotal = shortMet + shortMissed
-      const firstPctMet = firstTotal > 0 ? Math.round((firstMet / firstTotal) * 100) : null
-      const shortPctMet = shortTotal > 0 ? Math.round((shortMet / shortTotal) * 100) : null
-
-      // KPI 3: Tech pass rate
-      const myTech = techDecisionsRaw.filter((t) => t.recruiterId === rid)
-      const techAdvances = myTech.filter((t) => t.decision === 'ADVANCE').length
+      // KPI 3: Tech pass rate (one outcome per candidate-position)
+      const myTech = techOutcomes.filter((t) => t.recruiterId === rid)
+      const techAdvances = myTech.filter((t) => t.kind === 'pass').length
       const techTotal = myTech.length
       const techPassRate = techTotal > 0 ? Math.round((techAdvances / techTotal) * 100) : null
 
@@ -355,10 +399,9 @@ export async function GET(req: NextRequest) {
 
       // Achievement: weighted attainment, each KPI capped at 100%, N/A weights re-normalized
       const cap = (x: number) => Math.min(1, x)
-      const slaParts = [
-        firstTotal > 0 ? firstMet / firstTotal : null,
-        shortTotal > 0 ? shortMet / shortTotal : null,
-      ].filter((x): x is number => x != null)
+      const slaParts = [firstAgg.attainment, shortAgg.attainment]
+        .filter((x): x is number => x != null)
+        .map((x) => x / 100)
       const kpiParts: { key: string; label: string; weight: number; attainment: number | null }[] = [
         { key: 'qualified', label: 'Qualified', weight: WEIGHTS.qualified, attainment: cap(qualifiedCount / QUALIFIED_TARGET) },
         { key: 'sla', label: 'Time to 1st submission', weight: WEIGHTS.sla, attainment: slaParts.length > 0 ? cap(slaParts.reduce((a, b) => a + b, 0) / slaParts.length) : null },
@@ -383,26 +426,9 @@ export async function GET(req: NextRequest) {
       // Drill-down
       const drillPositions = myPositions.map((pos) => {
         const kickoff = new Date(pos.createdAt)
-        const inSLAWindow = kickoff >= slaWindowStart && kickoff <= monthEnd
-        const qualified = qualifiedByPos.get(pos.id) ?? []
-        const firstQ = qualified[0] ?? null
-        const thirdQ = qualified[2] ?? null
-        let firstSLA: { result: string; days: number | null } = { result: 'na', days: null }
-        let shortlistSLA: { result: string; days: number | null } = { result: 'na', days: null }
-        if (inSLAWindow) {
-          if (firstQ) {
-            const d = businessDaysBetween(kickoff, firstQ)
-            firstSLA = { result: d <= 3 ? 'met' : 'missed', days: d }
-          } else {
-            firstSLA = { result: addBusinessDays(kickoff, 3) >= slaRef ? 'in_progress' : 'missed', days: null }
-          }
-          if (thirdQ) {
-            const d = businessDaysBetween(kickoff, thirdQ)
-            shortlistSLA = { result: d <= 5 ? 'met' : 'missed', days: d }
-          } else {
-            shortlistSLA = { result: addBusinessDays(kickoff, 5) >= slaRef ? 'in_progress' : 'missed', days: null }
-          }
-        }
+        const sla = slaById.get(pos.id)
+        const firstSLA = sla?.first ?? NA_SLA(3, 1)
+        const shortlistSLA = sla?.shortlist ?? NA_SLA(5, 3)
         return {
           id: pos.id, title: pos.title, status: pos.status,
           headcount: pos.headcount ?? 1,
@@ -420,8 +446,8 @@ export async function GET(req: NextRequest) {
           id: pos.id, title: pos.title, status: pos.status,
           headcount: pos.headcount ?? 1,
           kickoff: new Date(pos.createdAt).toISOString(),
-          firstSLA: { result: 'na', days: null },
-          shortlistSLA: { result: 'na', days: null },
+          firstSLA: NA_SLA(3, 1),
+          shortlistSLA: NA_SLA(5, 3),
           activityOnly: true,
         })
       }
@@ -459,8 +485,8 @@ export async function GET(req: NextRequest) {
           target: QUALIFIED_TARGET,
         },
         timeToSubmission: {
-          first: { pctMet: firstPctMet, avgDays: firstDaysN > 0 ? Math.round(firstDaysSum / firstDaysN * 10) / 10 : null, met: firstMet, missed: firstMissed, inProgress: firstInProgress },
-          shortlist: { pctMet: shortPctMet, avgDays: shortDaysN > 0 ? Math.round(shortDaysSum / shortDaysN * 10) / 10 : null, met: shortMet, missed: shortMissed, inProgress: shortInProgress },
+          first: firstAgg,
+          shortlist: shortAgg,
         },
         techPassRate: { rate: techPassRate, advances: techAdvances, total: techTotal },
         closures: { count: closureCount, target: closureTarget, stretch: 3, isLowDemand: closureIsLowDemand, isNA: closureIsNA },

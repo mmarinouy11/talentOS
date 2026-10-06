@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronUp, ChevronDown, ChevronLeft } from 'lucide-react'
 
-type SlaResult = { result: string; days: number | null }
-interface SlaAgg { pctMet: number | null; avgDays: number | null; met: number; missed: number; inProgress: number }
+type SlaResult = { result: 'met' | 'partial' | 'missed' | 'in_progress' | 'na'; count: number; need: number; windowBd: number; days: number | null }
+interface SlaAgg { attainment: number | null; avgDays: number | null; met: number; decided: number; inProgress: number }
 interface CandRef { name: string; cpId: string; positionId: string; positionTitle: string }
 
 interface RecruiterKPI {
@@ -84,21 +84,27 @@ function StatusIcon({ s }: { s: Status }) {
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const Dash = () => <span className="text-gray-300">—</span>
 
-function SlaBadge({ sla, target }: { sla: SlaResult; target: number }) {
+function SlaBadge({ sla }: { sla: SlaResult }) {
   if (sla.result === 'na') return <Dash />
-  if (sla.result === 'met') return <span className="text-[#2F2C29] font-medium">✓ met · {sla.days}bd</span>
-  if (sla.result === 'missed') return <span className="text-gray-500">○ missed{sla.days != null ? ` · ${sla.days}bd` : ''}</span>
-  return <span className="text-amber-500">◐ in progress (≤{target}bd)</span>
+  if (sla.need === 1) {
+    if (sla.result === 'met') return <span className="text-[#2F2C29] font-medium">✓ met · {sla.days}bd</span>
+    if (sla.result === 'in_progress') return <span className="text-amber-500">◐ in progress (≤{sla.windowBd}bd)</span>
+    return <span className="text-gray-500">○ missed{sla.days != null ? ` · ${sla.days}bd` : ''}</span>
+  }
+  const label = `${sla.count} of ${sla.need}`
+  if (sla.result === 'met') return <span className="text-[#2F2C29] font-medium">✓ {label} · {sla.windowBd}bd</span>
+  if (sla.result === 'in_progress') return <span className="text-amber-500">◐ {label} · in progress</span>
+  if (sla.result === 'partial') return <span className="text-amber-500">◐ {label} · {sla.windowBd}bd</span>
+  return <span className="text-gray-500">○ {label} · {sla.windowBd}bd</span>
 }
 
 function SlaCell({ agg, target }: { agg: SlaAgg; target: number }) {
-  const decided = agg.met + agg.missed
-  if (decided === 0 && agg.inProgress === 0) return <Dash />
-  const s: Status = agg.pctMet == null ? 'na' : agg.pctMet === 100 ? 'met' : agg.pctMet >= 80 ? 'near' : 'below'
+  if (agg.decided === 0 && agg.inProgress === 0) return <Dash />
+  const s: Status = agg.attainment == null ? 'na' : agg.attainment === 100 ? 'met' : agg.attainment >= 80 ? 'near' : 'below'
   return (
     <div>
       <div className="tabular-nums">
-        <StatusIcon s={s} /> {agg.pctMet != null ? `${agg.pctMet}%` : '—'}
+        <StatusIcon s={s} /> {agg.attainment != null ? `${agg.attainment}%` : '—'}
         <span className="text-gray-400 text-xs"> · ≤{target}bd</span>
       </div>
       <div className="text-xs text-gray-400">
@@ -134,7 +140,8 @@ function MiniBarChart({ data, month }: { data: Record<string, number>; month: st
 }
 
 const th = 'px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap'
-const subTh = 'text-left py-1.5 font-medium'
+const hdrEdge = 'border-b-[2px] border-b-[#8CF000]'
+const subTh ='text-left py-1.5 font-medium'
 
 function DrillDown({ r }: { r: RecruiterKPI }) {
   const d = r.drillDown
@@ -159,8 +166,8 @@ function DrillDown({ r }: { r: RecruiterKPI }) {
                   <td className="py-1.5 pr-4 text-gray-500 text-xs">{p.status}</td>
                   <td className="py-1.5 pr-4 text-gray-700">{p.headcount}</td>
                   <td className="py-1.5 pr-4 text-gray-500">{fmtDate(p.kickoff)}</td>
-                  <td className="py-1.5 pr-4"><SlaBadge sla={p.firstSLA} target={3} /></td>
-                  <td className="py-1.5"><SlaBadge sla={p.shortlistSLA} target={5} /></td>
+                  <td className="py-1.5 pr-4"><SlaBadge sla={p.firstSLA} /></td>
+                  <td className="py-1.5"><SlaBadge sla={p.shortlistSLA} /></td>
                 </tr>
               ))}
             </tbody>
@@ -451,25 +458,22 @@ export default function RecruiterPerformancePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th />
-                    <th colSpan={3} className="px-3 pt-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest border-r border-gray-100">Demand</th>
-                    <th className="px-3 pt-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">KPIs</th>
-                    <th colSpan={2} className="px-3 pt-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap">Time to 1st submission · 25%</th>
-                    <th colSpan={4} />
+                  <tr className="bg-gray-50">
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`}>Recruiter</th>
+                    <th colSpan={3} className={`${th} text-center border-b border-gray-200 border-r border-r-gray-100`}>Demand</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`}>Qualified · 25%</th>
+                    <th colSpan={2} className={`${th} text-center border-b border-gray-200`}>Time to 1st submission · 25%</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`} title="Passed ÷ (passed + failed) tech evaluations of recruiter-screened candidates, one per candidate">Tech Quality · 20%</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`}>Closures · 30%</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`} title="Weighted KPI attainment, each capped at 100%">Achievement</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge}`} />
                   </tr>
-                  <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
-                    <th className={`${th} text-left`}>Recruiter</th>
-                    <th className={`${th} text-right`} title="Assigned positions open during the month">Assigned</th>
-                    <th className={`${th} text-right`} title="Positions with candidate added, interview scheduled or decision in the month">Active</th>
-                    <th className={`${th} text-right border-r border-gray-100`} title="Headcount of assigned positions minus hired">Open HC</th>
-                    <th className={`${th} text-left`}>Qualified · 25%</th>
-                    <th className={`${th} text-left`}>1st Qualified</th>
-                    <th className={`${th} text-left`}>Shortlist</th>
-                    <th className={`${th} text-left`} title="Passed ÷ completed tech evaluations (Advance/Reject) of recruiter-screened candidates">Tech Quality · 20%</th>
-                    <th className={`${th} text-left`}>Closures · 30%</th>
-                    <th className={`${th} text-left`} title="Weighted KPI attainment, each capped at 100%">Achievement</th>
-                    <th className={th} />
+                  <tr className="bg-gray-50">
+                    <th className={`${th} ${hdrEdge} text-right`} title="Assigned positions open during the month">Assigned</th>
+                    <th className={`${th} ${hdrEdge} text-right`} title="Positions with candidate added, interview scheduled or decision in the month">Active</th>
+                    <th className={`${th} ${hdrEdge} text-right border-r border-r-gray-100`} title="Headcount of assigned positions minus hired">Open HC</th>
+                    <th className={`${th} ${hdrEdge} text-left`}>1st Qualified</th>
+                    <th className={`${th} ${hdrEdge} text-left`} title="Partial credit: share of 3 qualified within 5 business days">Shortlist</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
