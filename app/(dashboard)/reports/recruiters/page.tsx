@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronUp, ChevronDown, ChevronLeft } from 'lucide-react'
@@ -158,117 +158,167 @@ function MiniBarChart({ data, month }: { data: Record<string, number>; month: st
 
 const th = 'px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap'
 const hdrEdge = 'border-b-[2px] border-b-[#8CF000]'
-const subTh ='text-left py-1.5 font-medium'
+
+const FIRST_SLA_LABEL = '1st submission in 3bd'
+const SHORTLIST_SLA_LABEL = '3 shortlisted in 5bd'
+
+const dTh = 'px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap'
+const dTd = 'px-3 py-2 align-middle'
+const dTr = 'hover:bg-[#F5F0EB] transition-colors'
+const byDateDesc = <T,>(get: (x: T) => string) => (a: T, b: T) => new Date(get(b)).getTime() - new Date(get(a)).getTime()
+const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ')
+
+function Section({ title, empty, emptyText, children }: { title: string; empty: boolean; emptyText: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</p>
+      {empty ? <p className="text-sm text-gray-400">{emptyText}</p> : children}
+    </div>
+  )
+}
+
+function DTable({ widths, headers, children }: { widths: string[]; headers: ReactNode[]; children: ReactNode }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <table className="w-full text-sm table-fixed">
+        <colgroup>{widths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+        <thead>
+          <tr className={`bg-gray-50 ${hdrEdge}`}>
+            {headers.map((h, i) => <th key={i} className={dTh}>{h}</th>)}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">{children}</tbody>
+      </table>
+    </div>
+  )
+}
+
+function TruncLink({ href, text }: { href: string; text: string }) {
+  return (
+    <Link href={href} target="_blank" rel="noopener noreferrer" title={text} className="block truncate text-gray-800 hover:underline">
+      {text}
+    </Link>
+  )
+}
+
+function ResultBadge({ result }: { result: 'Passed' | 'Failed' }) {
+  return result === 'Passed'
+    ? <span className="inline-flex items-center rounded-full bg-lime-100 px-2 py-0.5 text-xs font-medium text-lime-800">Passed</span>
+    : <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Failed</span>
+}
 
 function DrillDown({ r }: { r: RecruiterKPI }) {
   const d = r.drillDown
+  const assigned = d.positions.filter((p) => !p.activityOnly).sort(byDateDesc((p) => p.kickoff))
+  const activityOnly = d.positions.filter((p) => p.activityOnly).sort((a, b) =>
+    (a.status === 'OPEN' ? 0 : 1) - (b.status === 'OPEN' ? 0 : 1) || a.title.localeCompare(b.title))
+  const qualified = [...d.qualifiedCandidates].sort(byDateDesc((c) => c.date))
+  const tech = [...d.techEvaluations].sort(byDateDesc((t) => t.date))
+  const closures = [...d.closuresList].sort(byDateDesc((c) => c.hireDate))
+  const candHref = (c: CandRef) => `/positions/${c.positionId}/candidates/${c.cpId}`
+  const posHref = (id: string) => `/positions/${id}`
+  const sla = r.timeToSubmission
+
   return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Positions (assigned + with activity)</p>
-        {d.positions.length === 0 ? <p className="text-sm text-gray-400">No positions.</p> : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-400 border-b border-gray-200">
-                <th className={subTh}>Position</th><th className={subTh}>Status</th><th className={subTh}>HC</th>
-                <th className={subTh}>Kickoff</th><th className={subTh}>1st qualified (≤3bd)</th><th className={subTh}>3 shortlisted (≤5bd)</th>
+    <div className="space-y-6">
+      <Section title="Achievement breakdown" empty={false} emptyText="">
+        <DTable widths={['46%', '18%', '18%', '18%']} headers={['KPI', 'Attain.', 'Weight', 'Contrib.']}>
+          {r.achievement.breakdown.map((b) => (
+            <Fragment key={b.key}>
+              <tr className={`${dTr} ${b.attainment == null ? 'text-gray-400' : 'text-gray-700'}`}>
+                <td className={dTd}>{b.label}</td>
+                <td className={`${dTd} tabular-nums`}>{b.attainment != null ? `${b.attainment}%` : 'N/A'}</td>
+                <td className={`${dTd} tabular-nums`}>
+                  {b.weight}%
+                  {b.attainment != null && b.effectiveWeight !== b.weight && <span className="text-gray-400 text-xs"> → {b.effectiveWeight}%</span>}
+                </td>
+                <td className={`${dTd} tabular-nums`}>{b.contribution != null ? b.contribution.toFixed(1) : '—'}</td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {d.positions.map((p) => (
-                <tr key={p.id}>
-                  <td className="py-1.5 pr-4"><Link href={`/positions/${p.id}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{p.title}</Link>
-                    {p.activityOnly && <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">activity only</span>}
-                  </td>
-                  <td className="py-1.5 pr-4 text-gray-500 text-xs">{p.status}</td>
-                  <td className="py-1.5 pr-4 text-gray-700">{p.headcount}</td>
-                  <td className="py-1.5 pr-4 text-gray-500">{fmtDate(p.kickoff)}</td>
-                  <td className="py-1.5 pr-4"><SlaBadge sla={p.firstSLA} /></td>
-                  <td className="py-1.5"><SlaBadge sla={p.shortlistSLA} /></td>
+              {b.key === 'sla' && ([[FIRST_SLA_LABEL, sla.first], [SHORTLIST_SLA_LABEL, sla.shortlist]] as const).map(([label, agg]) => (
+                <tr key={label} className={`${dTr} text-xs text-gray-500`}>
+                  <td className={`${dTd} pl-7`}>{label}</td>
+                  <td className={`${dTd} tabular-nums`}>{agg.attainment != null ? `${agg.attainment}%` : 'N/A'}</td>
+                  <td className={dTd} /><td className={dTd} />
                 </tr>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+            </Fragment>
+          ))}
+          <tr className="font-semibold text-gray-900 bg-gray-50">
+            <td className={dTd}>Total</td><td className={dTd} /><td className={dTd} />
+            <td className={`${dTd} tabular-nums`}>{r.achievement.score != null ? `${r.achievement.score}%` : 'N/A'}</td>
+          </tr>
+        </DTable>
+      </Section>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Qualified this month ({d.qualifiedCandidates.length})</p>
-          {d.qualifiedCandidates.length === 0 ? <p className="text-sm text-gray-400">None.</p> : (
-            <ul className="space-y-1 text-sm">
-              {d.qualifiedCandidates.map((c) => (
-                <li key={`${c.cpId}-${c.date}`}>
-                  <Link href={`/positions/${c.positionId}/candidates/${c.cpId}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{c.name}</Link>
-                  <span className="text-gray-400"> · {c.positionTitle} · {fmtDate(c.date)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+      <Section title={`Assigned positions (${assigned.length})`} empty={assigned.length === 0} emptyText="No assigned positions">
+        <DTable widths={['30%', '10%', '6%', '10%', '22%', '22%']} headers={['Position', 'Status', 'HC', 'Kickoff', FIRST_SLA_LABEL, SHORTLIST_SLA_LABEL]}>
+          {assigned.map((p) => (
+            <tr key={p.id} className={dTr}>
+              <td className={dTd}><TruncLink href={posHref(p.id)} text={p.title} /></td>
+              <td className={`${dTd} text-gray-500 text-xs`}>{titleCase(p.status)}</td>
+              <td className={`${dTd} tabular-nums text-gray-700`}>{p.headcount}</td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(p.kickoff)}</td>
+              <td className={`${dTd} text-xs`}><SlaBadge sla={p.firstSLA} /></td>
+              <td className={`${dTd} text-xs`}><SlaBadge sla={p.shortlistSLA} /></td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
 
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-2">Tech evaluations this month ({d.techEvaluations.length})</p>
-          {d.techEvaluations.length === 0 ? <p className="text-sm text-gray-400">None.</p> : (
-            <>
-              <p className="text-sm text-gray-700 mb-1.5">
-                {r.techPassRate.advances} of {r.techPassRate.total} passed ({r.techPassRate.rate}%)
-              </p>
-              <ul className="space-y-1 text-sm">
-                {d.techEvaluations.map((t) => (
-                  <li key={t.cpId}>
-                    <Link href={`/positions/${t.positionId}/candidates/${t.cpId}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{t.name}</Link>
-                    <span className="text-gray-400"> · {t.positionTitle} · </span>
-                    <span className={t.result === 'Passed' ? 'text-[#2F2C29] font-medium' : 'text-gray-500'}>{t.result}</span>
-                    <span className="text-gray-400"> · {fmtDate(t.date)} · {t.source}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Closures this month ({d.closuresList.length})</p>
-          {d.closuresList.length === 0 ? <p className="text-sm text-gray-400">None.</p> : (
-            <ul className="space-y-1 text-sm">
-              {d.closuresList.map((c) => (
-                <li key={`${c.cpId}-${c.hireDate}`}>
-                  <Link href={`/positions/${c.positionId}/candidates/${c.cpId}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{c.name}</Link>
-                  <span className="text-gray-400"> · {c.positionTitle} · hired {fmtDate(c.hireDate)}{c.startDate ? ` · starts ${fmtDate(c.startDate)}` : ''}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Achievement breakdown</p>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-400 border-b border-gray-200">
-                <th className={subTh}>KPI</th>
-                <th className="text-right py-1.5 font-medium">Attain.</th>
-                <th className="text-right py-1.5 font-medium">Weight</th>
-                <th className="text-right py-1.5 font-medium">Contrib.</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {r.achievement.breakdown.map((b) => (
-                <tr key={b.key} className={b.attainment == null ? 'text-gray-400' : 'text-gray-700'}>
-                  <td className="py-1.5 pr-2">{b.label}</td>
-                  <td className="py-1.5 text-right tabular-nums">{b.attainment != null ? `${b.attainment}%` : 'N/A'}</td>
-                  <td className="py-1.5 text-right tabular-nums">
-                    {b.weight}%
-                    {b.attainment != null && b.effectiveWeight !== b.weight && <span className="text-gray-400 text-xs"> → {b.effectiveWeight}%</span>}
-                  </td>
-                  <td className="py-1.5 text-right tabular-nums">{b.contribution != null ? b.contribution.toFixed(1) : '—'}</td>
-                </tr>
-              ))}
-              <tr className="font-semibold text-gray-900">
-                <td className="py-1.5">Total</td><td /><td />
-                <td className="py-1.5 text-right tabular-nums">{r.achievement.score != null ? `${r.achievement.score}%` : 'N/A'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Section title={`Activity-only positions (${activityOnly.length})`} empty={activityOnly.length === 0} emptyText="No activity-only positions">
+        <DTable widths={['52%', '16%', '12%', '20%']} headers={['Position', 'Status', 'HC', 'Kickoff']}>
+          {activityOnly.map((p) => (
+            <tr key={p.id} className={dTr}>
+              <td className={dTd}><TruncLink href={posHref(p.id)} text={p.title} /></td>
+              <td className={`${dTd} text-gray-500 text-xs`}>{titleCase(p.status)}</td>
+              <td className={`${dTd} tabular-nums text-gray-700`}>{p.headcount}</td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(p.kickoff)}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
+
+      <Section title={`Qualified this month (${qualified.length})`} empty={qualified.length === 0} emptyText="No qualified candidates this month">
+        <DTable widths={['35%', '45%', '20%']} headers={['Candidate', 'Position', 'Date']}>
+          {qualified.map((c) => (
+            <tr key={`${c.cpId}-${c.date}`} className={dTr}>
+              <td className={dTd}><TruncLink href={candHref(c)} text={c.name} /></td>
+              <td className={`${dTd} text-gray-500`}><span className="block truncate" title={c.positionTitle}>{c.positionTitle}</span></td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(c.date)}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
+
+      <Section title={`Tech evaluations this month (${tech.length})`} empty={tech.length === 0} emptyText="No tech evaluations this month">
+        <p className="text-sm text-gray-700 mb-2">
+          {r.techPassRate.advances} of {r.techPassRate.total} passed ({r.techPassRate.rate}%)
+        </p>
+        <DTable widths={['26%', '34%', '13%', '12%', '15%']} headers={['Candidate', 'Position', 'Result', 'Date', 'Source']}>
+          {tech.map((t) => (
+            <tr key={t.cpId} className={dTr}>
+              <td className={dTd}><TruncLink href={candHref(t)} text={t.name} /></td>
+              <td className={`${dTd} text-gray-500`}><span className="block truncate" title={t.positionTitle}>{t.positionTitle}</span></td>
+              <td className={dTd}><ResultBadge result={t.result} /></td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(t.date)}</td>
+              <td className={`${dTd} text-gray-500 text-xs`}>{t.source}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
+
+      <Section title={`Closures this month (${closures.length})`} empty={closures.length === 0} emptyText="No closures this month">
+        <DTable widths={['30%', '40%', '15%', '15%']} headers={['Candidate', 'Position', 'Hired', 'Start date']}>
+          {closures.map((c) => (
+            <tr key={c.cpId} className={dTr}>
+              <td className={dTd}><TruncLink href={candHref(c)} text={c.name} /></td>
+              <td className={`${dTd} text-gray-500`}><span className="block truncate" title={c.positionTitle}>{c.positionTitle}</span></td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(c.hireDate)}</td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{c.startDate ? fmtDate(c.startDate) : '—'}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
     </div>
   )
 }
@@ -508,8 +558,8 @@ export default function RecruiterPerformancePage() {
                     <th className={`${th} ${hdrEdge} text-right`} title="Assigned positions open during the month">Assigned</th>
                     <th className={`${th} ${hdrEdge} text-right`} title="Positions with candidate added, interview scheduled or decision in the month">Active</th>
                     <th className={`${th} ${hdrEdge} text-right border-r border-r-gray-100`} title="Headcount of assigned positions minus hired">Open HC</th>
-                    <th className={`${th} ${hdrEdge} text-left`}>1st Qualified</th>
-                    <th className={`${th} ${hdrEdge} text-left`} title="Partial credit: share of 3 qualified within 5 business days">3 shortlisted</th>
+                    <th className={`${th} ${hdrEdge} text-left`}>{FIRST_SLA_LABEL}</th>
+                    <th className={`${th} ${hdrEdge} text-left`} title="Partial credit: share of 3 qualified within 5 business days">{SHORTLIST_SLA_LABEL}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
