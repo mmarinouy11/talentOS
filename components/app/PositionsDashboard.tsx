@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import { PositionsTable } from '@/components/app/PositionsTable'
 import type { PositionRow, TypeFilter } from '@/components/app/PositionsTable'
 
@@ -60,8 +62,9 @@ export function PositionsDashboard({ positions, isAdmin }: Props) {
   const activeClient = clients.includes(clientFilter) ? clientFilter : ''
 
   // Cards reflect the selected client; proactive positions stay out of the status cards
-  const { headcounts, proactiveOpenCount } = useMemo(() => {
+  const { headcounts, openPositions, proactiveOpenCount } = useMemo(() => {
     const hc = { OPEN: 0, ON_HOLD: 0, FILLED: 0, CLOSED: 0, CANCELLED: 0, ytj: 0 }
+    let open = 0
     let proactive = 0
     for (const p of positions) {
       if (activeClient && p.client !== activeClient) continue
@@ -70,9 +73,10 @@ export function PositionsDashboard({ positions, isAdmin }: Props) {
         continue
       }
       hc[p.status] += p.headcount ?? 1
+      if (p.status === 'OPEN') open++
       if (p.isYtj) hc.ytj += p.headcount ?? 1
     }
-    return { headcounts: hc, proactiveOpenCount: proactive }
+    return { headcounts: hc, openPositions: open, proactiveOpenCount: proactive }
   }, [positions, activeClient])
 
   // Status cards count requisitions only, so clicking one switches the list back to requisitions
@@ -105,6 +109,18 @@ export function PositionsDashboard({ positions, isAdmin }: Props) {
 
   return (
     <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Positions</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {headcounts.OPEN} open headcount across {openPositions} position{openPositions === 1 ? '' : 's'}
+            {activeClient && <span className="text-gray-400"> · {activeClient}</span>}
+          </p>
+        </div>
+        <Link href="/positions/new">
+          <Button>New Position</Button>
+        </Link>
+      </div>
       <div className="flex items-stretch gap-4">
         <div className="grid grid-cols-5 gap-4 flex-1">
           {cards.map((c) => (
