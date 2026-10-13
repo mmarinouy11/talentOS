@@ -1,12 +1,18 @@
 'use client'
 
-import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronUp, ChevronDown, ChevronLeft } from 'lucide-react'
 
-type SlaResult = { result: string; days: number | null }
-interface SlaAgg { pctMet: number | null; avgDays: number | null; met: number; missed: number; inProgress: number }
+type SlaResult = {
+  result: 'met' | 'partial' | 'missed' | 'in_progress' | 'elsewhere' | 'pending' | 'na'
+  count: number; need: number; windowBd: number; days: number | null; decisionDate: string | null
+}
+interface SlaAgg {
+  attainment: number | null; avgDays: number | null; met: number; decided: number
+  inProgress: number; inProgressCount: number; inProgressNeed: number
+}
 interface CandRef { name: string; cpId: string; positionId: string; positionTitle: string }
 
 interface RecruiterKPI {
@@ -21,13 +27,17 @@ interface RecruiterKPI {
   qualified: { count: number; perActivePosition: number | null; pace: number | null; target: number }
   timeToSubmission: { first: SlaAgg; shortlist: SlaAgg }
   techPassRate: { rate: number | null; advances: number; total: number }
-  closures: { count: number; target: number; isLowDemand: boolean; isNA: boolean }
-  starts: { count: number }
+  closures: { count: number; target: number; stretch: number; isLowDemand: boolean; isNA: boolean }
+  achievement: {
+    score: number | null
+    naKpis: string[]
+    breakdown: { key: string; label: string; weight: number; attainment: number | null; effectiveWeight: number; contribution: number | null }[]
+  }
   drillDown: {
-    positions: { id: string; title: string; status: string; headcount: number; kickoff: string; firstSLA: SlaResult; shortlistSLA: SlaResult }[]
+    positions: { id: string; title: string; status: string; headcount: number; kickoff: string; firstSLA: SlaResult; shortlistSLA: SlaResult; activityOnly: boolean }[]
     qualifiedCandidates: (CandRef & { date: string })[]
+    techEvaluations: (CandRef & { result: 'Passed' | 'Failed'; date: string; source: 'decision' | 'stage move' })[]
     closuresList: (CandRef & { hireDate: string; startDate: string | null })[]
-    startsList: (CandRef & { startDate: string })[]
   }
   activity: {
     manual: number; direct: number; partner: number
@@ -81,27 +91,43 @@ function StatusIcon({ s }: { s: Status }) {
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const Dash = () => <span className="text-gray-300">—</span>
 
-function SlaBadge({ sla, target }: { sla: SlaResult; target: number }) {
+function SlaBadge({ sla }: { sla: SlaResult }) {
   if (sla.result === 'na') return <Dash />
-  if (sla.result === 'met') return <span className="text-[#2F2C29] font-medium">✓ met · {sla.days}bd</span>
-  if (sla.result === 'missed') return <span className="text-gray-500">○ missed{sla.days != null ? ` · ${sla.days}bd` : ''}</span>
-  return <span className="text-amber-500">◐ in progress (≤{target}bd)</span>
+  if (sla.result === 'elsewhere') {
+    const m = sla.decisionDate ? new Date(sla.decisionDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''
+    return <span className="text-gray-400 text-xs">— counted in {m}</span>
+  }
+  if (sla.result === 'pending') return <span className="text-gray-400 text-xs">— decided in a later month</span>
+  if (sla.need === 1) {
+    if (sla.result === 'met') return <span className="text-[#2F2C29] font-medium">✓ met · {sla.days}bd</span>
+    if (sla.result === 'in_progress') return <span className="text-amber-500">◐ in progress (≤{sla.windowBd}bd)</span>
+    return <span className="text-gray-500">○ missed{sla.days != null ? ` · ${sla.days}bd` : ''}</span>
+  }
+  const label = `${sla.count} of ${sla.need}`
+  if (sla.result === 'met') return <span className="text-[#2F2C29] font-medium">✓ {label} · {sla.windowBd}bd</span>
+  if (sla.result === 'in_progress') return <span className="text-amber-500">◐ {label} · in progress</span>
+  if (sla.result === 'partial') return <span className="text-amber-500">◐ {label} · {sla.windowBd}bd</span>
+  return <span className="text-gray-500">○ {label} · {sla.windowBd}bd</span>
 }
 
 function SlaCell({ agg, target }: { agg: SlaAgg; target: number }) {
-  const decided = agg.met + agg.missed
-  if (decided === 0 && agg.inProgress === 0) return <Dash />
-  const s: Status = agg.pctMet == null ? 'na' : agg.pctMet === 100 ? 'met' : agg.pctMet >= 80 ? 'near' : 'below'
+  if (agg.decided === 0 && agg.inProgress === 0) return <Dash />
+  const s: Status = agg.attainment == null ? 'na' : agg.attainment === 100 ? 'met' : agg.attainment >= 80 ? 'near' : 'below'
   return (
-    <div>
-      <div className="tabular-nums">
-        <StatusIcon s={s} /> {agg.pctMet != null ? `${agg.pctMet}%` : '—'}
-        <span className="text-gray-400 text-xs"> · ≤{target}bd</span>
-      </div>
-      <div className="text-xs text-gray-400">
-        {agg.avgDays != null ? `avg ${agg.avgDays}bd` : 'no data'}
-        {agg.inProgress > 0 && ` · ${agg.inProgress} in progress`}
-      </div>
+    <div title={`Target ≤${target} business days`}>
+      {agg.decided > 0 && (
+        <div className="tabular-nums whitespace-nowrap">
+          <StatusIcon s={s} /> {agg.attainment}%
+          <span className="text-gray-400 text-xs"> · {agg.avgDays != null ? `avg ${agg.avgDays}bd` : 'none met'}</span>
+        </div>
+      )}
+      {agg.inProgress > 0 && (
+        <div className="text-xs text-amber-500">
+          {agg.inProgressNeed > agg.inProgress
+            ? `${agg.inProgressCount} of ${agg.inProgressNeed} · in progress`
+            : `${agg.inProgress} in progress`}
+        </div>
+      )}
     </div>
   )
 }
@@ -131,79 +157,168 @@ function MiniBarChart({ data, month }: { data: Record<string, number>; month: st
 }
 
 const th = 'px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap'
-const subTh = 'text-left py-1.5 font-medium'
+const hdrEdge = 'border-b-[2px] border-b-[#8CF000]'
+
+const FIRST_SLA_LABEL = '1st submission in 3bd'
+const SHORTLIST_SLA_LABEL = '3 shortlisted in 5bd'
+
+const dTh = 'px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide whitespace-nowrap'
+const dTd = 'px-3 py-2 align-middle'
+const dTr = 'hover:bg-[#F5F0EB] transition-colors'
+const byDateDesc = <T,>(get: (x: T) => string) => (a: T, b: T) => new Date(get(b)).getTime() - new Date(get(a)).getTime()
+const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ')
+
+function Section({ title, empty, emptyText, children }: { title: string; empty: boolean; emptyText: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</p>
+      {empty ? <p className="text-sm text-gray-400">{emptyText}</p> : children}
+    </div>
+  )
+}
+
+function DTable({ widths, headers, children }: { widths: string[]; headers: ReactNode[]; children: ReactNode }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <table className="w-full text-sm table-fixed">
+        <colgroup>{widths.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+        <thead>
+          <tr className={`bg-gray-50 ${hdrEdge}`}>
+            {headers.map((h, i) => <th key={i} className={dTh}>{h}</th>)}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">{children}</tbody>
+      </table>
+    </div>
+  )
+}
+
+function TruncLink({ href, text }: { href: string; text: string }) {
+  return (
+    <Link href={href} target="_blank" rel="noopener noreferrer" title={text} className="block truncate text-gray-800 hover:underline">
+      {text}
+    </Link>
+  )
+}
+
+function ResultBadge({ result }: { result: 'Passed' | 'Failed' }) {
+  return result === 'Passed'
+    ? <span className="inline-flex items-center rounded-full bg-lime-100 px-2 py-0.5 text-xs font-medium text-lime-800">Passed</span>
+    : <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Failed</span>
+}
 
 function DrillDown({ r }: { r: RecruiterKPI }) {
   const d = r.drillDown
+  const assigned = d.positions.filter((p) => !p.activityOnly).sort(byDateDesc((p) => p.kickoff))
+  const activityOnly = d.positions.filter((p) => p.activityOnly).sort((a, b) =>
+    (a.status === 'OPEN' ? 0 : 1) - (b.status === 'OPEN' ? 0 : 1) || a.title.localeCompare(b.title))
+  const qualified = [...d.qualifiedCandidates].sort(byDateDesc((c) => c.date))
+  const tech = [...d.techEvaluations].sort(byDateDesc((t) => t.date))
+  const closures = [...d.closuresList].sort(byDateDesc((c) => c.hireDate))
+  const candHref = (c: CandRef) => `/positions/${c.positionId}/candidates/${c.cpId}`
+  const posHref = (id: string) => `/positions/${id}`
+  const sla = r.timeToSubmission
+
   return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Positions (assigned)</p>
-        {d.positions.length === 0 ? <p className="text-sm text-gray-400">No assigned positions.</p> : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-400 border-b border-gray-200">
-                <th className={subTh}>Position</th><th className={subTh}>Status</th><th className={subTh}>HC</th>
-                <th className={subTh}>Kickoff</th><th className={subTh}>1st qualified (≤3bd)</th><th className={subTh}>Shortlist (≤5bd)</th>
+    <div className="space-y-6">
+      <Section title="Achievement breakdown" empty={false} emptyText="">
+        <DTable widths={['46%', '18%', '18%', '18%']} headers={['KPI', 'Attain.', 'Weight', 'Contrib.']}>
+          {r.achievement.breakdown.map((b) => (
+            <Fragment key={b.key}>
+              <tr className={`${dTr} ${b.attainment == null ? 'text-gray-400' : 'text-gray-700'}`}>
+                <td className={dTd}>{b.label}</td>
+                <td className={`${dTd} tabular-nums`}>{b.attainment != null ? `${b.attainment}%` : 'N/A'}</td>
+                <td className={`${dTd} tabular-nums`}>
+                  {b.weight}%
+                  {b.attainment != null && b.effectiveWeight !== b.weight && <span className="text-gray-400 text-xs"> → {b.effectiveWeight}%</span>}
+                </td>
+                <td className={`${dTd} tabular-nums`}>{b.contribution != null ? b.contribution.toFixed(1) : '—'}</td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {d.positions.map((p) => (
-                <tr key={p.id}>
-                  <td className="py-1.5 pr-4"><Link href={`/positions/${p.id}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{p.title}</Link></td>
-                  <td className="py-1.5 pr-4 text-gray-500 text-xs">{p.status}</td>
-                  <td className="py-1.5 pr-4 text-gray-700">{p.headcount}</td>
-                  <td className="py-1.5 pr-4 text-gray-500">{fmtDate(p.kickoff)}</td>
-                  <td className="py-1.5 pr-4"><SlaBadge sla={p.firstSLA} target={3} /></td>
-                  <td className="py-1.5"><SlaBadge sla={p.shortlistSLA} target={5} /></td>
+              {b.key === 'sla' && ([[FIRST_SLA_LABEL, sla.first], [SHORTLIST_SLA_LABEL, sla.shortlist]] as const).map(([label, agg]) => (
+                <tr key={label} className={`${dTr} text-xs text-gray-500`}>
+                  <td className={`${dTd} pl-7`}>{label}</td>
+                  <td className={`${dTd} tabular-nums`}>{agg.attainment != null ? `${agg.attainment}%` : 'N/A'}</td>
+                  <td className={dTd} /><td className={dTd} />
                 </tr>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+            </Fragment>
+          ))}
+          <tr className="font-semibold text-gray-900 bg-gray-50">
+            <td className={dTd}>Total</td><td className={dTd} /><td className={dTd} />
+            <td className={`${dTd} tabular-nums`}>{r.achievement.score != null ? `${r.achievement.score}%` : 'N/A'}</td>
+          </tr>
+        </DTable>
+      </Section>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Qualified this month ({d.qualifiedCandidates.length})</p>
-          {d.qualifiedCandidates.length === 0 ? <p className="text-sm text-gray-400">None.</p> : (
-            <ul className="space-y-1 text-sm">
-              {d.qualifiedCandidates.map((c) => (
-                <li key={`${c.cpId}-${c.date}`}>
-                  <Link href={`/positions/${c.positionId}/candidates/${c.cpId}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{c.name}</Link>
-                  <span className="text-gray-400"> · {c.positionTitle} · {fmtDate(c.date)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Closures this month ({d.closuresList.length})</p>
-          {d.closuresList.length === 0 ? <p className="text-sm text-gray-400">None.</p> : (
-            <ul className="space-y-1 text-sm">
-              {d.closuresList.map((c) => (
-                <li key={`${c.cpId}-${c.hireDate}`}>
-                  <Link href={`/positions/${c.positionId}/candidates/${c.cpId}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{c.name}</Link>
-                  <span className="text-gray-400"> · {c.positionTitle} · hired {fmtDate(c.hireDate)}{c.startDate ? ` · starts ${fmtDate(c.startDate)}` : ''}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Starts this month ({d.startsList.length})</p>
-          {d.startsList.length === 0 ? <p className="text-sm text-gray-400">None.</p> : (
-            <ul className="space-y-1 text-sm">
-              {d.startsList.map((c) => (
-                <li key={c.cpId}>
-                  <Link href={`/positions/${c.positionId}/candidates/${c.cpId}`} target="_blank" rel="noopener noreferrer" className="text-gray-800 hover:underline">{c.name}</Link>
-                  <span className="text-gray-400"> · {c.positionTitle} · {fmtDate(c.startDate)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+      <Section title={`Assigned positions (${assigned.length})`} empty={assigned.length === 0} emptyText="No assigned positions">
+        <DTable widths={['30%', '10%', '6%', '10%', '22%', '22%']} headers={['Position', 'Status', 'HC', 'Kickoff', FIRST_SLA_LABEL, SHORTLIST_SLA_LABEL]}>
+          {assigned.map((p) => (
+            <tr key={p.id} className={dTr}>
+              <td className={dTd}><TruncLink href={posHref(p.id)} text={p.title} /></td>
+              <td className={`${dTd} text-gray-500 text-xs`}>{titleCase(p.status)}</td>
+              <td className={`${dTd} tabular-nums text-gray-700`}>{p.headcount}</td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(p.kickoff)}</td>
+              <td className={`${dTd} text-xs`}><SlaBadge sla={p.firstSLA} /></td>
+              <td className={`${dTd} text-xs`}><SlaBadge sla={p.shortlistSLA} /></td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
+
+      <Section title={`Activity-only positions (${activityOnly.length})`} empty={activityOnly.length === 0} emptyText="No activity-only positions">
+        <DTable widths={['52%', '16%', '12%', '20%']} headers={['Position', 'Status', 'HC', 'Kickoff']}>
+          {activityOnly.map((p) => (
+            <tr key={p.id} className={dTr}>
+              <td className={dTd}><TruncLink href={posHref(p.id)} text={p.title} /></td>
+              <td className={`${dTd} text-gray-500 text-xs`}>{titleCase(p.status)}</td>
+              <td className={`${dTd} tabular-nums text-gray-700`}>{p.headcount}</td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(p.kickoff)}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
+
+      <Section title={`Qualified this month (${qualified.length})`} empty={qualified.length === 0} emptyText="No qualified candidates this month">
+        <DTable widths={['35%', '45%', '20%']} headers={['Candidate', 'Position', 'Date']}>
+          {qualified.map((c) => (
+            <tr key={`${c.cpId}-${c.date}`} className={dTr}>
+              <td className={dTd}><TruncLink href={candHref(c)} text={c.name} /></td>
+              <td className={`${dTd} text-gray-500`}><span className="block truncate" title={c.positionTitle}>{c.positionTitle}</span></td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(c.date)}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
+
+      <Section title={`Tech evaluations this month (${tech.length})`} empty={tech.length === 0} emptyText="No tech evaluations this month">
+        <p className="text-sm text-gray-700 mb-2">
+          {r.techPassRate.advances} of {r.techPassRate.total} passed ({r.techPassRate.rate}%)
+        </p>
+        <DTable widths={['26%', '34%', '13%', '12%', '15%']} headers={['Candidate', 'Position', 'Result', 'Date', 'Source']}>
+          {tech.map((t) => (
+            <tr key={t.cpId} className={dTr}>
+              <td className={dTd}><TruncLink href={candHref(t)} text={t.name} /></td>
+              <td className={`${dTd} text-gray-500`}><span className="block truncate" title={t.positionTitle}>{t.positionTitle}</span></td>
+              <td className={dTd}><ResultBadge result={t.result} /></td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(t.date)}</td>
+              <td className={`${dTd} text-gray-500 text-xs`}>{t.source}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
+
+      <Section title={`Closures this month (${closures.length})`} empty={closures.length === 0} emptyText="No closures this month">
+        <DTable widths={['30%', '40%', '15%', '15%']} headers={['Candidate', 'Position', 'Hired', 'Start date']}>
+          {closures.map((c) => (
+            <tr key={c.cpId} className={dTr}>
+              <td className={dTd}><TruncLink href={candHref(c)} text={c.name} /></td>
+              <td className={`${dTd} text-gray-500`}><span className="block truncate" title={c.positionTitle}>{c.positionTitle}</span></td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(c.hireDate)}</td>
+              <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{c.startDate ? fmtDate(c.startDate) : '—'}</td>
+            </tr>
+          ))}
+        </DTable>
+      </Section>
     </div>
   )
 }
@@ -215,6 +330,7 @@ function ScorecardRow({ r, isCurrentMonth, open, onToggle }: { r: RecruiterKPI; 
     : ratioStatus(q.count, q.target)
   const t = r.techPassRate
   const c = r.closures
+  const a = r.achievement
 
   return (
     <>
@@ -247,11 +363,19 @@ function ScorecardRow({ r, isCurrentMonth, open, onToggle }: { r: RecruiterKPI; 
           {c.isNA ? <span className="text-gray-400">N/A</span> : (
             <div>
               <StatusIcon s={ratioStatus(c.count, c.target)} /> {c.count} / {c.target}
-              <div className="text-xs text-gray-400">{c.isLowDemand ? '(low demand)' : 'stretch 3'}</div>
+              {!c.isLowDemand && <span className="text-gray-400 text-xs"> · stretch {c.stretch}</span>}
+              {c.isLowDemand && <div className="text-xs text-gray-400">(low demand)</div>}
             </div>
           )}
         </td>
-        <td className="px-3 py-3 text-right tabular-nums text-gray-700">{r.starts.count || <Dash />}</td>
+        <td className="px-3 py-3 tabular-nums">
+          {a.score == null ? <span className="text-gray-400">N/A</span> : (
+            <div>
+              <StatusIcon s={a.score >= 90 ? 'met' : a.score >= 70 ? 'near' : 'below'} /> <span className="font-semibold">{a.score}%</span>
+              {a.naKpis.length > 0 && <div className="text-xs text-gray-400">N/A: {a.naKpis.join(', ')}</div>}
+            </div>
+          )}
+        </td>
         <td className="px-3 py-3 text-gray-400">{open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</td>
       </tr>
       {open && (
@@ -387,8 +511,7 @@ export default function RecruiterPerformancePage() {
   const totals = useMemo(() => data?.metrics.reduce((acc, r) => ({
     qualified: acc.qualified + r.qualified.count,
     closures: acc.closures + r.closures.count,
-    starts: acc.starts + r.starts.count,
-  }), { qualified: 0, closures: 0, starts: 0 }), [data])
+  }), { qualified: 0, closures: 0 }), [data])
 
   return (
     <div className="space-y-6">
@@ -421,24 +544,22 @@ export default function RecruiterPerformancePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th />
-                    <th colSpan={3} className="px-3 pt-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest border-r border-gray-100">Demand</th>
-                    <th colSpan={5} className="px-3 pt-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-widest">KPIs</th>
-                    <th colSpan={2} />
+                  <tr className="bg-gray-50">
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`}>Recruiter</th>
+                    <th colSpan={3} className={`${th} text-center border-b border-gray-200 border-r border-r-gray-100`}>Demand</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`}>Qualified · 25%</th>
+                    <th colSpan={2} className={`${th} text-center border-b border-gray-200`}>Time to submission · 25%</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`} title="Passed ÷ (passed + failed) tech evaluations of recruiter-screened candidates, one per candidate">Tech Quality · 20%</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`}>Closures · 30%</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge} text-left align-bottom`} title="Weighted KPI attainment, each capped at 100%">Achievement</th>
+                    <th rowSpan={2} className={`${th} ${hdrEdge}`} />
                   </tr>
-                  <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
-                    <th className={`${th} text-left`}>Recruiter</th>
-                    <th className={`${th} text-right`} title="Assigned positions open during the month">Assigned</th>
-                    <th className={`${th} text-right`} title="Positions with candidate added, interview scheduled or decision in the month">Active</th>
-                    <th className={`${th} text-right border-r border-gray-100`} title="Headcount of assigned positions minus hired">Open HC</th>
-                    <th className={`${th} text-left`}>Qualified</th>
-                    <th className={`${th} text-left`}>1st Submission</th>
-                    <th className={`${th} text-left`}>Shortlist</th>
-                    <th className={`${th} text-left`}>Tech Pass</th>
-                    <th className={`${th} text-left`}>Closures</th>
-                    <th className={`${th} text-right`} title="Informational — hired candidates who started this month">Starts</th>
-                    <th className={th} />
+                  <tr className="bg-gray-50">
+                    <th className={`${th} ${hdrEdge} text-right`} title="Assigned positions open during the month">Assigned</th>
+                    <th className={`${th} ${hdrEdge} text-right`} title="Positions with candidate added, interview scheduled or decision in the month">Active</th>
+                    <th className={`${th} ${hdrEdge} text-right border-r border-r-gray-100`} title="Headcount of assigned positions minus hired">Open HC</th>
+                    <th className={`${th} ${hdrEdge} text-left`}>{FIRST_SLA_LABEL}</th>
+                    <th className={`${th} ${hdrEdge} text-left`} title="Partial credit: share of 3 qualified within 5 business days">{SHORTLIST_SLA_LABEL}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -460,8 +581,7 @@ export default function RecruiterPerformancePage() {
                       <td className="px-3 py-3 tabular-nums">{totals.qualified}</td>
                       <td /><td /><td />
                       <td className="px-3 py-3 tabular-nums">{totals.closures}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{totals.starts}</td>
-                      <td />
+                      <td /><td />
                     </tr>
                   </tfoot>
                 )}

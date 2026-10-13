@@ -122,7 +122,7 @@ const STAGE_ORDER: Record<string, number> = {
 }
 
 type SortDir = 'asc' | 'desc'
-type SortKey = 'name' | 'email' | 'seniority' | 'stage' | 'fitScore' | 'dateAdded'
+type SortKey = 'name' | 'email' | 'seniority' | 'stage' | 'fitScore' | 'dateAdded' | 'recruiter'
 
 function SortableHeader({
   label,
@@ -208,6 +208,7 @@ interface CandidatePosition {
   status: CandidateStatus
   fitScore: number | null
   createdAt: string
+  recruiterName?: string | null
   latestInterviewStatus?: string | null
   latestInterviewDecision?: string | null
   latestInterviewScheduledAt?: string | null
@@ -376,6 +377,9 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
       } else if (sortKey === 'dateAdded') {
         av = new Date(a.createdAt).getTime()
         bv = new Date(b.createdAt).getTime()
+      } else if (sortKey === 'recruiter') {
+        av = a.recruiterName ?? null
+        bv = b.recruiterName ?? null
       }
 
       if (av == null) return 1
@@ -471,6 +475,11 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
           const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           return days === 0 ? 'Today' : `${label} (${days}d)`
         })()}</td>
+        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+          {cp.recruiterName
+            ? <span title={cp.recruiterName}>{cp.recruiterName.trim().split(/\s+/)[0]}</span>
+            : <span className="text-gray-400">—</span>}
+        </td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.country ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>
         <td className="px-4 py-3">
@@ -525,6 +534,7 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
       <tr className="border-b-[2px] border-b-[#8CF000] bg-gray-50">
         {sh('Name', 'name')}
         {sh('Date Added', 'dateAdded')}
+        {sh('Recruiter', 'recruiter')}
         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Country</th>
         {sh('Seniority', 'seniority')}
         {sh('Stage', 'stage')}

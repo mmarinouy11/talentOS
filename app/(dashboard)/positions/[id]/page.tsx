@@ -87,6 +87,7 @@ export default async function PositionDetailPage({
         include: {
           candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true, minimumCompensation: true } },
           interviews: { select: { status: true, decision: true, stage: true, scheduledAt: true } },
+          recruiter: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },
       },
@@ -319,6 +320,7 @@ export default async function PositionDetailPage({
           status: cp.status,
           fitScore: cp.fitScore,
           createdAt: cp.createdAt.toISOString(),
+          recruiterName: cp.recruiter?.name ?? null,
           latestInterviewStatus: pickLatestInterview(cp.interviews, cp.stage)?.status ?? null,
           latestInterviewDecision: pickLatestInterview(cp.interviews, cp.stage)?.decision ?? null,
           latestInterviewScheduledAt: pickLatestInterview(cp.interviews, cp.stage)?.scheduledAt?.toISOString() ?? null,

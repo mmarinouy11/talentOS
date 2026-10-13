@@ -13,6 +13,11 @@ enum Role {
   HIRING_MANAGER
 }
 
+enum PositionType {
+  REQUISITION
+  PROACTIVE
+}
+
 enum PositionStatus {
   OPEN
   ON_HOLD
@@ -249,6 +254,8 @@ model Position {
   createdAt            DateTime       @default(now())
   cancelledReason      String?        @db.Text
   cancelledAt          DateTime?
+  type                 PositionType @default(REQUISITION)
+  convertedAt          DateTime?
   updatedAt            DateTime       @updatedAt
   deletedAt            DateTime?
 

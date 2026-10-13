@@ -1,6 +1,11 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import type { PositionStatus } from '@prisma/client'
+
+const QUALIFIED_TARGET = 30
+const TECH_TARGET = 0.6
+const WEIGHTS = { qualified: 0.25, sla: 0.25, tech: 0.2, closures: 0.3 }
 
 function businessDaysBetween(from: Date, to: Date): number {
   if (to < from) return 0
@@ -26,15 +31,60 @@ function addBusinessDays(date: Date, n: number): Date {
   return result
 }
 
-function subtractBusinessDays(date: Date, n: number): Date {
-  const result = new Date(date); result.setHours(0, 0, 0, 0)
-  let rem = n
-  while (rem > 0) {
-    result.setDate(result.getDate() - 1)
-    const d = result.getDay()
-    if (d !== 0 && d !== 6) rem--
+// Business days elapsed after kickoff up to `to` (kickoff Mon → Tue = 1)
+function elapsedBusinessDays(kickoff: Date, to: Date): number {
+  const next = new Date(kickoff); next.setHours(0, 0, 0, 0); next.setDate(next.getDate() + 1)
+  return businessDaysBetween(next, to)
+}
+
+type SlaOutcome = {
+  status: 'met' | 'partial' | 'missed' | 'in_progress'
+  count: number
+  need: number
+  windowBd: number
+  days: number | null
+  decisionDate: Date | null
+}
+
+// Each SLA outcome becomes final on its decision date: the date the target was reached
+// (met early) or the deadline day, kickoff + windowBd business days (with partial credit).
+function evalSla(kickoff: Date, qualifiedDates: Date[], windowBd: number, need: number, now: Date): SlaOutcome {
+  const deadlineEnd = addBusinessDays(kickoff, windowBd); deadlineEnd.setHours(23, 59, 59, 999)
+  const within = qualifiedDates.filter((d) => d <= deadlineEnd)
+  if (within.length >= need) {
+    const nth = within[need - 1]
+    return { status: 'met', count: need, need, windowBd, days: elapsedBusinessDays(kickoff, nth), decisionDate: nth }
   }
-  return result
+  if (now <= deadlineEnd) {
+    return { status: 'in_progress', count: within.length, need, windowBd, days: null, decisionDate: null }
+  }
+  const deadline = new Date(deadlineEnd); deadline.setHours(0, 0, 0, 0)
+  return { status: within.length > 0 ? 'partial' : 'missed', count: within.length, need, windowBd, days: null, decisionDate: deadline }
+}
+
+type SlaCellResult = {
+  result: 'met' | 'partial' | 'missed' | 'in_progress' | 'elsewhere' | 'pending' | 'na'
+  count: number
+  need: number
+  windowBd: number
+  days: number | null
+  decisionDate: string | null
+}
+
+const NA_SLA = (windowBd: number, need: number): SlaCellResult =>
+  ({ result: 'na', count: 0, need, windowBd, days: null, decisionDate: null })
+
+function aggregateSla(counted: SlaOutcome[], inProgress: SlaOutcome[]) {
+  const met = counted.filter((o) => o.status === 'met')
+  return {
+    attainment: counted.length > 0 ? Math.round((counted.reduce((s, o) => s + o.count / o.need, 0) / counted.length) * 100) : null,
+    met: met.length,
+    decided: counted.length,
+    avgDays: met.length > 0 ? Math.round((met.reduce((s, o) => s + o.days!, 0) / met.length) * 10) / 10 : null,
+    inProgress: inProgress.length,
+    inProgressCount: inProgress.reduce((s, o) => s + o.count, 0),
+    inProgressNeed: inProgress.reduce((s, o) => s + o.need, 0),
+  }
 }
 
 function monthBounds(month: string): { start: Date; end: Date } {
@@ -62,11 +112,6 @@ export async function GET(req: NextRequest) {
   const totalBD = businessDaysBetween(monthStart, monthEnd)
   const elapsedBD = isCurrentMonth ? Math.max(1, businessDaysBetween(monthStart, now)) : totalBD
 
-  // SLA window: positions whose kickoff + 5bd overlaps into this month
-  const slaWindowStart = subtractBusinessDays(monthStart, 5)
-  // Deadline comparison reference: current time for current month, monthEnd for past months
-  const slaRef = isCurrentMonth ? now : monthEnd
-
   try {
     const recruiters = await db.user.findMany({
       where: { active: true, role: 'RECRUITER' },
@@ -81,7 +126,11 @@ export async function GET(req: NextRequest) {
         recruiterId: { in: recruiterIds },
         deletedAt: null,
         createdAt: { lte: monthEnd },
-        status: { notIn: ['CANCELLED'] },
+        NOT: [
+          { status: { in: ['CLOSED', 'FILLED'] }, updatedAt: { lt: monthStart } },
+          { status: 'CANCELLED', cancelledAt: { lt: monthStart } },
+          { status: 'CANCELLED', cancelledAt: null },
+        ],
       },
       select: {
         id: true, title: true, status: true, headcount: true,
@@ -122,6 +171,13 @@ export async function GET(req: NextRequest) {
       if (!activityMap.has(row.recruiterId)) activityMap.set(row.recruiterId, new Set())
       activityMap.get(row.recruiterId)!.add(row.positionId)
     }
+    const activityPosIds = [...new Set([...activityMap.values()].flatMap((s) => [...s]))]
+    const activityPositions = activityPosIds.length > 0 ? await db.position.findMany({
+      where: { id: { in: activityPosIds }, deletedAt: null },
+      select: { id: true, title: true, status: true, headcount: true, createdAt: true },
+    }) : []
+    type ActivityPos = { id: string; title: string; status: PositionStatus; headcount: number | null; createdAt: Date }
+    const activityPosById = new Map<string, ActivityPos>(activityPositions.map((p: ActivityPos) => [p.id, p]))
 
     // Qualified candidates in month: SCREENING ADVANCE, decidedAt fallback updatedAt in month
     const qualifiedRaw = await db.$queryRaw<{
@@ -155,26 +211,79 @@ export async function GET(req: NextRequest) {
       qualifiedByPos.get(row.positionId)!.push(new Date(row.decidedAt))
     }
 
-    // Tech pass rate: TECHNICAL_INTERVIEW decisions in month, attributed to cp.recruiterId
-    const techDecisionsRaw = await db.$queryRaw<{ recruiterId: string; decision: string }[]>`
-      SELECT cp."recruiterId", i."decision"
-      FROM "Interview" i
-      JOIN "CandidatePosition" cp ON cp.id = i."candidatePositionId"
-      WHERE i."stage" = 'TECHNICAL_INTERVIEW'
-        AND i."decision" IN ('ADVANCE', 'REJECT')
-        AND COALESCE(i."decidedAt", i."updatedAt") >= ${monthStart}
-        AND COALESCE(i."decidedAt", i."updatedAt") <= ${monthEnd}
-        AND cp."recruiterId" IS NOT NULL
+    // Tech evaluation events in month for recruiter-screened candidates:
+    // pass = tech ADVANCE, or a stage move out of TECHNICAL_INTERVIEW to a later stage
+    // (covers rounds advanced without a recorded decision); fail = tech REJECT.
+    // Events after a withdrawal are dropped; HOLD/pending never produce an event.
+    type TechSource = 'decision' | 'stage move'
+    const techEventsRaw = await db.$queryRaw<{
+      cpId: string; recruiterId: string; positionId: string; kind: 'pass' | 'fail'; source: TechSource; at: Date
+      firstName: string; lastName: string; positionTitle: string
+    }[]>`
+      WITH events AS (
+        SELECT i."candidatePositionId" AS "cpId",
+               CASE WHEN i."decision" = 'ADVANCE' THEN 'pass' ELSE 'fail' END AS kind,
+               'decision' AS source,
+               COALESCE(i."decidedAt", i."updatedAt") AS at
+        FROM "Interview" i
+        WHERE i."stage" = 'TECHNICAL_INTERVIEW'
+          AND i."decision" IN ('ADVANCE', 'REJECT')
+          AND COALESCE(i."decidedAt", i."updatedAt") >= ${monthStart}
+          AND COALESCE(i."decidedAt", i."updatedAt") <= ${monthEnd}
+        UNION ALL
+        SELECT sh."candidatePositionId" AS "cpId", 'pass' AS kind, 'stage move' AS source, sh."movedAt" AS at
+        FROM "StageHistory" sh
+        WHERE sh."fromStage" = 'TECHNICAL_INTERVIEW'
+          AND sh."toStage" IN ('MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED')
+          AND sh."movedAt" >= ${monthStart} AND sh."movedAt" <= ${monthEnd}
+      )
+      SELECT e."cpId", cp."recruiterId", cp."positionId", e.kind, e.source, e.at,
+             c."firstName", c."lastName", p."title" AS "positionTitle"
+      FROM events e
+      JOIN "CandidatePosition" cp ON cp.id = e."cpId"
+      JOIN "Candidate" c ON c.id = cp."candidateId"
+      JOIN "Position" p ON p.id = cp."positionId"
+      WHERE cp."recruiterId" IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM "Interview" s
+          WHERE s."candidatePositionId" = cp.id
+            AND s."stage" = 'SCREENING' AND s."decision" = 'ADVANCE'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM "StageHistory" w
+          WHERE w."candidatePositionId" = cp.id
+            AND w."toStage" = 'WITHDRAWN'
+            AND w."movedAt" < e.at
+        )
     `
+    // One outcome per candidate-position: the latest event in the month wins. A pass backed
+    // by a recorded ADVANCE is reported as "decision"; "stage move" only when none exists.
+    const eventsByCp = new Map<string, typeof techEventsRaw>()
+    for (const ev of techEventsRaw) {
+      if (!eventsByCp.has(ev.cpId)) eventsByCp.set(ev.cpId, [])
+      eventsByCp.get(ev.cpId)!.push({ ...ev, at: new Date(ev.at) })
+    }
+    const techOutcomes = [...eventsByCp.values()].map((evs) => {
+      const latest = evs.reduce((a, b) => (b.at > a.at ? b : a))
+      const decisionPass = latest.kind === 'pass'
+        ? evs.filter((e) => e.kind === 'pass' && e.source === 'decision').sort((a, b) => b.at.getTime() - a.at.getTime())[0]
+        : undefined
+      const chosen = decisionPass ?? latest
+      return {
+        cpId: chosen.cpId, recruiterId: chosen.recruiterId, positionId: chosen.positionId,
+        name: `${chosen.firstName} ${chosen.lastName}`, positionTitle: chosen.positionTitle,
+        kind: latest.kind, source: chosen.source, at: chosen.at,
+      }
+    })
 
-    // Closures: StageHistory toStage=HIRED in month
+    // Closures: distinct candidate-positions moved to HIRED in month (earliest move = hire date)
     const closuresRaw = await db.$queryRaw<{
       recruiterId: string; positionId: string; cpId: string
       hireDate: Date; firstName: string; lastName: string
       positionTitle: string; startDate: Date | null
     }[]>`
       SELECT cp."recruiterId", cp."positionId", cp.id as "cpId",
-             sh."movedAt" as "hireDate",
+             MIN(sh."movedAt") as "hireDate",
              c."firstName", c."lastName", p."title" as "positionTitle",
              cp."startDate"
       FROM "StageHistory" sh
@@ -184,24 +293,8 @@ export async function GET(req: NextRequest) {
       WHERE sh."toStage" = 'HIRED'
         AND sh."movedAt" >= ${monthStart} AND sh."movedAt" <= ${monthEnd}
         AND cp."recruiterId" IS NOT NULL
-    `
-
-    // Starts: cp.startDate in month and <= today (end of today)
-    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
-    const startsRaw = await db.$queryRaw<{
-      recruiterId: string; positionId: string; cpId: string
-      firstName: string; lastName: string; positionTitle: string; startDate: Date
-    }[]>`
-      SELECT cp."recruiterId", cp."positionId", cp.id as "cpId",
-             c."firstName", c."lastName", p."title" as "positionTitle",
-             cp."startDate"
-      FROM "CandidatePosition" cp
-      JOIN "Candidate" c ON c.id = cp."candidateId"
-      JOIN "Position" p ON p.id = cp."positionId"
-      WHERE cp."startDate" >= ${monthStart}
-        AND cp."startDate" <= ${monthEnd}
-        AND cp."startDate" <= ${todayEnd}
-        AND cp."recruiterId" IS NOT NULL
+      GROUP BY cp.id, cp."recruiterId", cp."positionId", cp."startDate",
+               c."firstName", c."lastName", p."title"
     `
 
     // === Activity section (existing metrics, period = month) ===
@@ -295,44 +388,34 @@ export async function GET(req: NextRequest) {
       const pace = isCurrentMonth && elapsedBD > 0
         ? Math.round((qualifiedCount / elapsedBD) * totalBD) : null
 
-      // KPI 2: Time to submission — positions in SLA window
-      const slaPositions = myPositions.filter((p) => {
-        const k = new Date(p.createdAt)
-        return k >= slaWindowStart && k <= monthEnd
+      // KPI 2: Time to submission — each outcome counts in the month of its decision date;
+      // undecided outcomes appear as in progress only in the current month
+      const inThisMonth = (d: Date | null) => d != null && d >= monthStart && d <= monthEnd
+      const toCell = (o: SlaOutcome): SlaCellResult => ({
+        result: inThisMonth(o.decisionDate) ? o.status
+          : o.status === 'in_progress' ? (isCurrentMonth ? 'in_progress' : 'pending')
+          : 'elsewhere',
+        count: o.count, need: o.need, windowBd: o.windowBd, days: o.days,
+        decisionDate: o.decisionDate?.toISOString() ?? null,
       })
-      let firstMet = 0, firstMissed = 0, firstInProgress = 0, firstDaysSum = 0, firstDaysN = 0
-      let shortMet = 0, shortMissed = 0, shortInProgress = 0, shortDaysSum = 0, shortDaysN = 0
-      for (const pos of slaPositions) {
+      const slaById = new Map(myPositions.map((pos) => {
         const kickoff = new Date(pos.createdAt)
-        const qualified = qualifiedByPos.get(pos.id) ?? []
-        const firstQ = qualified[0] ?? null
-        const thirdQ = qualified[2] ?? null
-        const firstDeadline = addBusinessDays(kickoff, 3)
-        const shortDeadline = addBusinessDays(kickoff, 5)
-
-        if (firstQ) {
-          const d = businessDaysBetween(kickoff, firstQ)
-          firstDaysSum += d; firstDaysN++
-          if (d <= 3) firstMet++; else firstMissed++
-        } else {
-          if (firstDeadline >= slaRef) firstInProgress++; else firstMissed++
-        }
-        if (thirdQ) {
-          const d = businessDaysBetween(kickoff, thirdQ)
-          shortDaysSum += d; shortDaysN++
-          if (d <= 5) shortMet++; else shortMissed++
-        } else {
-          if (shortDeadline >= slaRef) shortInProgress++; else shortMissed++
-        }
+        const q = qualifiedByPos.get(pos.id) ?? []
+        return [pos.id, { first: evalSla(kickoff, q, 3, 1, now), shortlist: evalSla(kickoff, q, 5, 3, now) }]
+      }))
+      const slaAgg = (pick: 'first' | 'shortlist') => {
+        const outcomes = [...slaById.values()].map((s) => s[pick])
+        return aggregateSla(
+          outcomes.filter((o) => inThisMonth(o.decisionDate)),
+          isCurrentMonth ? outcomes.filter((o) => o.status === 'in_progress') : [],
+        )
       }
-      const firstTotal = firstMet + firstMissed
-      const shortTotal = shortMet + shortMissed
-      const firstPctMet = firstTotal > 0 ? Math.round((firstMet / firstTotal) * 100) : null
-      const shortPctMet = shortTotal > 0 ? Math.round((shortMet / shortTotal) * 100) : null
+      const firstAgg = slaAgg('first')
+      const shortAgg = slaAgg('shortlist')
 
-      // KPI 3: Tech pass rate
-      const myTech = techDecisionsRaw.filter((t) => t.recruiterId === rid)
-      const techAdvances = myTech.filter((t) => t.decision === 'ADVANCE').length
+      // KPI 3: Tech pass rate (one outcome per candidate-position)
+      const myTech = techOutcomes.filter((t) => t.recruiterId === rid)
+      const techAdvances = myTech.filter((t) => t.kind === 'pass').length
       const techTotal = myTech.length
       const techPassRate = techTotal > 0 ? Math.round((techAdvances / techTotal) * 100) : null
 
@@ -343,39 +426,60 @@ export async function GET(req: NextRequest) {
       const closureIsNA = openHeadcount === 0
       const closureIsLowDemand = !closureIsNA && openHeadcount < 2
 
-      // Starts
-      const myStarts = startsRaw.filter((s) => s.recruiterId === rid)
+      // Achievement: weighted attainment, each KPI capped at 100%, N/A weights re-normalized
+      const cap = (x: number) => Math.min(1, x)
+      const slaParts = [firstAgg.attainment, shortAgg.attainment]
+        .filter((x): x is number => x != null)
+        .map((x) => x / 100)
+      const kpiParts: { key: string; label: string; weight: number; attainment: number | null }[] = [
+        { key: 'qualified', label: 'Qualified', weight: WEIGHTS.qualified, attainment: cap(qualifiedCount / QUALIFIED_TARGET) },
+        { key: 'sla', label: 'Time to submission', weight: WEIGHTS.sla, attainment: slaParts.length > 0 ? cap(slaParts.reduce((a, b) => a + b, 0) / slaParts.length) : null },
+        { key: 'tech', label: 'Tech evaluation quality', weight: WEIGHTS.tech, attainment: techTotal > 0 ? cap(techAdvances / techTotal / TECH_TARGET) : null },
+        { key: 'closures', label: 'Closures', weight: WEIGHTS.closures, attainment: closureIsNA ? null : cap(closureCount / closureTarget) },
+      ]
+      const applicableWeight = kpiParts.reduce((s, k) => s + (k.attainment != null ? k.weight : 0), 0)
+      const breakdown = kpiParts.map((k) => {
+        const effectiveWeight = k.attainment != null && applicableWeight > 0 ? k.weight / applicableWeight : 0
+        return {
+          key: k.key, label: k.label,
+          weight: Math.round(k.weight * 100),
+          attainment: k.attainment != null ? Math.round(k.attainment * 100) : null,
+          effectiveWeight: Math.round(effectiveWeight * 1000) / 10,
+          contribution: k.attainment != null ? Math.round(k.attainment * effectiveWeight * 1000) / 10 : null,
+        }
+      })
+      const achievementScore = applicableWeight > 0
+        ? Math.round(kpiParts.reduce((s, k) => s + (k.attainment != null ? k.attainment * (k.weight / applicableWeight) : 0), 0) * 100)
+        : null
 
       // Drill-down
       const drillPositions = myPositions.map((pos) => {
         const kickoff = new Date(pos.createdAt)
-        const inSLAWindow = kickoff >= slaWindowStart && kickoff <= monthEnd
-        const qualified = qualifiedByPos.get(pos.id) ?? []
-        const firstQ = qualified[0] ?? null
-        const thirdQ = qualified[2] ?? null
-        let firstSLA: { result: string; days: number | null } = { result: 'na', days: null }
-        let shortlistSLA: { result: string; days: number | null } = { result: 'na', days: null }
-        if (inSLAWindow) {
-          if (firstQ) {
-            const d = businessDaysBetween(kickoff, firstQ)
-            firstSLA = { result: d <= 3 ? 'met' : 'missed', days: d }
-          } else {
-            firstSLA = { result: addBusinessDays(kickoff, 3) >= slaRef ? 'in_progress' : 'missed', days: null }
-          }
-          if (thirdQ) {
-            const d = businessDaysBetween(kickoff, thirdQ)
-            shortlistSLA = { result: d <= 5 ? 'met' : 'missed', days: d }
-          } else {
-            shortlistSLA = { result: addBusinessDays(kickoff, 5) >= slaRef ? 'in_progress' : 'missed', days: null }
-          }
-        }
+        const sla = slaById.get(pos.id)
+        const firstSLA = sla ? toCell(sla.first) : NA_SLA(3, 1)
+        const shortlistSLA = sla ? toCell(sla.shortlist) : NA_SLA(5, 3)
         return {
           id: pos.id, title: pos.title, status: pos.status,
           headcount: pos.headcount ?? 1,
           kickoff: kickoff.toISOString(),
           firstSLA, shortlistSLA,
+          activityOnly: false,
         }
       })
+      const assignedIds = new Set(myPositions.map((p) => p.id))
+      for (const pid of myActivityPosIds) {
+        if (assignedIds.has(pid)) continue
+        const pos = activityPosById.get(pid)
+        if (!pos) continue
+        drillPositions.push({
+          id: pos.id, title: pos.title, status: pos.status,
+          headcount: pos.headcount ?? 1,
+          kickoff: new Date(pos.createdAt).toISOString(),
+          firstSLA: NA_SLA(3, 1),
+          shortlistSLA: NA_SLA(5, 3),
+          activityOnly: true,
+        })
+      }
 
       // Activity section
       const sourcing = actSourcingMap.get(rid) ?? { manual: 0, direct: 0, partner: 0 }
@@ -407,24 +511,29 @@ export async function GET(req: NextRequest) {
           count: qualifiedCount,
           perActivePosition: qualifiedPerActive,
           pace,
-          target: 20,
+          target: QUALIFIED_TARGET,
         },
         timeToSubmission: {
-          first: { pctMet: firstPctMet, avgDays: firstDaysN > 0 ? Math.round(firstDaysSum / firstDaysN * 10) / 10 : null, met: firstMet, missed: firstMissed, inProgress: firstInProgress },
-          shortlist: { pctMet: shortPctMet, avgDays: shortDaysN > 0 ? Math.round(shortDaysSum / shortDaysN * 10) / 10 : null, met: shortMet, missed: shortMissed, inProgress: shortInProgress },
+          first: firstAgg,
+          shortlist: shortAgg,
         },
         techPassRate: { rate: techPassRate, advances: techAdvances, total: techTotal },
-        closures: { count: closureCount, target: closureTarget, isLowDemand: closureIsLowDemand, isNA: closureIsNA },
-        starts: {
-          count: myStarts.length,
-          list: myStarts.map((s) => ({
-            name: `${s.firstName} ${s.lastName}`,
-            cpId: s.cpId, positionId: s.positionId, positionTitle: s.positionTitle,
-            startDate: new Date(s.startDate).toISOString(),
-          })),
+        closures: { count: closureCount, target: closureTarget, stretch: 3, isLowDemand: closureIsLowDemand, isNA: closureIsNA },
+        achievement: {
+          score: achievementScore,
+          naKpis: breakdown.filter((b) => b.attainment == null).map((b) => b.label),
+          breakdown,
         },
         drillDown: {
           positions: drillPositions,
+          techEvaluations: myTech
+            .sort((a, b) => a.at.getTime() - b.at.getTime())
+            .map((t) => ({
+              name: t.name, cpId: t.cpId, positionId: t.positionId, positionTitle: t.positionTitle,
+              result: t.kind === 'pass' ? 'Passed' : 'Failed',
+              date: t.at.toISOString(),
+              source: t.source,
+            })),
           qualifiedCandidates: myQualified.map((q) => ({
             name: `${q.firstName} ${q.lastName}`,
             cpId: q.cpId, positionId: q.positionId, positionTitle: q.positionTitle,
@@ -435,11 +544,6 @@ export async function GET(req: NextRequest) {
             cpId: c.cpId, positionId: c.positionId, positionTitle: c.positionTitle,
             hireDate: new Date(c.hireDate).toISOString(),
             startDate: c.startDate ? new Date(c.startDate).toISOString() : null,
-          })),
-          startsList: myStarts.map((s) => ({
-            name: `${s.firstName} ${s.lastName}`,
-            cpId: s.cpId, positionId: s.positionId, positionTitle: s.positionTitle,
-            startDate: new Date(s.startDate).toISOString(),
           })),
         },
         activity: {
