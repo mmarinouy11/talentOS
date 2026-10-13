@@ -213,6 +213,7 @@ export default async function PositionDetailPage({
               positionTitle={position.title}
               recruiterId={position.recruiterId}
               recruiters={recruiterOptions}
+              activeCandidates={position.candidatePositions.filter((cp) => cp.status === 'ACTIVE').length}
             />
           )}
           {isAdmin && (

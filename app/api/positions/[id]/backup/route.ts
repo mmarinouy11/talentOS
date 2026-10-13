@@ -7,6 +7,7 @@ import { randomBytes } from 'crypto'
 const schema = z.object({
   title: z.string().trim().min(1),
   recruiterId: z.string().min(1),
+  carryCandidates: z.boolean().default(false),
 })
 
 // POST /api/positions/[id]/backup — clone a requisition into a new PROACTIVE position
@@ -31,7 +32,16 @@ export async function POST(
   const recruiter = await db.user.findUnique({ where: { id: parsed.data.recruiterId }, select: { id: true } })
   if (!recruiter) return NextResponse.json({ error: 'Lead recruiter not found' }, { status: 400 })
 
-  const backup = await db.position.create({
+  const userId = (session.user as { id?: string }).id!
+  const carried = parsed.data.carryCandidates
+    ? await db.candidatePosition.findMany({
+        where: { positionId: source.id, status: 'ACTIVE', candidate: { deletedAt: null } },
+      })
+    : []
+  const carryNote = `Carried over from: ${source.title}`
+
+  const backup = await db.$transaction(async (tx) => {
+   const created = await tx.position.create({
     data: {
       title: parsed.data.title,
       recruiterId: recruiter.id,
@@ -62,6 +72,43 @@ export async function POST(
       linkedinSearchQueries: source.linkedinSearchQueries,
     },
     select: { id: true },
+   })
+
+   // Original candidate-positions are left untouched; interviews and prior history stay there.
+   // createdAt/stageEnteredAt are preserved so aging and sourcing metrics don't treat them as new.
+   for (const cp of carried) {
+     await tx.candidatePosition.create({
+       data: {
+         candidateId: cp.candidateId,
+         positionId: created.id,
+         recruiterId: cp.recruiterId,
+         stage: cp.stage,
+         status: 'ACTIVE',
+         stageEnteredAt: cp.stageEnteredAt,
+         createdAt: cp.createdAt,
+         fitScore: cp.fitScore,
+         technicalFitScore: cp.technicalFitScore,
+         seniorityFitScore: cp.seniorityFitScore,
+         domainFitScore: cp.domainFitScore,
+         communicationFitScore: cp.communicationFitScore,
+         fitSummary: cp.fitSummary,
+         fitStrengths: cp.fitStrengths,
+         fitGaps: cp.fitGaps,
+         fitScoredAt: cp.fitScoredAt,
+         notes: cp.notes ? `${carryNote}\n\n${cp.notes}` : carryNote,
+         stageHistory: {
+           create: {
+             fromStage: null,
+             toStage: cp.stage,
+             movedAt: cp.stageEnteredAt,
+             movedById: userId,
+             notes: `Carried over from ${source.title}`,
+           },
+         },
+       },
+     })
+   }
+   return created
   })
 
   return NextResponse.json(backup, { status: 201 })

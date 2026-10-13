@@ -14,16 +14,19 @@ export function CreateBackupButton({
   positionTitle,
   recruiterId,
   recruiters,
+  activeCandidates,
 }: {
   positionId: string
   positionTitle: string
   recruiterId: string
   recruiters: RecruiterOption[]
+  activeCandidates: number
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState(`${positionTitle} — Backup`)
   const [leadId, setLeadId] = useState(recruiterId)
+  const [carryCandidates, setCarryCandidates] = useState(activeCandidates > 0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -36,7 +39,7 @@ export function CreateBackupButton({
       const res = await fetch(`/api/positions/${positionId}/backup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), recruiterId: leadId }),
+        body: JSON.stringify({ title: title.trim(), recruiterId: leadId, carryCandidates: carryCandidates && activeCandidates > 0 }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) { setError(body.error ?? 'Could not create backup'); return }
@@ -58,7 +61,7 @@ export function CreateBackupButton({
               <h2 className="text-lg font-semibold text-gray-900">Create proactive backup</h2>
               <p className="text-sm text-gray-500 mt-1">
                 A new proactive position with the same JD and settings, to source backup profiles.
-                Candidates and partners are not copied.
+                Partners, interviews and stage history are not copied.
               </p>
             </div>
             <div>
@@ -74,6 +77,18 @@ export function CreateBackupButton({
                 ))}
               </Select>
             </div>
+            <label className={`flex items-center gap-2 text-sm ${activeCandidates === 0 ? 'text-gray-400' : 'text-gray-700 cursor-pointer'}`}>
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[#8CF000]"
+                checked={carryCandidates && activeCandidates > 0}
+                disabled={activeCandidates === 0}
+                onChange={(e) => setCarryCandidates(e.target.checked)}
+              />
+              {activeCandidates > 0
+                ? <>Bring active candidates ({activeCandidates})</>
+                : <>Bring active candidates <span className="text-gray-400">(no active candidates)</span></>}
+            </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
