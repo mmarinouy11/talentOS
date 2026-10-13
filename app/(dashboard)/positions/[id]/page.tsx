@@ -18,6 +18,7 @@ import { VendorAssignment } from '@/components/app/VendorAssignment'
 import { ApplicationPortalLink } from '@/components/app/ApplicationPortalLink'
 import { ProactiveBadge } from '@/components/app/ProactiveBadge'
 import { ConvertToRequisitionButton } from '@/components/app/ConvertToRequisitionButton'
+import { CreateBackupButton } from '@/components/app/CreateBackupButton'
 import type { Role } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
@@ -79,11 +80,13 @@ export default async function PositionDetailPage({
 
   const { id } = await params
 
-  const [position, assignedVendors] = await Promise.all([
+  const [position, assignedVendors, recruiterOptions] = await Promise.all([
   db.position.findFirst({
     where: { id, deletedAt: null },
     include: {
       recruiter: { select: { id: true, name: true, email: true } },
+      sourcePosition: { select: { id: true, title: true, deletedAt: true } },
+      backups: { where: { deletedAt: null }, select: { id: true, title: true, status: true }, orderBy: { createdAt: 'asc' } },
       candidatePositions: {
         where: { candidate: { deletedAt: null } },
         include: {
@@ -99,6 +102,11 @@ export default async function PositionDetailPage({
     where: { positionId: id },
     include: { vendor: { select: { id: true, name: true, pocName: true, pocEmail: true, portalToken: true } } },
     orderBy: { assignedAt: 'asc' },
+  }),
+  db.user.findMany({
+    where: { role: { in: ['RECRUITER', 'ADMIN'] } },
+    select: { id: true, name: true, email: true },
+    orderBy: { name: 'asc' },
   }),
   ])
 
@@ -167,6 +175,26 @@ export default async function PositionDetailPage({
             <PriorityBadge priority={position.priority} />
           </div>
           <p className="text-sm text-gray-500 mt-1">{position.client}</p>
+          {position.sourcePosition && !position.sourcePosition.deletedAt && (
+            <p className="text-sm text-gray-500 mt-1">
+              Backup for:{' '}
+              <Link href={`/positions/${position.sourcePosition.id}`} className="text-gray-800 hover:underline">
+                {position.sourcePosition.title}
+              </Link>
+            </p>
+          )}
+          {position.backups.length > 0 && (
+            <p className="text-sm text-gray-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>Backups:</span>
+              {position.backups.map((b, i) => (
+                <span key={b.id} className="inline-flex items-center gap-1">
+                  <Link href={`/positions/${b.id}`} className="text-gray-800 hover:underline">{b.title}</Link>
+                  <PositionStatusBadge status={b.status} />
+                  {i < position.backups.length - 1 && <span className="text-gray-300">·</span>}
+                </span>
+              ))}
+            </p>
+          )}
           {position.convertedAt && (
             <p className="text-xs text-gray-400 mt-1">Converted from proactive on {fmt(position.convertedAt)}</p>
           )}
@@ -179,6 +207,14 @@ export default async function PositionDetailPage({
         </div>
         <div className="flex items-center gap-2">
           {canConvert && <ConvertToRequisitionButton positionId={id} positionTitle={position.title} />}
+          {!isProactive && (
+            <CreateBackupButton
+              positionId={id}
+              positionTitle={position.title}
+              recruiterId={position.recruiterId}
+              recruiters={recruiterOptions}
+            />
+          )}
           {isAdmin && (
             <PositionDeleteButton positionId={id} positionTitle={position.title} />
           )}
