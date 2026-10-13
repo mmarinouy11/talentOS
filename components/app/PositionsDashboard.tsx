@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PositionsTable } from '@/components/app/PositionsTable'
 import type { PositionRow, TypeFilter } from '@/components/app/PositionsTable'
 
@@ -35,20 +35,45 @@ function StatusCard({ label, count, color, filterValue, active, onClick }: Statu
 interface Props {
   positions: PositionRow[]
   isAdmin: boolean
-  counts: {
-    OPEN: number; ON_HOLD: number; FILLED: number; CLOSED: number; CANCELLED: number
-    ytjCount: number
-  }
-  headcounts: {
-    OPEN: number; ON_HOLD: number; FILLED: number; CLOSED: number; CANCELLED: number
-    ytj: number
-  }
-  proactiveOpenCount: number
 }
 
-export function PositionsDashboard({ positions, isAdmin, counts: _counts, headcounts, proactiveOpenCount }: Props) {
+const CLIENT_STORAGE_KEY = 'positions-client-filter'
+
+function readSavedClient(): string {
+  try { return sessionStorage.getItem(CLIENT_STORAGE_KEY) ?? '' } catch { return '' }
+}
+
+export function PositionsDashboard({ positions, isAdmin }: Props) {
   const [statusFilter, setStatusFilter] = useState<FilterValue>('OPEN')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('REQUISITION')
+  const [clientFilter, setClientFilter] = useState<string>(readSavedClient)
+
+  useEffect(() => {
+    try { sessionStorage.setItem(CLIENT_STORAGE_KEY, clientFilter) } catch { /* sessionStorage unavailable */ }
+  }, [clientFilter])
+
+  const clients = useMemo(
+    () => [...new Set(positions.map((p) => p.client))].sort((a, b) => a.localeCompare(b)),
+    [positions],
+  )
+  // A saved client that no longer has positions falls back to "All clients"
+  const activeClient = clients.includes(clientFilter) ? clientFilter : ''
+
+  // Cards reflect the selected client; proactive positions stay out of the status cards
+  const { headcounts, proactiveOpenCount } = useMemo(() => {
+    const hc = { OPEN: 0, ON_HOLD: 0, FILLED: 0, CLOSED: 0, CANCELLED: 0, ytj: 0 }
+    let proactive = 0
+    for (const p of positions) {
+      if (activeClient && p.client !== activeClient) continue
+      if (p.type === 'PROACTIVE') {
+        if (p.status === 'OPEN') proactive++
+        continue
+      }
+      hc[p.status] += p.headcount ?? 1
+      if (p.isYtj) hc.ytj += p.headcount ?? 1
+    }
+    return { headcounts: hc, proactiveOpenCount: proactive }
+  }, [positions, activeClient])
 
   // Status cards count requisitions only, so clicking one switches the list back to requisitions
   function handleCardClick(value: FilterValue) {
@@ -117,6 +142,9 @@ export function PositionsDashboard({ positions, isAdmin, counts: _counts, headco
         onStatusFilterChange={(v) => setStatusFilter(v as FilterValue)}
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
+        clientFilter={activeClient}
+        onClientFilterChange={setClientFilter}
+        clients={clients}
       />
     </>
   )

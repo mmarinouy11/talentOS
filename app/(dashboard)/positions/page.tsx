@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { PositionsDashboard } from '@/components/app/PositionsDashboard'
-import type { PositionStatus, Role } from '@prisma/client'
+import type { Role } from '@prisma/client'
 
 export default async function PositionsPage() {
   const session = await auth()
@@ -36,28 +36,15 @@ export default async function PositionsPage() {
     orderBy: [{ client: 'asc' }, { createdAt: 'desc' }],
   })
 
-  const counts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CANCELLED: 0, FILLED: 0, CLOSED: 0 }
-  const headcounts: Record<PositionStatus, number> = { OPEN: 0, ON_HOLD: 0, CANCELLED: 0, FILLED: 0, CLOSED: 0 }
-  const today = new Date(); today.setUTCHours(0, 0, 0, 0)
-  let ytjPositionCount = 0
-  let ytjHeadcount = 0
-  let proactiveOpenCount = 0
+  // Header totals: open requisitions only (cards are computed client-side per selected client)
+  let openPositions = 0
+  let openHeadcount = 0
   for (const p of positions) {
-    // Proactive positions stay out of the status cards and headcount totals
-    if (p.type === 'PROACTIVE') {
-      if (p.status === 'OPEN') proactiveOpenCount++
-      continue
-    }
-    counts[p.status]++
-    headcounts[p.status] += p.headcount ?? 1
-    const hasYtj = p.candidatePositions.some(
-      (cp) => cp.status === 'HIRED' && cp.startDate != null && cp.startDate > today
-    )
-    if (hasYtj) {
-      ytjPositionCount++
-      ytjHeadcount += p.headcount ?? 1
-    }
+    if (p.type === 'PROACTIVE' || p.status !== 'OPEN') continue
+    openPositions++
+    openHeadcount += p.headcount ?? 1
   }
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0)
 
   const serialized = positions.map((p) => ({
     id: p.id,
@@ -87,7 +74,7 @@ export default async function PositionsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Positions</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {headcounts.OPEN} open headcount across {counts.OPEN} position{counts.OPEN === 1 ? '' : 's'}
+            {openHeadcount} open headcount across {openPositions} position{openPositions === 1 ? '' : 's'}
           </p>
         </div>
         <Link href="/positions/new">
@@ -95,13 +82,7 @@ export default async function PositionsPage() {
         </Link>
       </div>
 
-      <PositionsDashboard
-        positions={serialized}
-        isAdmin={isAdmin}
-        counts={{ OPEN: counts.OPEN, ON_HOLD: counts.ON_HOLD, FILLED: counts.FILLED, CLOSED: counts.CLOSED, CANCELLED: counts.CANCELLED, ytjCount: ytjPositionCount }}
-        headcounts={{ OPEN: headcounts.OPEN, ON_HOLD: headcounts.ON_HOLD, FILLED: headcounts.FILLED, CLOSED: headcounts.CLOSED, CANCELLED: headcounts.CANCELLED, ytj: ytjHeadcount }}
-        proactiveOpenCount={proactiveOpenCount}
-      />
+      <PositionsDashboard positions={serialized} isAdmin={isAdmin} />
     </div>
   )
 }

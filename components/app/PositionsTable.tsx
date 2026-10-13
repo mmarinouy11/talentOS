@@ -107,6 +107,9 @@ export function PositionsTable({
   onStatusFilterChange,
   typeFilter: controlledType,
   onTypeFilterChange,
+  clientFilter = '',
+  onClientFilterChange,
+  clients = [],
 }: {
   positions: PositionRow[]
   isAdmin?: boolean
@@ -115,6 +118,9 @@ export function PositionsTable({
   onStatusFilterChange?: (v: PositionStatus | '' | 'YTJ') => void
   typeFilter?: TypeFilter
   onTypeFilterChange?: (v: TypeFilter) => void
+  clientFilter?: string
+  onClientFilterChange?: (v: string) => void
+  clients?: string[]
 }) {
   const [internalType, setInternalType] = useState<TypeFilter>('REQUISITION')
   const typeFilter = controlledType ?? internalType
@@ -160,8 +166,9 @@ export function PositionsTable({
       p.client.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = !statusFilter_ || (statusFilter_ === 'YTJ' ? p.isYtj : p.status === statusFilter_)
     const matchesType = typeFilter === 'ALL' || p.type === typeFilter
-    return matchesSearch && matchesStatus && matchesType
-  }), [sortRows, search, statusFilter_, typeFilter])
+    const matchesClient = !clientFilter || p.client === clientFilter
+    return matchesSearch && matchesStatus && matchesType && matchesClient
+  }), [sortRows, search, statusFilter_, typeFilter, clientFilter])
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
@@ -210,6 +217,12 @@ export function PositionsTable({
           <option value="PROACTIVE">Proactive</option>
           <option value="ALL">All types</option>
         </Select>
+        {onClientFilterChange && (
+          <Select value={clientFilter} onChange={(e) => onClientFilterChange(e.target.value)} className="w-48" aria-label="Client">
+            <option value="">All clients</option>
+            {clients.map((c) => <option key={c} value={c}>{c}</option>)}
+          </Select>
+        )}
       </div>
 
       {sorted.length === 0 ? (
