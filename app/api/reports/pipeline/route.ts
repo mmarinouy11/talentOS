@@ -62,7 +62,7 @@ export async function GET(request: Request) {
 
 
   const positions = await db.position.findMany({
-    where: { status: 'OPEN', deletedAt: null },
+    where: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' },
     include: {
       recruiter: { select: { name: true, email: true } },
       candidatePositions: {
@@ -187,7 +187,7 @@ export async function GET(request: Request) {
         scheduledAt: { gte: fromDate, lte: toDate },
         candidatePosition: {
           status: { in: ['ACTIVE', 'HIRED'] },
-          position: { status: 'OPEN', deletedAt: null },
+          position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' },
           candidate: { deletedAt: null },
         },
       },
@@ -200,7 +200,7 @@ export async function GET(request: Request) {
         decision: 'ADVANCE',
         candidatePosition: {
           status: { in: ['ACTIVE', 'HIRED'] },
-          position: { status: 'OPEN', deletedAt: null },
+          position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' },
           candidate: { deletedAt: null },
         },
       },
@@ -209,7 +209,7 @@ export async function GET(request: Request) {
     db.candidatePosition.findMany({
       where: {
         createdAt: { gte: fromDate, lte: toDate },
-        position: { status: 'OPEN', deletedAt: null },
+        position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' },
         candidate: { deletedAt: null },
       },
       select: { positionId: true },
@@ -220,7 +220,7 @@ export async function GET(request: Request) {
         toStage: 'OFFER',
         movedAt: { gte: fromDate, lte: toDate },
         candidatePosition: {
-          position: { status: 'OPEN', deletedAt: null },
+          position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' },
           candidate: { deletedAt: null },
         },
       },
@@ -231,7 +231,7 @@ export async function GET(request: Request) {
         decidedAt: { gte: fromDate, lte: toDate },
         decision: 'REJECT',
         candidatePosition: {
-          position: { status: 'OPEN', deletedAt: null },
+          position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' },
           candidate: { deletedAt: null },
         },
       },
@@ -241,7 +241,7 @@ export async function GET(request: Request) {
       where: {
         toStage: 'HIRED',
         movedAt: { gte: fromDate, lte: toDate },
-        candidatePosition: { candidate: { deletedAt: null } },
+        candidatePosition: { candidate: { deletedAt: null }, position: { type: 'REQUISITION' } },
       },
       select: { candidatePosition: { select: { positionId: true } } },
       distinct: ['candidatePositionId'],

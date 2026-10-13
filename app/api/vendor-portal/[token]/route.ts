@@ -14,6 +14,8 @@ export async function GET(
     where: { portalToken: token },
     include: {
       positionVendors: {
+        // Proactive positions are never offered through partner or referral portals
+        where: { position: { type: 'REQUISITION' } },
         include: {
           position: {
             select: {

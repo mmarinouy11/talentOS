@@ -42,9 +42,12 @@ export async function PATCH(
 
   const position = await db.position.findFirst({
     where: { id: positionId, deletedAt: null },
-    select: { id: true, title: true, client: true },
+    select: { id: true, title: true, client: true, type: true },
   })
   if (!position) return NextResponse.json({ error: 'Position not found' }, { status: 404 })
+  if (position.type === 'PROACTIVE') {
+    return NextResponse.json({ error: 'Partners cannot be assigned to proactive positions' }, { status: 400 })
+  }
 
   const body = await request.json()
   const parsed = patchSchema.safeParse(body)

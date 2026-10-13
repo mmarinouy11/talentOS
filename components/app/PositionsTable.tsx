@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import type { PositionStatus, Priority } from '@prisma/client'
+import type { PositionStatus, PositionType, Priority } from '@prisma/client'
 import { PositionStatusBadge } from './PositionStatusBadge'
 import { PriorityBadge } from './PriorityBadge'
+import { ProactiveBadge } from './ProactiveBadge'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
@@ -63,6 +64,7 @@ export interface PositionRow {
   dgm: number | null
   dgmAtRisk: boolean
   headcount: number | null
+  type: PositionType
   recruiter: { name: string | null; email: string } | null
   _count: { candidatePositions: number; positionVendors: number }
   isYtj?: boolean
@@ -95,6 +97,7 @@ function fmtTarget(row: PositionRow) {
 }
 
 type SortKey = keyof SortRow
+export type TypeFilter = 'REQUISITION' | 'PROACTIVE' | 'ALL'
 
 export function PositionsTable({
   positions,
@@ -102,13 +105,23 @@ export function PositionsTable({
   initialStatus,
   statusFilter: controlledStatus,
   onStatusFilterChange,
+  typeFilter: controlledType,
+  onTypeFilterChange,
 }: {
   positions: PositionRow[]
   isAdmin?: boolean
   initialStatus?: PositionStatus | ''
   statusFilter?: PositionStatus | '' | 'YTJ'
   onStatusFilterChange?: (v: PositionStatus | '' | 'YTJ') => void
+  typeFilter?: TypeFilter
+  onTypeFilterChange?: (v: TypeFilter) => void
 }) {
+  const [internalType, setInternalType] = useState<TypeFilter>('REQUISITION')
+  const typeFilter = controlledType ?? internalType
+  function setTypeFilter(v: TypeFilter) {
+    if (onTypeFilterChange) onTypeFilterChange(v)
+    else setInternalType(v)
+  }
   const [search, setSearch] = useState('')
   const [statusFilter, setInternalStatus] = useState<PositionStatus | ''>(initialStatus ?? 'OPEN')
 
@@ -146,8 +159,9 @@ export function PositionsTable({
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.client.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = !statusFilter_ || (statusFilter_ === 'YTJ' ? p.isYtj : p.status === statusFilter_)
-    return matchesSearch && matchesStatus
-  }), [sortRows, search, statusFilter_])
+    const matchesType = typeFilter === 'ALL' || p.type === typeFilter
+    return matchesSearch && matchesStatus && matchesType
+  }), [sortRows, search, statusFilter_, typeFilter])
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
@@ -191,6 +205,11 @@ export function PositionsTable({
           <option value="FILLED">Filled</option>
           <option value="CLOSED">Closed</option>
         </Select>
+        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TypeFilter)} className="w-40" aria-label="Type">
+          <option value="REQUISITION">Requisitions</option>
+          <option value="PROACTIVE">Proactive</option>
+          <option value="ALL">All types</option>
+        </Select>
       </div>
 
       {sorted.length === 0 ? (
@@ -227,6 +246,7 @@ export function PositionsTable({
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {p.dgmAtRisk && <span className="text-red-600 mr-1" title="Margin at risk">⚠</span>}
                       {p.title}
+                      {p.type === 'PROACTIVE' && <ProactiveBadge className="ml-2 align-middle" />}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{p.client}</td>
                     <td className="px-4 py-3">
@@ -244,7 +264,7 @@ export function PositionsTable({
                     <td className="px-4 py-3 text-right font-medium text-gray-600">{days}d</td>
                     <td className="px-4 py-3 text-right text-gray-600">{p._count.candidatePositions}</td>
                     <td className="px-4 py-3 text-right text-gray-600">{p._partners > 0 ? p._partners : '—'}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">{p.headcount ?? 1}</td>
+                    <td className="px-4 py-3 text-right text-gray-600">{p.type === 'PROACTIVE' ? <span className="text-gray-400">—</span> : p.headcount ?? 1}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {isAdmin && (

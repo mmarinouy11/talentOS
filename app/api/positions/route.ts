@@ -27,6 +27,7 @@ const positionSchema = z.object({
   timezone: z.string().optional().nullable(),
   reportingEmails: z.array(z.string().email()).optional(),
   reportingDays: z.array(z.string()).optional(),
+  type: z.enum(['REQUISITION', 'PROACTIVE']).default('REQUISITION'),
 })
 
 export async function GET(request: Request) {
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
   const position = await db.position.create({
     data: {
       ...parsed.data,
+      ...(parsed.data.type === 'PROACTIVE' ? { headcount: null } : {}),
       status: 'OPEN',
       recruiterId: parsed.data.recruiterId || userId,
       applicationToken,

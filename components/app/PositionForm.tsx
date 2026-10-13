@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
-import type { Role, Priority, PositionStatus } from '@prisma/client'
+import type { Role, Priority, PositionStatus, PositionType } from '@prisma/client'
 import { RECRUITER_TIMEZONES } from '@/lib/timezone'
 
 export interface UserOption {
@@ -70,6 +70,7 @@ interface PositionFormProps {
     vendorMinFitScore?: number | null
     directMinFitScore?: number | null
     headcount?: number | null
+    type?: PositionType
     talentId?: string | null
     timezone?: string | null
     reportingEmails?: string[]
@@ -87,6 +88,8 @@ export function PositionForm({ users, defaultValues = {}, mode, isAdmin = false 
   const [cancelReason, setCancelReason] = useState<string>(CANCELLATION_REASONS[0])
   const [cancelCustom, setCancelCustom] = useState('')
   const [statusValue, setStatusValue] = useState<string>(defaultValues.status ?? 'OPEN')
+  const [typeValue, setTypeValue] = useState<PositionType>(defaultValues.type ?? 'REQUISITION')
+  const isProactive = typeValue === 'PROACTIVE'
   const [isAsap, setIsAsap] = useState(defaultValues.target_date_asap ?? false)
   const [locations, setLocations] = useState<string[]>(defaultValues.location ?? [])
   const [clientRate, setClientRate] = useState<string>(
@@ -199,12 +202,14 @@ export function PositionForm({ users, defaultValues = {}, mode, isAdmin = false 
       internalCostBudget: internalCostBudget !== '' && !isNaN(icbNum) ? icbNum : null,
       vendorMinFitScore: vendorMinFitScore !== '' && !isNaN(parseInt(vendorMinFitScore)) ? parseInt(vendorMinFitScore) : null,
       directMinFitScore: directMinFitScore !== '' && !isNaN(parseInt(directMinFitScore)) ? parseInt(directMinFitScore) : null,
-      headcount: fd.get('headcount') ? parseInt(fd.get('headcount') as string) || 1 : 1,
+      headcount: isProactive ? null : fd.get('headcount') ? parseInt(fd.get('headcount') as string) || 1 : 1,
       talentId: (fd.get('talentId') as string) || null,
       timezone,
       reportingEmails,
       reportingDays,
     }
+
+    if (mode === 'create') payload.type = typeValue
 
     if (mode === 'edit') {
       payload.status = statusValue
@@ -274,18 +279,39 @@ export function PositionForm({ users, defaultValues = {}, mode, isAdmin = false 
           />
         </div>
 
-        {/* Headcount */}
+        {/* Type */}
         <div>
-          <Label htmlFor="headcount">Headcount</Label>
-          <Input
-            id="headcount"
-            name="headcount"
-            type="number"
-            min={1}
-            defaultValue={defaultValues.headcount ?? 1}
-          />
-          <p className="text-xs text-gray-400 mt-1">Number of hires needed for this role</p>
+          <Label htmlFor="type">Type</Label>
+          <Select
+            id="type"
+            value={typeValue}
+            onChange={(e) => setTypeValue(e.target.value as PositionType)}
+            disabled={mode === 'edit'}
+          >
+            <option value="REQUISITION">Requisition</option>
+            <option value="PROACTIVE">Proactive</option>
+          </Select>
+          <p className="text-xs text-gray-400 mt-1">
+            {mode === 'edit'
+              ? isProactive ? 'Use "Convert to requisition" on the position page to change.' : 'Type cannot be changed after creation.'
+              : isProactive ? 'Pipeline built ahead of an approved requisition.' : 'Approved opening with headcount.'}
+          </p>
         </div>
+
+        {/* Headcount */}
+        {!isProactive && (
+          <div>
+            <Label htmlFor="headcount">Headcount</Label>
+            <Input
+              id="headcount"
+              name="headcount"
+              type="number"
+              min={1}
+              defaultValue={defaultValues.headcount ?? 1}
+            />
+            <p className="text-xs text-gray-400 mt-1">Number of hires needed for this role</p>
+          </div>
+        )}
 
         {/* TalentID */}
         <div>

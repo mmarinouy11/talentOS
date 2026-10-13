@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   if (!client) {
     const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
     const allPositions = await db.position.findMany({
-      where: { deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
+      where: { deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] }, type: 'REQUISITION' },
       select: {
         client: true,
         headcount: true,
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
     const DASH_STAGES: Stage[] = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED']
 
     const positions = await db.position.findMany({
-      where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
+      where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] }, type: 'REQUISITION' },
       include: {
         recruiter: { select: { name: true, email: true } },
         candidatePositions: {
@@ -208,7 +208,7 @@ export async function GET(request: Request) {
 
     const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
     const allAnalyticsPositions = await db.position.findMany({
-      where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
+      where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] }, type: 'REQUISITION' },
       select: {
         id: true,
         headcount: true,
@@ -305,7 +305,7 @@ export async function GET(request: Request) {
 
     const todayEnd = new Date(); todayEnd.setUTCHours(23, 59, 59, 999)
     const allActivityPositions = await db.position.findMany({
-      where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
+      where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] }, type: 'REQUISITION' },
       select: {
         id: true,
         title: true,
@@ -407,7 +407,7 @@ export async function GET(request: Request) {
   const pipelineTodayEnd = new Date(); pipelineTodayEnd.setUTCHours(23, 59, 59, 999)
 
   const allPipelinePositions = await db.position.findMany({
-    where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] } },
+    where: { client, deletedAt: null, status: { notIn: ['ON_HOLD', 'CANCELLED'] }, type: 'REQUISITION' },
     include: {
       recruiter: { select: { name: true, email: true } },
       positionVendors: {

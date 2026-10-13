@@ -26,6 +26,7 @@ export default async function PositionsPage() {
       dgm: true,
       dgmAtRisk: true,
       headcount: true,
+      type: true,
       cancelledReason: true,
       cancelledAt: true,
       recruiter: { select: { id: true, name: true, email: true } },
@@ -40,7 +41,13 @@ export default async function PositionsPage() {
   const today = new Date(); today.setUTCHours(0, 0, 0, 0)
   let ytjPositionCount = 0
   let ytjHeadcount = 0
+  let proactiveOpenCount = 0
   for (const p of positions) {
+    // Proactive positions stay out of the status cards and headcount totals
+    if (p.type === 'PROACTIVE') {
+      if (p.status === 'OPEN') proactiveOpenCount++
+      continue
+    }
     counts[p.status]++
     headcounts[p.status] += p.headcount ?? 1
     const hasYtj = p.candidatePositions.some(
@@ -64,6 +71,7 @@ export default async function PositionsPage() {
     dgm: p.dgm,
     dgmAtRisk: p.dgmAtRisk,
     headcount: p.headcount,
+    type: p.type,
     cancelledReason: p.cancelledReason,
     cancelledAt: p.cancelledAt?.toISOString() ?? null,
     recruiter: p.recruiter,
@@ -78,7 +86,9 @@ export default async function PositionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Positions</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{headcounts.OPEN} open headcount</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {headcounts.OPEN} open headcount across {counts.OPEN} position{counts.OPEN === 1 ? '' : 's'}
+          </p>
         </div>
         <Link href="/positions/new">
           <Button>New Position</Button>
@@ -90,6 +100,7 @@ export default async function PositionsPage() {
         isAdmin={isAdmin}
         counts={{ OPEN: counts.OPEN, ON_HOLD: counts.ON_HOLD, FILLED: counts.FILLED, CLOSED: counts.CLOSED, CANCELLED: counts.CANCELLED, ytjCount: ytjPositionCount }}
         headcounts={{ OPEN: headcounts.OPEN, ON_HOLD: headcounts.ON_HOLD, FILLED: headcounts.FILLED, CLOSED: headcounts.CLOSED, CANCELLED: headcounts.CANCELLED, ytj: ytjHeadcount }}
+        proactiveOpenCount={proactiveOpenCount}
       />
     </div>
   )

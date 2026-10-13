@@ -44,11 +44,14 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10
 }
 
+// Org-wide figures exclude proactive positions
+const ORG_WIDE_CP = { candidatePosition: { position: { type: 'REQUISITION' as const } } }
+
 export async function getTimeToStage(positionId?: string): Promise<TimeToStageResult[]> {
   const histories = await db.stageHistory.findMany({
     where: positionId
       ? { candidatePosition: { positionId } }
-      : undefined,
+      : ORG_WIDE_CP,
     orderBy: { movedAt: 'asc' },
     include: { candidatePosition: { select: { id: true } } },
   })
@@ -90,7 +93,7 @@ export async function getTimeInStage(positionId?: string): Promise<TimeInStageRe
   const histories = await db.stageHistory.findMany({
     where: positionId
       ? { candidatePosition: { positionId } }
-      : undefined,
+      : ORG_WIDE_CP,
     orderBy: { movedAt: 'asc' },
   })
 
@@ -143,7 +146,7 @@ export async function getLeadTime(positionId?: string): Promise<LeadTimeResult> 
 
   // Org-wide: all filled/closed positions
   const positions = await db.position.findMany({
-    where: { deletedAt: null, status: { in: ['FILLED', 'CLOSED'] } },
+    where: { deletedAt: null, status: { in: ['FILLED', 'CLOSED'] }, type: 'REQUISITION' },
     select: { createdAt: true, updatedAt: true },
   })
 
@@ -162,7 +165,7 @@ export async function getFunnelData(positionId?: string): Promise<FunnelStage[]>
         by: ['candidatePositionId'],
         where: {
           toStage: stage,
-          ...(positionId ? { candidatePosition: { positionId } } : {}),
+          ...(positionId ? { candidatePosition: { positionId } } : ORG_WIDE_CP),
         },
       })
       return { stage, count: count.length }

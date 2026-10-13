@@ -52,7 +52,7 @@ function evalSla(kickoff: Date, qualifiedDates: Date[], windowBd: number, need: 
   const deadlineEnd = addBusinessDays(kickoff, windowBd); deadlineEnd.setHours(23, 59, 59, 999)
   const within = qualifiedDates.filter((d) => d <= deadlineEnd)
   if (within.length >= need) {
-    const nth = within[need - 1]
+    const nth = within[need - 1] > kickoff ? within[need - 1] : kickoff
     return { status: 'met', count: need, need, windowBd, days: elapsedBusinessDays(kickoff, nth), decisionDate: nth }
   }
   if (now <= deadlineEnd) {
@@ -86,6 +86,9 @@ function aggregateSla(counted: SlaOutcome[], inProgress: SlaOutcome[]) {
     inProgressNeed: inProgress.reduce((s, o) => s + o.need, 0),
   }
 }
+
+// SLA kickoff: a converted proactive position starts its clock at conversion
+const kickoffOf = (p: { createdAt: Date; convertedAt: Date | null }) => new Date(p.convertedAt ?? p.createdAt)
 
 function monthBounds(month: string): { start: Date; end: Date } {
   const [year, mon] = month.split('-').map(Number)
@@ -125,6 +128,7 @@ export async function GET(req: NextRequest) {
       where: {
         recruiterId: { in: recruiterIds },
         deletedAt: null,
+        type: 'REQUISITION',
         createdAt: { lte: monthEnd },
         NOT: [
           { status: { in: ['CLOSED', 'FILLED'] }, updatedAt: { lt: monthStart } },
@@ -134,7 +138,7 @@ export async function GET(req: NextRequest) {
       },
       select: {
         id: true, title: true, status: true, headcount: true,
-        createdAt: true, recruiterId: true,
+        createdAt: true, convertedAt: true, recruiterId: true,
         candidatePositions: {
           where: { candidate: { deletedAt: null }, stage: 'HIRED' },
           select: { id: true },
@@ -166,27 +170,31 @@ export async function GET(req: NextRequest) {
         AND i."decision" IS NOT NULL
         AND cp."recruiterId" IS NOT NULL
     `
+    const activityRows = [...cpCreatedInMonth, ...ivScheduledInMonth, ...ivDecisionInMonth]
+    const activityPosIds = [...new Set(activityRows.map((r) => r.positionId))]
+    const activityPositions = activityPosIds.length > 0 ? await db.position.findMany({
+      where: { id: { in: activityPosIds }, deletedAt: null, type: 'REQUISITION' },
+      select: { id: true, title: true, status: true, headcount: true, createdAt: true, convertedAt: true },
+    }) : []
+    type ActivityPos = { id: string; title: string; status: PositionStatus; headcount: number | null; createdAt: Date; convertedAt: Date | null }
+    const activityPosById = new Map<string, ActivityPos>(activityPositions.map((p: ActivityPos) => [p.id, p]))
     const activityMap = new Map<string, Set<string>>()
-    for (const row of [...cpCreatedInMonth, ...ivScheduledInMonth, ...ivDecisionInMonth]) {
+    for (const row of activityRows) {
+      if (!activityPosById.has(row.positionId)) continue
       if (!activityMap.has(row.recruiterId)) activityMap.set(row.recruiterId, new Set())
       activityMap.get(row.recruiterId)!.add(row.positionId)
     }
-    const activityPosIds = [...new Set([...activityMap.values()].flatMap((s) => [...s]))]
-    const activityPositions = activityPosIds.length > 0 ? await db.position.findMany({
-      where: { id: { in: activityPosIds }, deletedAt: null },
-      select: { id: true, title: true, status: true, headcount: true, createdAt: true },
-    }) : []
-    type ActivityPos = { id: string; title: string; status: PositionStatus; headcount: number | null; createdAt: Date }
-    const activityPosById = new Map<string, ActivityPos>(activityPositions.map((p: ActivityPos) => [p.id, p]))
 
     // Qualified candidates in month: SCREENING ADVANCE, decidedAt fallback updatedAt in month
     const qualifiedRaw = await db.$queryRaw<{
       recruiterId: string; positionId: string; cpId: string
       decidedAt: Date; firstName: string; lastName: string; positionTitle: string
+      positionType: 'REQUISITION' | 'PROACTIVE'
     }[]>`
       SELECT cp."recruiterId", cp."positionId", cp.id as "cpId",
              COALESCE(i."decidedAt", i."updatedAt") as "decidedAt",
-             c."firstName", c."lastName", p."title" as "positionTitle"
+             c."firstName", c."lastName", p."title" as "positionTitle",
+             p."type"::text as "positionType"
       FROM "Interview" i
       JOIN "CandidatePosition" cp ON cp.id = i."candidatePositionId"
       JOIN "Candidate" c ON c.id = cp."candidateId"
@@ -293,6 +301,7 @@ export async function GET(req: NextRequest) {
       WHERE sh."toStage" = 'HIRED'
         AND sh."movedAt" >= ${monthStart} AND sh."movedAt" <= ${monthEnd}
         AND cp."recruiterId" IS NOT NULL
+        AND p."type" = 'REQUISITION'
       GROUP BY cp.id, cp."recruiterId", cp."positionId", cp."startDate",
                c."firstName", c."lastName", p."title"
     `
@@ -380,11 +389,14 @@ export async function GET(req: NextRequest) {
       }
 
       // KPI 1: Qualified
+      // Proactive qualified count toward the target but are reported separately
       const myQualified = qualifiedRaw.filter((q) => q.recruiterId === rid)
       const qualifiedCount = myQualified.length
+      const qualifiedProactive = myQualified.filter((q) => q.positionType === 'PROACTIVE').length
+      const qualifiedRequisition = qualifiedCount - qualifiedProactive
       const positionsWithActivity = myActivityPosIds.size
       const qualifiedPerActive = positionsWithActivity > 0
-        ? Math.round((qualifiedCount / positionsWithActivity) * 10) / 10 : null
+        ? Math.round((qualifiedRequisition / positionsWithActivity) * 10) / 10 : null
       const pace = isCurrentMonth && elapsedBD > 0
         ? Math.round((qualifiedCount / elapsedBD) * totalBD) : null
 
@@ -399,7 +411,7 @@ export async function GET(req: NextRequest) {
         decisionDate: o.decisionDate?.toISOString() ?? null,
       })
       const slaById = new Map(myPositions.map((pos) => {
-        const kickoff = new Date(pos.createdAt)
+        const kickoff = kickoffOf(pos)
         const q = qualifiedByPos.get(pos.id) ?? []
         return [pos.id, { first: evalSla(kickoff, q, 3, 1, now), shortlist: evalSla(kickoff, q, 5, 3, now) }]
       }))
@@ -454,7 +466,7 @@ export async function GET(req: NextRequest) {
 
       // Drill-down
       const drillPositions = myPositions.map((pos) => {
-        const kickoff = new Date(pos.createdAt)
+        const kickoff = kickoffOf(pos)
         const sla = slaById.get(pos.id)
         const firstSLA = sla ? toCell(sla.first) : NA_SLA(3, 1)
         const shortlistSLA = sla ? toCell(sla.shortlist) : NA_SLA(5, 3)
@@ -474,7 +486,7 @@ export async function GET(req: NextRequest) {
         drillPositions.push({
           id: pos.id, title: pos.title, status: pos.status,
           headcount: pos.headcount ?? 1,
-          kickoff: new Date(pos.createdAt).toISOString(),
+          kickoff: kickoffOf(pos).toISOString(),
           firstSLA: NA_SLA(3, 1),
           shortlistSLA: NA_SLA(5, 3),
           activityOnly: true,
@@ -504,11 +516,13 @@ export async function GET(req: NextRequest) {
           positionList: myPositions.map((p) => ({
             id: p.id, title: p.title, status: p.status,
             headcount: p.headcount ?? 1,
-            kickoff: new Date(p.createdAt).toISOString(),
+            kickoff: kickoffOf(p).toISOString(),
           })),
         },
         qualified: {
           count: qualifiedCount,
+          requisition: qualifiedRequisition,
+          proactive: qualifiedProactive,
           perActivePosition: qualifiedPerActive,
           pace,
           target: QUALIFIED_TARGET,
@@ -538,6 +552,7 @@ export async function GET(req: NextRequest) {
             name: `${q.firstName} ${q.lastName}`,
             cpId: q.cpId, positionId: q.positionId, positionTitle: q.positionTitle,
             date: new Date(q.decidedAt).toISOString(),
+            proactive: q.positionType === 'PROACTIVE',
           })),
           closuresList: myClosures.map((c) => ({
             name: `${c.firstName} ${c.lastName}`,

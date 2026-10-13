@@ -33,7 +33,7 @@ async function buildPipelineData(fromDate: Date, toDate: Date): Promise<Pipeline
 
 
   const positions = await db.position.findMany({
-    where: { status: 'OPEN', deletedAt: null },
+    where: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' },
     include: {
       recruiter: { select: { name: true, email: true } },
       candidatePositions: {
@@ -109,12 +109,12 @@ async function buildPipelineData(fromDate: Date, toDate: Date): Promise<Pipeline
   }))
 
   const [conductedInterviews, advancedCount, newCPsRaw, movedToOfferCount, rejectedCount, filledPositionsRaw] = await Promise.all([
-    db.interview.findMany({ where: { scheduledAt: { gte: fromDate, lte: toDate }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } }, select: { stage: true } }),
-    db.interview.count({ where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'ADVANCE', candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } } }),
-    db.candidatePosition.findMany({ where: { createdAt: { gte: fromDate, lte: toDate }, position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } }, select: { positionId: true } }),
-    db.stageHistory.count({ where: { toStage: 'OFFER', movedAt: { gte: fromDate, lte: toDate }, candidatePosition: { position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } } }),
-    db.interview.count({ where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'REJECT', candidatePosition: { position: { status: 'OPEN', deletedAt: null }, candidate: { deletedAt: null } } } }),
-    db.stageHistory.findMany({ where: { toStage: 'HIRED', movedAt: { gte: fromDate, lte: toDate }, candidatePosition: { candidate: { deletedAt: null } } }, select: { candidatePosition: { select: { positionId: true } } }, distinct: ['candidatePositionId'] }),
+    db.interview.findMany({ where: { scheduledAt: { gte: fromDate, lte: toDate }, candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' }, candidate: { deletedAt: null } } }, select: { stage: true } }),
+    db.interview.count({ where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'ADVANCE', candidatePosition: { status: { in: ['ACTIVE', 'HIRED'] }, position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' }, candidate: { deletedAt: null } } } }),
+    db.candidatePosition.findMany({ where: { createdAt: { gte: fromDate, lte: toDate }, position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' }, candidate: { deletedAt: null } }, select: { positionId: true } }),
+    db.stageHistory.count({ where: { toStage: 'OFFER', movedAt: { gte: fromDate, lte: toDate }, candidatePosition: { position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' }, candidate: { deletedAt: null } } } }),
+    db.interview.count({ where: { decidedAt: { gte: fromDate, lte: toDate }, decision: 'REJECT', candidatePosition: { position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' }, candidate: { deletedAt: null } } } }),
+    db.stageHistory.findMany({ where: { toStage: 'HIRED', movedAt: { gte: fromDate, lte: toDate }, candidatePosition: { candidate: { deletedAt: null }, position: { type: 'REQUISITION' } } }, select: { candidatePosition: { select: { positionId: true } } }, distinct: ['candidatePositionId'] }),
   ])
 
   const stageBuckets: Record<string, number> = {}
