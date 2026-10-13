@@ -112,6 +112,7 @@ export async function PATCH(
     where: { id },
     data: {
       ...restData,
+      ...(existing.type === 'PROACTIVE' ? { headcount: null } : {}),
       dgm,
       dgmAtRisk,
       ...(parsed.data.status === 'CANCELLED' ? { cancelledReason, cancelledAt } : {}),

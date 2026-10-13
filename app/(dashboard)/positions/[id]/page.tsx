@@ -16,6 +16,8 @@ import { PositionDeleteButton } from '@/components/app/PositionDeleteButton'
 import { isCandidateInactive } from '@/lib/candidate-status'
 import { VendorAssignment } from '@/components/app/VendorAssignment'
 import { ApplicationPortalLink } from '@/components/app/ApplicationPortalLink'
+import { ProactiveBadge } from '@/components/app/ProactiveBadge'
+import { ConvertToRequisitionButton } from '@/components/app/ConvertToRequisitionButton'
 import type { Role } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
@@ -110,6 +112,8 @@ export default async function PositionDetailPage({
   }
 
   const initialVendors = assignedVendors.map((pv) => pv.vendor)
+  const isProactive = position.type === 'PROACTIVE'
+  const canConvert = isProactive && (isAdmin || currentUserId === position.recruiterId)
 
   const [hoursBaseline, positionFunnel, positionTimeInStage, positionLeadTime, vendorMinSetting, directMinSetting] = await Promise.all([
     getMonthlyHoursBaseline(),
@@ -158,10 +162,14 @@ export default async function PositionDetailPage({
           </nav>
           <div className="flex items-center gap-3 mt-1">
             <h1 className="text-2xl font-semibold text-gray-900">{position.title}</h1>
+            {isProactive && <ProactiveBadge />}
             <PositionStatusBadge status={position.status} />
             <PriorityBadge priority={position.priority} />
           </div>
           <p className="text-sm text-gray-500 mt-1">{position.client}</p>
+          {position.convertedAt && (
+            <p className="text-xs text-gray-400 mt-1">Converted from proactive on {fmt(position.convertedAt)}</p>
+          )}
           {position.status === 'CANCELLED' && (position.cancelledAt || position.cancelledReason) && (
             <p className="text-sm text-red-600 mt-1">
               Cancelled{position.cancelledAt ? ` on ${fmt(position.cancelledAt)}` : ''}
@@ -170,6 +178,7 @@ export default async function PositionDetailPage({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {canConvert && <ConvertToRequisitionButton positionId={id} positionTitle={position.title} />}
           {isAdmin && (
             <PositionDeleteButton positionId={id} positionTitle={position.title} />
           )}
@@ -224,7 +233,11 @@ export default async function PositionDetailPage({
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Headcount</p>
-            <p className="text-sm text-gray-900 mt-0.5">{position.headcount ?? 1} position{(position.headcount ?? 1) !== 1 ? 's' : ''}</p>
+            <p className="text-sm text-gray-900 mt-0.5">
+              {isProactive
+                ? <span className="text-gray-400">Not applicable</span>
+                : <>{position.headcount ?? 1} position{(position.headcount ?? 1) !== 1 ? 's' : ''}</>}
+            </p>
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">TalentID</p>
@@ -398,21 +411,24 @@ export default async function PositionDetailPage({
         }}
       />
 
-      {/* Vendor Assignment */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Assigned Partners</h2>
-        <VendorAssignment positionId={id} initialVendors={initialVendors} />
-      </div>
+      {/* Partner assignment and the application portal are disabled until a proactive position is converted */}
+      {!isProactive && (
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-medium text-gray-900 mb-3">Assigned Partners</h2>
+            <VendorAssignment positionId={id} initialVendors={initialVendors} />
+          </div>
 
-      {/* Application Portal */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Application Portal</h2>
-        <ApplicationPortalLink
-          positionId={id}
-          initialToken={position.applicationToken ?? null}
-          screeningQuestions={position.screeningQuestions}
-        />
-      </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-medium text-gray-900 mb-3">Application Portal</h2>
+            <ApplicationPortalLink
+              positionId={id}
+              initialToken={position.applicationToken ?? null}
+              screeningQuestions={position.screeningQuestions}
+            />
+          </div>
+        </>
+      )}
 
       {/* Job Description */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">

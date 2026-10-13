@@ -32,6 +32,9 @@ export async function POST(
   if (!position) {
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
   }
+  if (position.type === 'PROACTIVE') {
+    return NextResponse.json({ error: 'This position is not accepting applications' }, { status: 403 })
+  }
 
   const formData = await request.formData()
   const cvFile = formData.get('cv') as File | null

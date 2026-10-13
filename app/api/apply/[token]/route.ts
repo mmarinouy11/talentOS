@@ -18,11 +18,15 @@ export async function GET(
       location: true,
       internalCostBudget: true,
       screeningQuestions: true,
+      type: true,
     },
   })
 
   if (!position) {
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
+  }
+  if (position.type === 'PROACTIVE') {
+    return NextResponse.json({ error: 'This position is not accepting applications' }, { status: 403 })
   }
 
   let budgetMonthly: number | null = null

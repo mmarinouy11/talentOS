@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
+import { ProactiveBadge } from '@/components/app/ProactiveBadge'
 import { useRouter } from 'next/navigation'
 import { ChevronUp, ChevronDown, ChevronLeft } from 'lucide-react'
 
@@ -24,7 +25,7 @@ interface RecruiterKPI {
     positionsWithActivity: number
     openHeadcountAssigned: number
   }
-  qualified: { count: number; perActivePosition: number | null; pace: number | null; target: number }
+  qualified: { count: number; requisition: number; proactive: number; perActivePosition: number | null; pace: number | null; target: number }
   timeToSubmission: { first: SlaAgg; shortlist: SlaAgg }
   techPassRate: { rate: number | null; advances: number; total: number }
   closures: { count: number; target: number; stretch: number; isLowDemand: boolean; isNA: boolean }
@@ -35,7 +36,7 @@ interface RecruiterKPI {
   }
   drillDown: {
     positions: { id: string; title: string; status: string; headcount: number; kickoff: string; firstSLA: SlaResult; shortlistSLA: SlaResult; activityOnly: boolean }[]
-    qualifiedCandidates: (CandRef & { date: string })[]
+    qualifiedCandidates: (CandRef & { date: string; proactive: boolean })[]
     techEvaluations: (CandRef & { result: 'Passed' | 'Failed'; date: string; source: 'decision' | 'stage move' })[]
     closuresList: (CandRef & { hireDate: string; startDate: string | null })[]
   }
@@ -90,6 +91,11 @@ function StatusIcon({ s }: { s: Status }) {
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const Dash = () => <span className="text-gray-300">—</span>
+
+function QualifiedSplit({ requisition, proactive }: { requisition: number; proactive: number }) {
+  if (proactive === 0) return <>{requisition}</>
+  return <>{requisition} <span className="text-gray-500 font-normal">+ {proactive} proactive</span></>
+}
 
 function SlaBadge({ sla }: { sla: SlaResult }) {
   if (sla.result === 'na') return <Dash />
@@ -282,7 +288,12 @@ function DrillDown({ r }: { r: RecruiterKPI }) {
         <DTable widths={['35%', '45%', '20%']} headers={['Candidate', 'Position', 'Date']}>
           {qualified.map((c) => (
             <tr key={`${c.cpId}-${c.date}`} className={dTr}>
-              <td className={dTd}><TruncLink href={candHref(c)} text={c.name} /></td>
+              <td className={dTd}>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="min-w-0 truncate"><TruncLink href={candHref(c)} text={c.name} /></span>
+                  {c.proactive && <ProactiveBadge className="shrink-0" />}
+                </div>
+              </td>
               <td className={`${dTd} text-gray-500`}><span className="block truncate" title={c.positionTitle}>{c.positionTitle}</span></td>
               <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(c.date)}</td>
             </tr>
@@ -344,7 +355,7 @@ function ScorecardRow({ r, isCurrentMonth, open, onToggle }: { r: RecruiterKPI; 
         <td className="px-3 py-3 text-right tabular-nums text-gray-700 border-r border-gray-100">{r.demand.openHeadcountAssigned}</td>
         <td className="px-3 py-3">
           <div className="tabular-nums">
-            <StatusIcon s={qStatus} /> {q.count} / {q.target}
+            <StatusIcon s={qStatus} /> <QualifiedSplit requisition={q.requisition} proactive={q.proactive} /> / {q.target}
             {isCurrentMonth && q.pace != null && <span className="text-gray-400 text-xs"> · pace {q.pace}</span>}
           </div>
           <div className="text-xs text-gray-400">{q.perActivePosition != null ? `${q.perActivePosition} per active pos.` : 'no active pos.'}</div>
@@ -509,9 +520,10 @@ export default function RecruiterPerformancePage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const totals = useMemo(() => data?.metrics.reduce((acc, r) => ({
-    qualified: acc.qualified + r.qualified.count,
+    qualified: acc.qualified + r.qualified.requisition,
+    qualifiedProactive: acc.qualifiedProactive + r.qualified.proactive,
     closures: acc.closures + r.closures.count,
-  }), { qualified: 0, closures: 0 }), [data])
+  }), { qualified: 0, qualifiedProactive: 0, closures: 0 }), [data])
 
   return (
     <div className="space-y-6">
@@ -578,7 +590,7 @@ export default function RecruiterPerformancePage() {
                     <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-gray-900">
                       <td className="px-3 py-3 text-xs text-gray-500 uppercase tracking-wide">Totals</td>
                       <td colSpan={3} className="border-r border-gray-100" />
-                      <td className="px-3 py-3 tabular-nums">{totals.qualified}</td>
+                      <td className="px-3 py-3 tabular-nums"><QualifiedSplit requisition={totals.qualified} proactive={totals.qualifiedProactive} /></td>
                       <td /><td /><td />
                       <td className="px-3 py-3 tabular-nums">{totals.closures}</td>
                       <td /><td />

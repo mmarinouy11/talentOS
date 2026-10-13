@@ -73,7 +73,7 @@ export async function POST(
   }
 
   const position = await db.position.findFirst({
-    where: { id: positionId, deletedAt: null, status: 'OPEN' },
+    where: { id: positionId, deletedAt: null, status: 'OPEN', type: 'REQUISITION' },
     include: { recruiter: { select: { id: true, name: true, email: true } } },
   })
   if (!position) {

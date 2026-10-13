@@ -62,6 +62,7 @@ export default async function EditPositionPage({
             vendorMinFitScore: position.vendorMinFitScore,
             directMinFitScore: position.directMinFitScore,
             headcount: position.headcount,
+            type: position.type,
             talentId: position.talentId,
             timezone: position.timezone,
             reportingEmails: position.reportingEmails,

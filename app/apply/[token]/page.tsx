@@ -105,12 +105,13 @@ export default function ApplyPage() {
   const [fitScore, setFitScore] = useState<number | null>(null)
 
   const fileRef = useRef<HTMLInputElement>(null)
+  const [notAccepting, setNotAccepting] = useState(false)
 
   useEffect(() => {
     fetch(`/api/apply/${token}`)
       .then((r) => r.json())
       .then((d) => {
-        if (d.error) { setState('invalid'); return }
+        if (d.error) { setNotAccepting(d.error === 'This position is not accepting applications'); setState('invalid'); return }
         setPosition(d)
         setAnswers(new Array(d.screeningQuestions.length).fill(''))
         setState('form')
@@ -222,8 +223,8 @@ export default function ApplyPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 16px' }}>
           <div style={{ background: '#fff', borderRadius: 20, padding: '48px 40px', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#2F2C29', marginBottom: 8, fontFamily: 'Arial, "Open Sans", sans-serif' }}>Invalid link</h1>
-            <p style={{ color: '#9a9490', fontSize: 14, fontFamily: 'Arial, "Open Sans", sans-serif' }}>This application link is invalid or the position is no longer accepting applications.</p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#2F2C29', marginBottom: 8, fontFamily: 'Arial, "Open Sans", sans-serif' }}>{notAccepting ? 'Not accepting applications' : 'Invalid link'}</h1>
+            <p style={{ color: '#9a9490', fontSize: 14, fontFamily: 'Arial, "Open Sans", sans-serif' }}>{notAccepting ? 'This position is not accepting applications.' : 'This application link is invalid or the position is no longer accepting applications.'}</p>
           </div>
         </div>
       </div>

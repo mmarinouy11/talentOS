@@ -15,7 +15,7 @@ export default async function VendorsPage() {
       _count: {
         select: {
           candidates: { where: { deletedAt: null } },
-          positionVendors: { where: { position: { status: 'OPEN', deletedAt: null } } },
+          positionVendors: { where: { position: { status: 'OPEN', deletedAt: null, type: 'REQUISITION' } } },
         },
       },
     },

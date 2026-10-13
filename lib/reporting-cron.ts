@@ -50,7 +50,7 @@ async function autoCloseStartedPositions() {
     where: {
       status: 'HIRED',
       startDate: { not: null, lt: todayStart },
-      position: { status: { not: 'CLOSED' }, deletedAt: null },
+      position: { status: { not: 'CLOSED' }, deletedAt: null, type: 'REQUISITION' },
     },
     select: { positionId: true },
     distinct: ['positionId'],
@@ -72,6 +72,7 @@ export async function runReportingCron() {
     where: {
       deletedAt: null,
       status: 'OPEN',
+      type: 'REQUISITION',
       reportingDays: { has: today },
       reportingEmails: { isEmpty: false },
     },

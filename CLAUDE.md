@@ -94,6 +94,16 @@ Import from `lib/anthropic.ts`:
 - `GET /api/settings` and `PATCH /api/settings/[key]` return 403 for non-ADMIN
 - Sidebar only shows Settings link for ADMIN role (handled in `app/(dashboard)/layout.tsx`)
 
+## Proactive Positions
+
+- `PositionType` enum: `REQUISITION` (default) | `PROACTIVE`; Position fields `type`, `convertedAt`
+- Proactive = pipeline built ahead of an approved requisition; headcount not applicable (stored null)
+- Type is chosen at creation only; `POST /api/positions/[id]/convert` (ADMIN or lead recruiter) sets type=REQUISITION, convertedAt, status=OPEN, headcount
+- SLA kickoff everywhere = `convertedAt ?? createdAt`
+- Excluded (filter `type: 'REQUISITION'`): /positions status cards + headcount, Account Report (all tabs + client list), Pipeline Report (web/preview/print/cron), reporting-cron (per-position emails + auto-close), org-wide analytics (`lib/analytics.ts` without positionId), Recruiter Performance demand/SLA/closures
+- Recruiter Performance Qualified includes proactive (shown as "N + M proactive")
+- Partner/referral portals and direct applications are disabled for proactive positions (UI hidden, APIs reject)
+
 ## Backlog
 
 - Automatic interview scheduling confirmation: currently moving an Interview to

@@ -31,6 +31,7 @@ export async function GET(
     where: {
       status: 'OPEN',
       deletedAt: null,
+      type: 'REQUISITION',
       id: { notIn: assignedPositionIds },
     },
     select: { id: true, title: true, client: true, status: true },
@@ -63,9 +64,12 @@ export async function POST(
 
   const position = await db.position.findFirst({
     where: { id: positionId, deletedAt: null },
-    select: { id: true, title: true, client: true },
+    select: { id: true, title: true, client: true, type: true },
   })
   if (!position) return NextResponse.json({ error: 'Position not found' }, { status: 404 })
+  if (position.type === 'PROACTIVE') {
+    return NextResponse.json({ error: 'Partners cannot be assigned to proactive positions' }, { status: 400 })
+  }
 
   await db.positionVendor.upsert({
     where: { positionId_vendorId: { positionId, vendorId } },

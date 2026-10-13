@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { PositionsTable } from '@/components/app/PositionsTable'
-import type { PositionRow } from '@/components/app/PositionsTable'
+import type { PositionRow, TypeFilter } from '@/components/app/PositionsTable'
 
 type FilterValue = 'OPEN' | 'ON_HOLD' | 'FILLED' | 'YTJ' | 'CLOSED' | 'CANCELLED' | ''
 
@@ -43,13 +43,31 @@ interface Props {
     OPEN: number; ON_HOLD: number; FILLED: number; CLOSED: number; CANCELLED: number
     ytj: number
   }
+  proactiveOpenCount: number
 }
 
-export function PositionsDashboard({ positions, isAdmin, counts: _counts, headcounts }: Props) {
+export function PositionsDashboard({ positions, isAdmin, counts: _counts, headcounts, proactiveOpenCount }: Props) {
   const [statusFilter, setStatusFilter] = useState<FilterValue>('OPEN')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('REQUISITION')
 
+  // Status cards count requisitions only, so clicking one switches the list back to requisitions
   function handleCardClick(value: FilterValue) {
+    if (typeFilter !== 'REQUISITION') {
+      setTypeFilter('REQUISITION')
+      setStatusFilter(value)
+      return
+    }
     setStatusFilter((prev) => (prev === value ? '' : value))
+  }
+
+  function handleProactiveClick() {
+    if (typeFilter === 'PROACTIVE') {
+      setTypeFilter('REQUISITION')
+      setStatusFilter('OPEN')
+    } else {
+      setTypeFilter('PROACTIVE')
+      setStatusFilter('OPEN')
+    }
   }
 
   const cards: { label: string; color: string; filterValue: FilterValue; count: number }[] = [
@@ -62,24 +80,43 @@ export function PositionsDashboard({ positions, isAdmin, counts: _counts, headco
 
   return (
     <>
-      <div className="grid grid-cols-5 gap-4">
-        {cards.map((c) => (
-          <StatusCard
-            key={c.filterValue}
-            label={c.label}
-            count={c.count}
-            color={c.color}
-            filterValue={c.filterValue}
-            active={statusFilter === c.filterValue}
-            onClick={handleCardClick}
-          />
-        ))}
+      <div className="flex items-stretch gap-4">
+        <div className="grid grid-cols-5 gap-4 flex-1">
+          {cards.map((c) => (
+            <StatusCard
+              key={c.filterValue}
+              label={c.label}
+              count={c.count}
+              color={c.color}
+              filterValue={c.filterValue}
+              active={typeFilter === 'REQUISITION' && statusFilter === c.filterValue}
+              onClick={handleCardClick}
+            />
+          ))}
+        </div>
+        <div className="w-px bg-gray-200 shrink-0" aria-hidden />
+        <button
+          type="button"
+          onClick={handleProactiveClick}
+          title="Open proactive positions (pipeline built ahead of a requisition)"
+          className={`text-left w-44 shrink-0 rounded-xl px-5 py-4 transition-all cursor-pointer focus:outline-none bg-gray-50 ${
+            typeFilter === 'PROACTIVE'
+              ? 'border-2 border-gray-500 shadow-sm'
+              : 'border border-dashed border-gray-300 hover:border-gray-400'
+          }`}
+        >
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Proactive</p>
+          <p className="text-3xl font-semibold mt-1 text-gray-600">{proactiveOpenCount}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">open positions</p>
+        </button>
       </div>
       <PositionsTable
         positions={positions}
         isAdmin={isAdmin}
         statusFilter={statusFilter}
         onStatusFilterChange={(v) => setStatusFilter(v as FilterValue)}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
       />
     </>
   )
