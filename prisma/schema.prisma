@@ -271,12 +271,13 @@ model Candidate {
   id                    String      @id @default(cuid())
   firstName             String
   lastName              String
-  email                 String      @unique
+  email                 String?     @unique
   phone                 String?
   country               String?
   cvDriveId             String?
   cvOriginalName        String?
   linkedinUrl           String?
+  linkedinHandle        String?
   notes                 String?     @db.Text
   skills                String[]
   languages             String[]
@@ -306,6 +307,8 @@ model Candidate {
   sourcedByVendor    Vendor?             @relation(fields: [sourcedByVendorId], references: [id])
   recruiter          User?               @relation("CandidateRecruiter", fields: [recruiterId], references: [id])
   emailLogs          EmailLog[]
+
+  @@index([linkedinHandle])
 }
 
 model CandidatePosition {
