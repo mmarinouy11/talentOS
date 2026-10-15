@@ -116,6 +116,14 @@ Import from `lib/anthropic.ts`:
 - CV files: `cvOriginalName` stores the user's file name (Drive names carry a timestamp prefix). Rejected portal submissions move their CV to the Drive trash (`trashDriveFileQuietly`). `scripts/orphan-cvs-report.ts`: dry run / `--apply` (trash, never permanent delete) / `--match [--apply]` to attach orphan CVs to candidates without one
 - Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
 
+## Home Screen
+
+- `/` renders the daily home for signed-in users (inside `DashboardShell`, shared with the `(dashboard)` layout); visitors keep the landing page. "Home" is the first sidebar item
+- Data: `getHomeData()` in `lib/home.ts` (one positions query + one "starting soon" query); UI: `components/app/home/HomeScreen.tsx` (server component)
+- Scope: OPEN requisitions, ACTIVE candidates; "Starting soon" = HIRED with startDate in the next 7 days on OPEN or FILLED requisitions; today's interviews include any candidate status
+- "Today" in America/Montevideo; business days via `lib/business-days.ts` (shared with Recruiter Performance); thresholds in `lib/home-thresholds.ts`
+- Shared: `HcFraction` (○/◐/✓), `lib/stage-labels.ts`
+
 ## Backlog
 
 - Automatic interview scheduling confirmation: currently moving an Interview to

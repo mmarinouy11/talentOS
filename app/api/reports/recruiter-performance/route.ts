@@ -1,41 +1,12 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { addBusinessDays, businessDaysBetween, elapsedBusinessDays } from '@/lib/business-days'
 import type { PositionStatus } from '@prisma/client'
 
 const QUALIFIED_TARGET = 30
 const TECH_TARGET = 0.6
 const WEIGHTS = { qualified: 0.25, sla: 0.25, tech: 0.2, closures: 0.3 }
-
-function businessDaysBetween(from: Date, to: Date): number {
-  if (to < from) return 0
-  let count = 0
-  const cur = new Date(from); cur.setHours(0, 0, 0, 0)
-  const end = new Date(to);   end.setHours(0, 0, 0, 0)
-  while (cur <= end) {
-    const d = cur.getDay()
-    if (d !== 0 && d !== 6) count++
-    cur.setDate(cur.getDate() + 1)
-  }
-  return count
-}
-
-function addBusinessDays(date: Date, n: number): Date {
-  const result = new Date(date); result.setHours(0, 0, 0, 0)
-  let rem = n
-  while (rem > 0) {
-    result.setDate(result.getDate() + 1)
-    const d = result.getDay()
-    if (d !== 0 && d !== 6) rem--
-  }
-  return result
-}
-
-// Business days elapsed after kickoff up to `to` (kickoff Mon → Tue = 1)
-function elapsedBusinessDays(kickoff: Date, to: Date): number {
-  const next = new Date(kickoff); next.setHours(0, 0, 0, 0); next.setDate(next.getDate() + 1)
-  return businessDaysBetween(next, to)
-}
 
 type SlaOutcome = {
   status: 'met' | 'partial' | 'missed' | 'in_progress'
