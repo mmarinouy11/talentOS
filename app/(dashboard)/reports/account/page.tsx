@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { HcFraction as HcCell } from '@/components/app/HcFraction'
 import { FunnelChart } from '@/components/app/FunnelChart'
 import { VelocityTable } from '@/components/app/VelocityTable'
 
@@ -26,12 +27,6 @@ interface DashboardData {
   client: string
   positions: DashboardPosition[]
   generatedAt: string
-}
-
-function HcCell({ hired, headcount, className = '' }: { hired: number; headcount: number; className?: string }) {
-  if (hired === 0) return <span className={`text-gray-400 ${className}`}>○ 0/{headcount}</span>
-  if (hired >= headcount) return <span className={`text-[#2F2C29] font-medium ${className}`}>✓ {hired}/{headcount}</span>
-  return <span className={`text-amber-500 ${className}`}>◐ {hired}/{headcount}</span>
 }
 
 const DASH_STAGES = ['HIRED', 'OFFER', 'CLIENT_INTERVIEW', 'MANAGER_INTERVIEW', 'TECHNICAL_INTERVIEW', 'SCREENING', 'APPLIED'] as const

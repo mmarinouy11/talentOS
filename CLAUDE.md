@@ -47,7 +47,7 @@ Import from `lib/anthropic.ts`:
 - Modal: `AddCandidateToPositionModal` — two tabs: "Search Existing" and "Import from LinkedIn" (uses LinkedInImportFlow with positionId)
 - Shared PDF extraction: `lib/pdf-extract.ts` (used by both CV upload and bulk import)
 - Job state: `lib/import-jobs.ts` — module-level Map, 30-min TTL
-- Dedup: by email (case-insensitive) against existing non-deleted candidates
+- Dedup: each parsed row gets a `match` (New / Existing / Conflict / Possible duplicate) from `findCandidateMatches`; existing rows unchecked by default and linked (not created) when checked inside a position; conflict rows not selectable; confirm re-checks server-side
 - Max: 50 PDFs per batch, 50MB zip
 
 ## Interview Pipeline
@@ -108,10 +108,24 @@ Import from `lib/anthropic.ts`:
 
 ## Candidate Identity
 
-- `Candidate.email` is optional (`String? @unique`); `linkedinHandle` (indexed, not unique yet) is set from `linkedinUrl` on every write via `normalizeLinkedinHandle()` (`lib/linkedin.ts`)
-- Creation requires a real email or a LinkedIn profile URL (`lib/candidate-identity.ts`); no placeholder emails are generated anymore (`isPlaceholderEmail()` kept for legacy data)
+- `Candidate.email` is optional (`String? @unique`); `linkedinHandle` (`String? @unique`) is set from `linkedinUrl` on every write via `normalizeLinkedinHandle()` (`lib/linkedin.ts`)
+- Creation requires a real email or a LinkedIn profile URL (`lib/candidate-identifier.ts`, client-safe); no placeholder emails are generated anymore (`isPlaceholderEmail()` kept for legacy data)
 - Portals (vendor, referral, direct apply) still require an email
+- Duplicate checks: `findCandidateMatches()` in `lib/candidate-identity.ts` (server) → exact (email case-insensitive or LinkedIn handle) / conflict (email and LinkedIn match different candidates) / possible (normalized name + phone or country). POST /api/candidates returns 409 `{ duplicate }` for exact/conflict, and for possible unless `allowPossibleDuplicate`; UI in `DuplicateCandidatePanel`. PATCH returns 409 `{ conflictCandidate }` when the new email/LinkedIn belongs to another candidate
+- Portals: vendor/referral reject any email or LinkedIn match; direct apply re-surfaces the matched candidate
+- CV files: `cvOriginalName` stores the user's file name (Drive names carry a timestamp prefix). Rejected portal submissions move their CV to the Drive trash (`trashDriveFileQuietly`). `scripts/orphan-cvs-report.ts`: dry run / `--apply` (trash, never permanent delete) / `--match [--apply]` to attach orphan CVs to candidates without one
 - Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
+
+## Home Screen
+
+- `/` renders the daily home for signed-in users (inside `DashboardShell`, shared with the `(dashboard)` layout); visitors keep the landing page. "Home" is the first sidebar item
+- Data: `getHomeData()` in `lib/home.ts` (one positions query + one "starting soon" query); UI: `components/app/home/HomeScreen.tsx` (server component)
+- Scope: OPEN requisitions, ACTIVE candidates; "Starting soon" = HIRED with startDate in the next 7 days on OPEN or FILLED requisitions; today's interviews include any candidate status
+- "Today" in America/Montevideo; business days via `lib/business-days.ts` (shared with Recruiter Performance); thresholds in `lib/home-thresholds.ts`
+- Shared: `HcFraction` (○/◐/✓), `lib/stage-labels.ts`
+- "Current waiting by stage" (formerly Bottlenecks): Avg so far vs Typical (`getTimeInStage()` from `lib/analytics.ts`, same as /reports Time in Stage); amber when above typical, red when ≥50% above
+- Fulfilled positions (HIRED count ≥ headcount, null = 1) are excluded from Feedback pending, No next step, New applications, Bottlenecks and their counters; still in Today's interviews and Starting soon; shown muted at the bottom of their client in Open positions
+- Layout: two columns on lg (Needs attention ≈60% | Today's interviews + Bottlenecks ≈40%), Open positions full width below. "Feedback pending" (interviews before today with no decision; Owner = CandidatePosition recruiter) and "No next step" (non-Pipeline, ≥7d in stage, nothing pending or scheduled; grouped by position, expandable) each have a counter; lists other than "Waiting for a decision" show 5 rows + "Show all"; decided interviews collapse at the bottom. Toggles in `components/app/home/HomeToggles.tsx` (client)
 
 ## Backlog
 

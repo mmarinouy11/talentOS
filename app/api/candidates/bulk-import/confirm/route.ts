@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
-import { hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
+import { findCandidateMatches, hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
 
 interface CandidateInput {
   firstName: string | null
@@ -26,6 +26,10 @@ interface CandidateInput {
 export interface ConfirmResult {
   created: number
   skipped: number
+  // existing candidates linked to the position instead of being created
+  linked: number
+  // rows not written because their email and LinkedIn belong to different candidates
+  conflicts: string[]
   errors: string[]
   candidatePositions?: Array<{
     id: string
@@ -63,6 +67,8 @@ export async function POST(request: Request) {
 
     let created = 0
     let skipped = 0
+    let linked = 0
+    const conflicts: string[] = []
     const errors: string[] = []
     const createdPositions: ConfirmResult['candidatePositions'] = []
 
@@ -73,11 +79,20 @@ export async function POST(request: Request) {
       const label = email ?? c.linkedinUrl ?? `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()
 
       try {
-        let candidate = email
-          ? await db.candidate.findFirst({ where: { email, deletedAt: null } })
-          : null
+        // Re-checked here because the recruiter may have edited the email or LinkedIn in the review table
+        const match = await findCandidateMatches(
+          { email, linkedinUrl: c.linkedinUrl, firstName: c.firstName, lastName: c.lastName, phone: c.phone, country: c.country },
+          { positionId },
+        )
+        if (match.kind === 'conflict') { conflicts.push(label); continue }
 
-        if (!candidate) {
+        let candidate
+        if (match.kind === 'exact') {
+          // Existing candidate: link to the position instead of creating; nothing to do without a position
+          if (!positionId) { skipped++; continue }
+          candidate = await db.candidate.findUniqueOrThrow({ where: { id: match.candidates[0].id } })
+        } else {
+          // New or possible duplicate: the recruiter selected the row, so it is created
           candidate = await db.candidate.create({
             data: {
               firstName: c.firstName ?? '',
@@ -101,15 +116,16 @@ export async function POST(request: Request) {
             },
           })
           created++
-        } else {
-          skipped++
         }
 
         if (positionId) {
           const existing = await db.candidatePosition.findFirst({
             where: { candidateId: candidate.id, positionId },
           })
-          if (!existing) {
+          if (existing) {
+            if (match.kind === 'exact') skipped++
+          } else {
+            if (match.kind === 'exact') linked++
             const cp = await db.candidatePosition.create({
               data: {
                 candidateId: candidate.id,
@@ -151,7 +167,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const result: ConfirmResult = { created, skipped, errors }
+    const result: ConfirmResult = { created, skipped, linked, conflicts, errors }
     if (positionId) result.candidatePositions = createdPositions
 
     return NextResponse.json(result)

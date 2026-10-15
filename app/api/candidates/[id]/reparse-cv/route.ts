@@ -32,16 +32,15 @@ export async function POST(
 
   // Upload to Drive (non-fatal)
   let cvDriveId: string | null = null
-  let cvOriginalName: string | null = file.name
+  const cvOriginalName: string | null = file.name
   try {
-    const { fileId, fileName } = await uploadFileToDrive(
+    const { fileId } = await uploadFileToDrive(
       buffer,
       `${Date.now()}_${file.name}`,
       file.type,
       process.env.GOOGLE_DRIVE_FOLDER_ID!
     )
     cvDriveId = fileId
-    cvOriginalName = fileName
   } catch (err) {
     console.error('[reparse-cv] Drive upload failed (non-fatal):', err)
   }

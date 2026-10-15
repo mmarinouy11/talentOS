@@ -1,9 +1,10 @@
 import { db } from '@/lib/db'
+import { findCandidateMatches } from '@/lib/candidate-identity'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { callClaudeJSON } from '@/lib/anthropic'
-import { uploadFileToDrive } from '@/lib/google'
+import { trashDriveFileQuietly, uploadFileToDrive } from '@/lib/google'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
 import { resolveEmailTemplate } from '@/lib/email-resolver'
@@ -19,7 +20,8 @@ Return ONLY valid JSON with these exact fields:
   "yearsOfExperience": number or null,
   "skills": array of strings,
   "languages": array of strings,
-  "summary": string or null
+  "summary": string or null,
+  "linkedinUrl": the candidate's own LinkedIn profile URL (linkedin.com/in/...) if it appears in the CV, else null
 }`
 
 export async function POST(
@@ -78,16 +80,16 @@ export async function POST(
   }
 
   // CHECK 1 — Duplicate
-  const existingCandidate = await db.candidate.findFirst({
-    where: { email: emailRaw, deletedAt: null },
-  })
+  const dup = await findCandidateMatches({ email: emailRaw, linkedinUrl })
+  const existingCandidate = dup.kind === 'exact' || dup.kind === 'conflict' ? dup.candidates[0] : null
   if (existingCandidate) {
     const existingCP = await db.candidatePosition.findFirst({
       where: { positionId, candidateId: existingCandidate.id },
     })
+    const what = dup.kind === 'exact' && !dup.matchedBy.includes('email') ? 'LinkedIn profile' : 'email'
     const message = existingCP
-      ? 'A candidate with this email has already been submitted for this position.'
-      : 'A candidate with this email address already exists in our system.'
+      ? `A candidate with this ${what} has already been submitted for this position.`
+      : `A candidate with this ${what} already exists in our system.`
     return NextResponse.json({
       rejected: true,
       reason: 'duplicate',
@@ -113,8 +115,9 @@ export async function POST(
     skills: string[]
     languages: string[]
     summary: string | null
+    linkedinUrl?: string | null
   }
-  const defaultParsed: ParsedCV = { seniority: null, yearsOfExperience: null, skills: [], languages: [], summary: null }
+  const defaultParsed: ParsedCV = { seniority: null, yearsOfExperience: null, skills: [], languages: [], summary: null, linkedinUrl: null }
 
   const [driveResult, parsedResult] = await Promise.all([
     uploadFileToDrive(buffer, `${Date.now()}_${cvFile.name}`, cvFile.type, process.env.GOOGLE_DRIVE_FOLDER_ID!)
@@ -130,7 +133,32 @@ export async function POST(
 
   const parsed: ParsedCV = parsedResult ?? defaultParsed
   const cvDriveId = driveResult?.fileId
-  const cvOriginalName = driveResult?.fileName
+  const cvOriginalName = driveResult ? cvFile.name : null
+
+  // CHECK 1c — Duplicate by the LinkedIn profile found in the CV (strict, same as an email match)
+  const cvLinkedinHandle = normalizeLinkedinHandle(parsed.linkedinUrl)
+  if (cvLinkedinHandle && cvLinkedinHandle !== normalizeLinkedinHandle(linkedinUrl)) {
+    const cvDup = await findCandidateMatches({ linkedinUrl: parsed.linkedinUrl })
+    if (cvDup.kind === 'exact') {
+      const existingCP = await db.candidatePosition.findFirst({
+        where: { positionId, candidateId: cvDup.candidates[0].id },
+      })
+      const message = existingCP
+        ? 'A candidate with the LinkedIn profile in this CV has already been submitted for this position.'
+        : 'A candidate with the LinkedIn profile in this CV already exists in our system.'
+      await trashDriveFileQuietly(cvDriveId, 'refer')
+      return NextResponse.json({
+        rejected: true,
+        reason: 'duplicate',
+        message,
+        checks: [
+          { name: 'Eligibility Check', passed: false, detail: message },
+        ],
+      })
+    }
+  }
+
+  const storedLinkedinUrl = normalizeLinkedinHandle(linkedinUrl) ? linkedinUrl : cvLinkedinHandle ? parsed.linkedinUrl!.trim() : linkedinUrl
 
   const candidate = await db.candidate.create({
     data: {
@@ -139,8 +167,8 @@ export async function POST(
       email: emailRaw,
       phone: phone || null,
       country: countryRaw,
-      linkedinUrl: linkedinUrl || null,
-      linkedinHandle: normalizeLinkedinHandle(linkedinUrl),
+      linkedinUrl: storedLinkedinUrl || null,
+      linkedinHandle: normalizeLinkedinHandle(storedLinkedinUrl),
       seniority: parsed.seniority ?? undefined,
       yearsOfExperience: parsed.yearsOfExperience ?? null,
       skills: parsed.skills ?? [],
@@ -172,6 +200,7 @@ export async function POST(
     if (countryRaw && !locationAllowed(position.location, countryRaw)) {
       await db.candidatePosition.delete({ where: { id: cp.id } })
       await db.candidate.delete({ where: { id: candidate.id } })
+      await trashDriveFileQuietly(cvDriveId, 'refer')
       return NextResponse.json({
         rejected: true,
         reason: 'location',
@@ -196,6 +225,7 @@ export async function POST(
   if (fitScore < threshold) {
     await db.candidatePosition.delete({ where: { id: cp.id } })
     await db.candidate.delete({ where: { id: candidate.id } })
+    await trashDriveFileQuietly(cvDriveId, 'refer')
     return NextResponse.json({
       rejected: true,
       reason: 'low_score',

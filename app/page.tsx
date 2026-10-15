@@ -1,5 +1,8 @@
 import { auth } from '@/lib/auth'
 import Link from 'next/link'
+import { DashboardShell } from '@/components/app/DashboardShell'
+import { HomeScreen } from '@/components/app/home/HomeScreen'
+import { getHomeData } from '@/lib/home'
 import {
   Briefcase, Users, Calendar, Building2, FileText,
   BarChart2, Mail, Sparkles, Upload,
@@ -85,6 +88,16 @@ export default async function RootPage() {
   const session = await auth()
   const isAuthenticated = !!session?.user
 
+  // Signed-in users get the daily home screen inside the app shell; visitors keep the landing page
+  if (isAuthenticated) {
+    const data = await getHomeData()
+    return (
+      <DashboardShell>
+        <HomeScreen data={data} />
+      </DashboardShell>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#F5F0EB', fontFamily: 'system-ui, Arial, sans-serif', color: '#2F2C29' }}>
 
@@ -94,13 +107,13 @@ export default async function RootPage() {
           Tenarai <span style={{ color: '#8CF000' }}>LATAM</span>
         </span>
         <Link
-          href={isAuthenticated ? '/positions' : '/login'}
+          href="/login"
           style={{
             background: '#8CF000', color: '#000', fontWeight: 700, fontSize: 13,
             padding: '8px 20px', borderRadius: 8, textDecoration: 'none',
           }}
         >
-          {isAuthenticated ? 'Go to Dashboard' : 'Sign In'}
+          Sign In
         </Link>
       </nav>
 
@@ -113,14 +126,14 @@ export default async function RootPage() {
           End-to-end recruiting operations for Tenarai LATAM. From sourcing to hire, all in one place.
         </p>
         <Link
-          href={isAuthenticated ? '/positions' : '/login'}
+          href="/login"
           style={{
             display: 'inline-block', background: '#8CF000', color: '#000',
             fontWeight: 800, fontSize: 15, padding: '14px 36px',
             borderRadius: 12, textDecoration: 'none', letterSpacing: '-0.01em',
           }}
         >
-          {isAuthenticated ? 'Go to Dashboard →' : 'Sign In →'}
+          Sign In →
         </Link>
       </section>
 

@@ -86,7 +86,8 @@ export default async function ReportsPage() {
           <VelocityTable data={timeToStage} label="Avg Days to Reach" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Time in Stage</h2>
+          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-1">Time in Stage</h2>
+          <p className="text-xs font-medium text-gray-600 mb-3">Historical: completed stays across all positions</p>
           <p className="text-xs text-gray-400 mb-3">Average days candidates spend in each stage before moving on.</p>
           <VelocityTable data={timeInStage} label="Avg Days in Stage" />
         </div>
