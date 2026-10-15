@@ -294,7 +294,13 @@ export async function POST(
           console.warn(`[apply] LinkedIn ${handle} belongs to candidate ${owner.id}; not added to ${candidate.id}`)
         }
       }
-      if (Object.keys(data).length > 0) await db.candidate.update({ where: { id: candidate.id }, data })
+      if (Object.keys(data).length > 0) {
+        await db.candidate.update({ where: { id: candidate.id }, data })
+        // Refresh the stored fit score from the updated profile; the acceptance above used the earlier score
+        scoreCandidateForPosition(cp.id).catch((err) => {
+          console.error(`[apply] Background re-score failed for candidatePosition ${cp.id}:`, err)
+        })
+      }
     } catch (err) {
       console.error(`[apply] Failed to refresh returning candidate ${candidate.id}:`, err)
       // Non-fatal — the application itself was accepted
