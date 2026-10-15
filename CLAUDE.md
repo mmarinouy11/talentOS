@@ -103,6 +103,8 @@ Import from `lib/anthropic.ts`:
 - Excluded (filter `type: 'REQUISITION'`): /positions status cards + headcount, Account Report (all tabs + client list), Pipeline Report (web/preview/print/cron), reporting-cron (per-position emails + auto-close), org-wide analytics (`lib/analytics.ts` without positionId), Recruiter Performance demand/SLA/closures
 - Recruiter Performance Qualified includes proactive (shown as "N + M proactive")
 - Partner/referral portals and direct applications are disabled for proactive positions (UI hidden, APIs reject)
+- Proactive backups: `POST /api/positions/[id]/backup` clones a REQUISITION (any status) into a PROACTIVE position with `sourcePositionId`; copies JD intelligence as-is (no re-parse), not candidates/partners/headcount. Detail page shows "Backup for" / "Backups" links
+- Backup modal option "Bring active candidates (N)" (default on): in the same transaction copies each ACTIVE CandidatePosition (stage, recruiter, fit scores, createdAt, stageEnteredAt) plus one StageHistory entry (null → stage, movedAt = stageEnteredAt); interviews/history stay on the original, which is not modified
 
 ## Backlog
 
