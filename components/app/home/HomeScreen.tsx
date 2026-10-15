@@ -348,7 +348,7 @@ function ClientRows({ group }: { group: HomeData['snapshot'][number] }) {
         </td>
       </tr>
       {group.positions.map((p) => (
-        <tr key={p.positionId} className={`${tr} border-b border-gray-100`}>
+        <tr key={p.positionId} className={`${tr} border-b border-gray-100 ${p.fulfilled ? 'opacity-50' : ''}`} title={p.fulfilled ? 'Fulfilled: hired candidates cover the headcount' : undefined}>
           <td className={td}>
             <Link href={`/positions/${p.positionId}`} className="block min-w-[10rem] font-medium text-gray-900 hover:underline">{p.title}</Link>
             <div className="text-xs mt-0.5"><HcFraction hired={p.hired} headcount={p.headcount} /></div>

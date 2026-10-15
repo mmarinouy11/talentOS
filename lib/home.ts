@@ -35,6 +35,8 @@ export interface SnapshotRow {
   oldestWaitBd: number | null
   // days since the oldest ACTIVE candidate still in APPLIED was added
   pipeAgeDays: number | null
+  // HIRED candidates >= headcount: no pending actions; listed muted at the bottom of its client
+  fulfilled: boolean
 }
 export interface BottleneckRow { stage: string; active: number; avgDays: number | null; overThreshold: number }
 
@@ -111,13 +113,15 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
     const headcount = p.headcount ?? 1
     openHeadcount += headcount
     const stageCounts = Object.fromEntries(SNAPSHOT_STAGES.map((s) => [s, 0])) as SnapshotRow['stageCounts']
-    let hired = 0
+    const hired = p.candidatePositions.filter((cp) => cp.status === 'HIRED' || cp.stage === 'HIRED').length
+    // Fulfilled positions are left out of the pending-action sections (feedback, no next step,
+    // new applications, bottlenecks); today's interviews and starting soon still include them
+    const fulfilled = hired >= headcount
     let oldestWaitBd: number | null = null
     let pipeAgeDays: number | null = null
 
     for (const cp of p.candidatePositions) {
       const ref: CandRef = { ...posRef, cpId: cp.id, candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`.trim() }
-      if (cp.status === 'HIRED' || cp.stage === 'HIRED') hired++
 
       // Today's interviews include every candidate status, so ones decided today still show as done
       for (const iv of cp.interviews) {
@@ -132,6 +136,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
       if (cp.status !== 'ACTIVE') continue
       activeCandidates++
       if ((SNAPSHOT_STAGES as readonly string[]).includes(cp.stage)) stageCounts[cp.stage as keyof typeof stageCounts]++
+      if (fulfilled) continue
       if (cp.stage === 'APPLIED') {
         const age = Math.max(0, Math.floor((now.getTime() - cp.createdAt.getTime()) / DAY_MS))
         pipeAgeDays = Math.max(pipeAgeDays ?? 0, age)
@@ -172,7 +177,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
       }
     }
 
-    snapshotRows.push({ positionId: p.id, title: p.title, client: p.client, headcount, hired, stageCounts, oldestWaitBd, pipeAgeDays })
+    snapshotRows.push({ positionId: p.id, title: p.title, client: p.client, headcount, hired, stageCounts, oldestWaitBd, pipeAgeDays, fulfilled })
   }
 
   const startingSoon: StartingSoonItem[] = hiredSoon.map((cp) => ({
@@ -205,6 +210,8 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
 
   const byClient = new Map<string, SnapshotRow[]>()
   for (const r of snapshotRows) byClient.set(r.client, [...(byClient.get(r.client) ?? []), r])
+  // Fulfilled positions go to the bottom of their client group (stable, so title order is kept)
+  for (const [client, rows] of byClient) byClient.set(client, [...rows.filter((r) => !r.fulfilled), ...rows.filter((r) => r.fulfilled)])
 
   const bottlenecks: BottleneckRow[] = BOTTLENECK_STAGES.map((stage) => {
     const days = bottleneckDays.get(stage) ?? []
