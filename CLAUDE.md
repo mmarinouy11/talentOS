@@ -116,6 +116,14 @@ Import from `lib/anthropic.ts`:
 - CV files: `cvOriginalName` stores the user's file name (Drive names carry a timestamp prefix). Rejected portal submissions move their CV to the Drive trash (`trashDriveFileQuietly`). `scripts/orphan-cvs-report.ts`: dry run / `--apply` (trash, never permanent delete) / `--match [--apply]` to attach orphan CVs to candidates without one
 - Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
 
+## Fit Scoring Suggestions
+
+- `scoreCandidateForPosition()` (`lib/fit-scorer.ts`) also returns `strongestRoles` (2–3 generic role types) and an optional `suggestedPosition` in the same Claude call
+- Other positions offered: OPEN, REQUISITION or PROACTIVE, not fulfilled, not the current one, location allows the candidate's country (`locationAllowed`), ≥1 skill overlap; sorted by overlap, max 10. Skipped when none qualify
+- Suggestion kept only if its positionId was offered and its estimated score is ≥ fitScore + 10; stored on CandidatePosition (`strongestRoles`, `suggestedPositionId/Score/Reason`), cleared on re-score otherwise
+- UI: FitScoreCard shows "Strongest in" chips and "Better match" (only while that position is OPEN and not fulfilled) with "Add to that position" (POST /api/candidate-positions, same recruiter, triggers scoring) or "Already in that position"; /candidates/[id] shows strongest roles from the latest scoring
+- No bulk re-scoring: applies to new scorings and manual re-scores
+
 ## Home Screen
 
 - `/` renders the daily home for signed-in users (inside `DashboardShell`, shared with the `(dashboard)` layout); visitors keep the landing page. "Home" is the first sidebar item

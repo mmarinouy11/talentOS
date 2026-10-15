@@ -54,6 +54,28 @@ export default async function CandidateInPositionPage({
   const { candidate, position } = cp
   const hoursBaseline = await getMonthlyHoursBaseline()
 
+  // "Better match" only while that position is still OPEN and not fulfilled
+  const suggestedPosition = cp.suggestedPositionId
+    ? await db.position.findFirst({
+        where: { id: cp.suggestedPositionId, deletedAt: null, status: 'OPEN' },
+        select: {
+          id: true, title: true, client: true, headcount: true,
+          _count: { select: { candidatePositions: { where: { status: 'HIRED' } } } },
+        },
+      })
+    : null
+  const suggestion = suggestedPosition && cp.suggestedPositionScore != null
+    && suggestedPosition._count.candidatePositions < (suggestedPosition.headcount ?? 1)
+    ? {
+        positionId: suggestedPosition.id,
+        title: suggestedPosition.title,
+        client: suggestedPosition.client,
+        estimatedScore: cp.suggestedPositionScore,
+        reason: cp.suggestedPositionReason,
+        existingCpId: candidate.candidatePositions.find((o) => o.positionId === suggestedPosition.id)?.id ?? null,
+      }
+    : null
+
   const STAGE_LABELS: Record<string, string> = {
     APPLIED: 'Applied', SCREENING: 'Screening', TECHNICAL_INTERVIEW: 'Technical Interview',
     MANAGER_INTERVIEW: 'Manager Interview', CLIENT_INTERVIEW: 'Client Interview',
@@ -175,6 +197,10 @@ export default async function CandidateInPositionPage({
             fitStrengths={cp.fitStrengths}
             fitGaps={cp.fitGaps}
             fitScoredAt={cp.fitScoredAt?.toISOString() ?? null}
+            strongestRoles={cp.strongestRoles}
+            suggestion={suggestion}
+            candidateId={candidate.id}
+            recruiterId={cp.recruiterId}
           />
 
           {/* Budget Fit */}
