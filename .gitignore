@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .claude/
+
+# dedupe-candidates output (contains candidate PII)
+/reports/
