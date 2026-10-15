@@ -80,10 +80,10 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
       const res = await fetch('/api/cv/upload', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'CV parse failed'); return }
-      const { parsed, driveFileId, driveFileName } = data
+      const { parsed, driveFileId, originalName } = data
       setCvParsed(parsed)
       setCvDriveId(driveFileId ?? '')
-      setCvOriginalName(driveFileName ?? file.name)
+      setCvOriginalName(originalName ?? file.name)
       // Pre-fill empty fields from parsed CV
       if (parsed.firstName && !firstName) setFirstName(parsed.firstName)
       if (parsed.lastName && !lastName) setLastName(parsed.lastName)

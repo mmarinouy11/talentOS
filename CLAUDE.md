@@ -113,6 +113,7 @@ Import from `lib/anthropic.ts`:
 - Portals (vendor, referral, direct apply) still require an email
 - Duplicate checks: `findCandidateMatches()` in `lib/candidate-identity.ts` (server) → exact (email case-insensitive or LinkedIn handle) / conflict (email and LinkedIn match different candidates) / possible (normalized name + phone or country). POST /api/candidates returns 409 `{ duplicate }` for exact/conflict, and for possible unless `allowPossibleDuplicate`; UI in `DuplicateCandidatePanel`. PATCH returns 409 `{ conflictCandidate }` when the new email/LinkedIn belongs to another candidate
 - Portals: vendor/referral reject any email or LinkedIn match; direct apply re-surfaces the matched candidate
+- CV files: `cvOriginalName` stores the user's file name (Drive names carry a timestamp prefix). Rejected portal submissions move their CV to the Drive trash (`trashDriveFileQuietly`). `scripts/orphan-cvs-report.ts`: dry run / `--apply` (trash, never permanent delete) / `--match [--apply]` to attach orphan CVs to candidates without one
 - Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
 
 ## Backlog

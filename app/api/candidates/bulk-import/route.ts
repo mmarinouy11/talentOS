@@ -97,7 +97,7 @@ async function processJob(
             experience: parsed.experience ?? [],
             education: parsed.education ?? [],
             cvDriveId: driveResult?.fileId ?? null,
-            cvOriginalName: driveResult?.fileName ?? fileName,
+            cvOriginalName: driveResult ? fileName : null,
             match,
           }
         } catch (err) {

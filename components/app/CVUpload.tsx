@@ -63,7 +63,8 @@ export function CVUpload({ onParsed, onError, className }: CVUploadProps) {
         throw new Error(data.error ?? 'Upload failed')
       }
       setState('success')
-      onParsed(data.parsed, data.driveFileId, data.driveFileName)
+      // third arg is what gets stored as cvOriginalName: the user's file name, not the timestamped Drive name
+      onParsed(data.parsed, data.driveFileId, data.originalName ?? data.driveFileName)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Upload failed'
       setErrorMsg(msg)

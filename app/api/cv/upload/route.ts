@@ -156,7 +156,7 @@ export async function POST(request: Request) {
         const clean = block.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
         const parsed: ParsedCV = JSON.parse(clean)
         console.log('[cv-upload] Vision parsed result:', JSON.stringify(parsed))
-        return NextResponse.json({ driveFileId, driveFileName: driveFileName2, parsed })
+        return NextResponse.json({ driveFileId, driveFileName: driveFileName2, originalName, parsed })
       } catch (err) {
         console.error('[cv-upload] Vision parsing failed:', err)
         return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Could not parse this PDF. The file may be corrupt or unreadable.' }, { status: 422 })
@@ -172,7 +172,7 @@ export async function POST(request: Request) {
 
     console.log('[cv-upload] Claude parsed result:', JSON.stringify(parsed))
 
-    return NextResponse.json({ driveFileId, driveFileName: driveFileName2, parsed })
+    return NextResponse.json({ driveFileId, driveFileName: driveFileName2, originalName, parsed })
   } catch (err) {
     console.error('[cv-upload] Error:', err)
     return anthropicErrorResponse(err) ?? NextResponse.json({ error: 'Failed to process CV' }, { status: 500 })

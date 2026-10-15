@@ -5,7 +5,7 @@ import type { Prisma } from '@prisma/client'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { callClaudeJSON } from '@/lib/anthropic'
-import { deleteDriveFileQuietly, uploadFileToDrive } from '@/lib/google'
+import { trashDriveFileQuietly, uploadFileToDrive } from '@/lib/google'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
 import { directCandidateSubmittedEmail, directReturningCandidateEmail } from '@/lib/email-templates'
@@ -116,7 +116,7 @@ export async function POST(
 
   const parsed: ParsedCV = parsedResult ?? defaultParsed
   const cvDriveId = driveResult?.fileId
-  const cvOriginalName = driveResult?.fileName
+  const cvOriginalName = driveResult ? cvFile.name : null
 
   // Build notes from screening Q&A
   let notes: string | undefined
@@ -136,7 +136,7 @@ export async function POST(
       where: { positionId: position.id, candidateId: existingCandidate.id },
     })
     if (existingCP) {
-      await deleteDriveFileQuietly(cvDriveId, 'apply')
+      await trashDriveFileQuietly(cvDriveId, 'apply')
       return NextResponse.json({
         rejected: true,
         reason: 'duplicate',
@@ -200,7 +200,7 @@ export async function POST(
     if (countryRaw && !locationAllowed(position.location, countryRaw)) {
       await db.candidatePosition.delete({ where: { id: cp.id } })
       if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
-      await deleteDriveFileQuietly(cvDriveId, 'apply')
+      await trashDriveFileQuietly(cvDriveId, 'apply')
       return NextResponse.json({
         rejected: true,
         reason: 'location',
@@ -225,7 +225,7 @@ export async function POST(
   if (fitScore < threshold) {
     await db.candidatePosition.delete({ where: { id: cp.id } })
     if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
-    await deleteDriveFileQuietly(cvDriveId, 'apply')
+    await trashDriveFileQuietly(cvDriveId, 'apply')
     return NextResponse.json({
       rejected: true,
       reason: 'low_score',
@@ -245,7 +245,7 @@ export async function POST(
     if (desiredCompensation > budgetMonthly) {
       await db.candidatePosition.delete({ where: { id: cp.id } })
       if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
-      await deleteDriveFileQuietly(cvDriveId, 'apply')
+      await trashDriveFileQuietly(cvDriveId, 'apply')
       return NextResponse.json({
         rejected: true,
         reason: 'over_budget',

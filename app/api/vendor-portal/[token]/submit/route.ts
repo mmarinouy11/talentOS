@@ -4,7 +4,7 @@ import { normalizeLinkedinHandle } from '@/lib/linkedin'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { callClaudeJSON } from '@/lib/anthropic'
-import { deleteDriveFileQuietly, uploadFileToDrive } from '@/lib/google'
+import { trashDriveFileQuietly, uploadFileToDrive } from '@/lib/google'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
 import { sendEmailViaSystemGmail } from '@/lib/email'
 import { resolveEmailTemplate } from '@/lib/email-resolver'
@@ -141,7 +141,7 @@ export async function POST(
 
   const parsed: ParsedCV = parsedResult ?? defaultParsed
   const cvDriveId = driveResult?.fileId
-  const cvOriginalName = driveResult?.fileName
+  const cvOriginalName = driveResult ? cvFile.name : null
 
   // CHECK 1c — Duplicate by the LinkedIn profile found in the CV (strict, same as an email match)
   const cvLinkedinHandle = normalizeLinkedinHandle(parsed.linkedinUrl)
@@ -154,7 +154,7 @@ export async function POST(
       const message = existingCP
         ? 'A candidate with the LinkedIn profile in this CV has already been submitted for this position.'
         : 'A candidate with the LinkedIn profile in this CV already exists in our system.'
-      await deleteDriveFileQuietly(cvDriveId, 'vendor-portal')
+      await trashDriveFileQuietly(cvDriveId, 'vendor-portal')
       return NextResponse.json({
         rejected: true,
         reason: 'duplicate',
@@ -204,7 +204,7 @@ export async function POST(
     if (countryRaw && !locationAllowed(position.location, countryRaw)) {
       await db.candidatePosition.delete({ where: { id: cp.id } })
       if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
-      await deleteDriveFileQuietly(cvDriveId, 'vendor-portal')
+      await trashDriveFileQuietly(cvDriveId, 'vendor-portal')
       return NextResponse.json({
         rejected: true,
         reason: 'location',
@@ -229,7 +229,7 @@ export async function POST(
   if (fitScore < threshold) {
     await db.candidatePosition.delete({ where: { id: cp.id } })
     if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
-    await deleteDriveFileQuietly(cvDriveId, 'vendor-portal')
+    await trashDriveFileQuietly(cvDriveId, 'vendor-portal')
     return NextResponse.json({
       rejected: true,
       reason: 'low_score',
@@ -248,7 +248,7 @@ export async function POST(
     if (desiredCompensation > budgetMonthly) {
       await db.candidatePosition.delete({ where: { id: cp.id } })
       if (createdCandidate) await db.candidate.delete({ where: { id: candidate.id } })
-      await deleteDriveFileQuietly(cvDriveId, 'vendor-portal')
+      await trashDriveFileQuietly(cvDriveId, 'vendor-portal')
       return NextResponse.json({
         rejected: true,
         reason: 'over_budget',

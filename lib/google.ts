@@ -53,17 +53,18 @@ export async function downloadFileFromDrive(fileId: string): Promise<Buffer> {
   return Buffer.from(response.data as ArrayBuffer)
 }
 
-export async function deleteFileFromDrive(fileId: string): Promise<void> {
+// Moves the file to the Drive trash (restorable for 30 days) rather than deleting it permanently
+export async function trashDriveFile(fileId: string): Promise<void> {
   const drive = getDriveClient()
-  await drive.files.delete({ fileId, supportsAllDrives: true })
+  await drive.files.update({ fileId, requestBody: { trashed: true }, supportsAllDrives: true })
 }
 
-// Best-effort cleanup (e.g. a rejected submission's CV): logs failures, never throws
-export async function deleteDriveFileQuietly(fileId: string | null | undefined, context: string): Promise<void> {
+// Best-effort cleanup (e.g. a rejected submission's CV): moves the file to the trash, logs failures, never throws
+export async function trashDriveFileQuietly(fileId: string | null | undefined, context: string): Promise<void> {
   if (!fileId) return
   try {
-    await deleteFileFromDrive(fileId)
+    await trashDriveFile(fileId)
   } catch (err) {
-    console.error(`[${context}] Failed to delete Drive file ${fileId}:`, err)
+    console.error(`[${context}] Failed to move Drive file ${fileId} to trash:`, err)
   }
 }
