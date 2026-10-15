@@ -11,7 +11,7 @@
 // as long as the group's membership has not changed.
 
 import { createHash } from 'crypto'
-import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs'
 import path from 'path'
 import type { Prisma, Stage } from '@prisma/client'
 import { db } from '../lib/db'
@@ -47,7 +47,24 @@ const phoneDigits = (p: string | null) => {
   return d.length >= 7 ? d : null
 }
 
-const realEmail = (e: string | null) => (e && !isPlaceholderEmail(e) ? e.trim().toLowerCase() : null)
+// Fake emails are cleared in Phase A and ignored when grouping
+const FAKE_EMAIL_DOMAINS = ['@email.com', '@bmail.com', '@amail.com', '@no-email.import']
+const FAKE_EMAILS_FILE = path.join(REPORTS_DIR, 'fake-emails.txt')
+const FAKE_EMAIL_LIST: Set<string> = existsSync(FAKE_EMAILS_FILE)
+  ? new Set(readFileSync(FAKE_EMAILS_FILE, 'utf8').split(/\r?\n/).map((l) => l.trim().toLowerCase()).filter((l) => l && !l.startsWith('#')))
+  : new Set()
+
+type FakeKind = 'placeholder' | 'domain' | 'list'
+function fakeEmailKind(e: string | null): FakeKind | null {
+  if (!e) return null
+  const v = e.trim().toLowerCase()
+  if (isPlaceholderEmail(v)) return 'placeholder'
+  if (FAKE_EMAIL_DOMAINS.some((d) => v.endsWith(d))) return 'domain'
+  if (FAKE_EMAIL_LIST.has(v)) return 'list'
+  return null
+}
+
+const realEmail = (e: string | null) => (e && e.trim() && !fakeEmailKind(e) ? e.trim().toLowerCase() : null)
 
 const STAGE_RANK: Record<Stage, number> = {
   REJECTED: -1, WITHDRAWN: -1,
@@ -107,19 +124,24 @@ async function loadCandidates(): Promise<Cand[]> {
 
 async function phaseA(cands: Cand[]) {
   const handleUpdates = cands.filter((c) => c.effHandle !== c.linkedinHandle)
-  const placeholderEmails = cands.filter((c) => c.email && isPlaceholderEmail(c.email))
+  const fakeEmails = cands.filter((c) => fakeEmailKind(c.email))
+  const byKind = (k: FakeKind) => fakeEmails.filter((c) => fakeEmailKind(c.email) === k).length
   console.log('\n== Phase A — backfill ==')
   console.log(`  linkedinHandle to set/update: ${handleUpdates.length}`)
-  console.log(`  placeholder emails to clear:  ${placeholderEmails.length}`)
+  console.log(`  fake emails to clear:         ${fakeEmails.length}`)
+  console.log(`    placeholder domains (${['@import.linkedin.com', '@import.tenarai.com'].join(', ')}): ${byKind('placeholder')}`)
+  console.log(`    fake domains (${FAKE_EMAIL_DOMAINS.join(', ')}): ${byKind('domain')}`)
+  console.log(`    explicit list (${path.relative(process.cwd(), FAKE_EMAILS_FILE)}, ${FAKE_EMAIL_LIST.size} entries): ${byKind('list')}`)
+  if (FAKE_EMAIL_LIST.size === 0) console.log(`    ! ${path.relative(process.cwd(), FAKE_EMAILS_FILE)} not found or empty — explicit list skipped`)
   if (!APPLY) { console.log('  (dry run — no changes written; use --apply)'); return }
 
   for (const c of handleUpdates) {
     await db.candidate.update({ where: { id: c.id }, data: { linkedinHandle: c.effHandle } })
   }
-  for (const c of placeholderEmails) {
+  for (const c of fakeEmails) {
     await db.candidate.update({ where: { id: c.id }, data: { email: null } })
   }
-  console.log(`  applied: ${handleUpdates.length} handles, ${placeholderEmails.length} emails cleared`)
+  console.log(`  applied: ${handleUpdates.length} handles, ${fakeEmails.length} fake emails cleared`)
 }
 
 // ─── Phase B: grouping ──────────────────────────────────────────────────────
@@ -136,6 +158,7 @@ function rankCandidates(members: Cand[]): Cand[] {
 }
 const pickPrimary = (members: Cand[]) => rankCandidates(members)[0]
 
+// groupId is derived only from the sorted member ids, so it is identical across runs while membership is unchanged
 function makeGroup(type: Group['type'], members: Cand[]): Group {
   const hash = createHash('sha1').update(members.map((m) => m.id).sort().join(',')).digest('hex').slice(0, 10)
   return { groupId: `${type === 'CERTAIN' ? 'C' : 'P'}-${hash}`, type, members, primary: pickPrimary(members) }
@@ -228,8 +251,11 @@ function writeReport(groups: Group[]) {
 
 // ─── Phase C: merge ─────────────────────────────────────────────────────────
 
+// Accepts a CSV with a groupId column (e.g. an edited duplicates report) or a plain text
+// file with one groupId per line; blank lines and lines starting with # are ignored.
 function readApprovedGroupIds(file: string): Set<string> {
-  const lines = readFileSync(file, 'utf8').split(/\r?\n/).filter((l) => l.trim())
+  const lines = readFileSync(file, 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith('#'))
+  if (lines.length === 0) return new Set()
   const header = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
   const col = header.indexOf('groupId')
   const rows = col >= 0 ? lines.slice(1) : lines
@@ -310,6 +336,16 @@ async function mergeGroup(g: Group) {
 
       await tx.candidate.delete({ where: { id: dupId } })
       log(`  deleted duplicate candidate ${dupId} (${dup.firstName} ${dup.lastName}, ${dup.email ?? 'no email'})`)
+    }
+
+    // Keep the longest full name in the group (ties keep the primary's), e.g. "Chris Aldana" → "Christian Santos Aldana"
+    const fullName = (m: { firstName: string; lastName: string }) => `${m.firstName.trim()} ${m.lastName.trim()}`.trim()
+    const longest = g.members.reduce((best, m) => (fullName(m).length > fullName(best).length ? m : best), g.primary)
+    if (longest.id !== primaryId) {
+      const firstName = longest.firstName.trim()
+      const lastName = longest.lastName.trim()
+      await tx.candidate.update({ where: { id: primaryId }, data: { firstName, lastName } })
+      log(`  name: "${fullName(g.primary)}" → "${firstName} ${lastName}" (from ${longest.id})`)
     }
   }, { timeout: 60_000 })
 }

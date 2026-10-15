@@ -42,4 +42,5 @@ next-env.d.ts
 .claude/
 
 # dedupe-candidates output (contains candidate PII)
-/reports/
+/reports/*
+!/reports/fake-emails.txt
