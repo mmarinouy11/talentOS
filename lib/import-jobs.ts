@@ -1,3 +1,5 @@
+import type { DuplicateResult } from '@/lib/candidate-identifier'
+
 export type Seniority = 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL'
 
 export const PLACEHOLDER_EMAIL_DOMAINS = ['@import.linkedin.com', '@import.tenarai.com']
@@ -25,8 +27,8 @@ export interface ParsedCandidate {
   education: { degree: string; institution: string; year?: string }[]
   cvDriveId: string | null
   cvOriginalName: string | null
-  duplicate: boolean
-  existingId?: string
+  // duplicate check against existing candidates (email, LinkedIn handle, name + phone/country)
+  match: DuplicateResult
   error?: string
 }
 

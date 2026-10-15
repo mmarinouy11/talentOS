@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
-import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
+import { MISSING_IDENTIFIER_ERROR, findCandidateMatches, hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
 
 const patchSchema = z.object({
   firstName: z.string().min(1).optional(),
@@ -88,13 +88,31 @@ export async function PATCH(
     return NextResponse.json({ error: MISSING_IDENTIFIER_ERROR }, { status: 400 })
   }
 
+  // The new email or LinkedIn must not belong to another candidate
+  const emailChanged = identity.email !== undefined && (identity.email ?? '').toLowerCase() !== (existing.email ?? '').toLowerCase()
+  const handleChanged = identity.linkedinHandle !== undefined && identity.linkedinHandle !== existing.linkedinHandle
+  if (emailChanged || handleChanged) {
+    const dup = await findCandidateMatches(
+      { email: emailChanged ? identity.email : null, linkedinUrl: handleChanged ? identity.linkedinUrl : null },
+      { excludeId: id },
+    )
+    if (dup.kind === 'exact' || dup.kind === 'conflict') {
+      const other = dup.candidates[0]
+      const field = dup.kind === 'exact' && dup.matchedBy[0] === 'linkedin' ? 'LinkedIn profile' : 'email'
+      return NextResponse.json({
+        error: `This ${field} already belongs to ${other.firstName} ${other.lastName}.`,
+        conflictCandidate: { id: other.id, name: `${other.firstName} ${other.lastName}`.trim() },
+      }, { status: 409 })
+    }
+  }
+
   try {
     const candidate = await db.candidate.update({ where: { id }, data: { ...rest, ...identity } })
     return NextResponse.json(candidate)
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code
     if (code === 'P2002') {
-      return NextResponse.json({ error: 'A candidate with this email address already exists.' }, { status: 409 })
+      return NextResponse.json({ error: 'This email or LinkedIn profile already belongs to another candidate (possibly a deleted one).' }, { status: 409 })
     }
     console.error('[PATCH /api/candidates/[id]]', err)
     return NextResponse.json({ error: 'Failed to update candidate.' }, { status: 500 })

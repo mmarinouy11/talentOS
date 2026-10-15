@@ -6,7 +6,7 @@ import { uploadFileToDrive } from '@/lib/google'
 import AdmZip from 'adm-zip'
 import { randomUUID } from 'crypto'
 import { importJobs, scheduleJobCleanup, type ParsedCandidate } from '@/lib/import-jobs'
-import { realEmailOrNull } from '@/lib/candidate-identity'
+import { findCandidateMatches, realEmailOrNull } from '@/lib/candidate-identity'
 
 const LINKEDIN_SYSTEM_PROMPT = `You are a LinkedIn profile PDF parser. Extract structured information from a LinkedIn profile export.
 Return ONLY valid JSON with these exact fields:
@@ -37,7 +37,7 @@ Rules:
 async function processJob(
   jobId: string,
   entries: AdmZip.IZipEntry[],
-  emailMap: Map<string, string>
+  positionId: string | null
 ) {
   const job = importJobs.get(jobId)
   if (!job) return
@@ -54,7 +54,7 @@ async function processJob(
           country: null, linkedinUrl: null, seniority: null,
           yearsOfExperience: null, skills: [], languages: [], summary: null,
           experience: [], education: [], cvDriveId: null, cvOriginalName: null,
-          duplicate: false,
+          match: { kind: 'none', candidates: [] } as ParsedCandidate['match'],
         }
         try {
           const pdfBuffer = entry.getData()
@@ -74,7 +74,7 @@ async function processJob(
               console.error(`[bulk-import] Drive upload failed for ${fileName}:`, err)
               return null
             }),
-            callClaudeJSON<Omit<ParsedCandidate, 'fileName' | 'duplicate' | 'existingId' | 'error' | 'cvDriveId' | 'cvOriginalName'>>(
+            callClaudeJSON<Omit<ParsedCandidate, 'fileName' | 'match' | 'error' | 'cvDriveId' | 'cvOriginalName'>>(
               `Parse this LinkedIn profile PDF and return the structured JSON:\n\n${text.slice(0, 8000)}`,
               'FAST',
               LINKEDIN_SYSTEM_PROMPT
@@ -83,8 +83,10 @@ async function processJob(
 
           // No placeholder emails: a profile without an email keeps email = null
           const email = realEmailOrNull(parsed.email)
-          const existingId = email ? emailMap.get(email.toLowerCase()) : undefined
-          const isDuplicate = existingId !== undefined
+          const match = await findCandidateMatches(
+            { email, linkedinUrl: parsed.linkedinUrl, firstName: parsed.firstName, lastName: parsed.lastName, phone: parsed.phone, country: parsed.country },
+            { positionId },
+          )
 
           return {
             fileName,
@@ -96,8 +98,7 @@ async function processJob(
             education: parsed.education ?? [],
             cvDriveId: driveResult?.fileId ?? null,
             cvOriginalName: driveResult?.fileName ?? fileName,
-            duplicate: isDuplicate,
-            existingId,
+            match,
           }
         } catch (err) {
           console.error(`Failed to parse ${fileName}:`, err)
@@ -121,6 +122,8 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    // Optional: the position being imported into, so matches can say whether they're already in it
+    const positionId = (formData.get('positionId') as string | null) || null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
     if (!file.name.endsWith('.zip')) {
@@ -145,21 +148,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Too many files (max 50 PDFs per batch)' }, { status: 400 })
     }
 
-    // Fetch existing emails for dedup check
-    const { db } = await import('@/lib/db')
-    const existingCandidates = await db.candidate.findMany({
-      where: { deletedAt: null, email: { not: null } },
-      select: { id: true, email: true },
-    })
-    const emailMap = new Map(existingCandidates.map((c) => [c.email!.toLowerCase(), c.id]))
-
     // Create job and return immediately
     const jobId = randomUUID()
     importJobs.set(jobId, { total: entries.length, completed: 0, done: false, results: [] })
     scheduleJobCleanup(jobId)
 
     // Process in background
-    processJob(jobId, entries, emailMap).catch((err) => {
+    processJob(jobId, entries, positionId).catch((err) => {
       const job = importJobs.get(jobId)
       if (job) { job.done = true; job.error = 'Processing failed unexpectedly' }
       console.error('Import job failed:', err)

@@ -47,7 +47,7 @@ Import from `lib/anthropic.ts`:
 - Modal: `AddCandidateToPositionModal` — two tabs: "Search Existing" and "Import from LinkedIn" (uses LinkedInImportFlow with positionId)
 - Shared PDF extraction: `lib/pdf-extract.ts` (used by both CV upload and bulk import)
 - Job state: `lib/import-jobs.ts` — module-level Map, 30-min TTL
-- Dedup: by email (case-insensitive) against existing non-deleted candidates
+- Dedup: each parsed row gets a `match` (New / Existing / Conflict / Possible duplicate) from `findCandidateMatches`; existing rows unchecked by default and linked (not created) when checked inside a position; conflict rows not selectable; confirm re-checks server-side
 - Max: 50 PDFs per batch, 50MB zip
 
 ## Interview Pipeline
@@ -108,9 +108,11 @@ Import from `lib/anthropic.ts`:
 
 ## Candidate Identity
 
-- `Candidate.email` is optional (`String? @unique`); `linkedinHandle` (indexed, not unique yet) is set from `linkedinUrl` on every write via `normalizeLinkedinHandle()` (`lib/linkedin.ts`)
-- Creation requires a real email or a LinkedIn profile URL (`lib/candidate-identity.ts`); no placeholder emails are generated anymore (`isPlaceholderEmail()` kept for legacy data)
+- `Candidate.email` is optional (`String? @unique`); `linkedinHandle` (`String? @unique`) is set from `linkedinUrl` on every write via `normalizeLinkedinHandle()` (`lib/linkedin.ts`)
+- Creation requires a real email or a LinkedIn profile URL (`lib/candidate-identifier.ts`, client-safe); no placeholder emails are generated anymore (`isPlaceholderEmail()` kept for legacy data)
 - Portals (vendor, referral, direct apply) still require an email
+- Duplicate checks: `findCandidateMatches()` in `lib/candidate-identity.ts` (server) → exact (email case-insensitive or LinkedIn handle) / conflict (email and LinkedIn match different candidates) / possible (normalized name + phone or country). POST /api/candidates returns 409 `{ duplicate }` for exact/conflict, and for possible unless `allowPossibleDuplicate`; UI in `DuplicateCandidatePanel`. PATCH returns 409 `{ conflictCandidate }` when the new email/LinkedIn belongs to another candidate
+- Portals: vendor/referral reject any email or LinkedIn match; direct apply re-surfaces the matched candidate
 - Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
 
 ## Backlog

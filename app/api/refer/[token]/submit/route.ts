@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { findCandidateMatches } from '@/lib/candidate-identity'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
@@ -78,16 +79,16 @@ export async function POST(
   }
 
   // CHECK 1 — Duplicate
-  const existingCandidate = await db.candidate.findFirst({
-    where: { email: emailRaw, deletedAt: null },
-  })
+  const dup = await findCandidateMatches({ email: emailRaw, linkedinUrl })
+  const existingCandidate = dup.kind === 'exact' || dup.kind === 'conflict' ? dup.candidates[0] : null
   if (existingCandidate) {
     const existingCP = await db.candidatePosition.findFirst({
       where: { positionId, candidateId: existingCandidate.id },
     })
+    const what = dup.kind === 'exact' && !dup.matchedBy.includes('email') ? 'LinkedIn profile' : 'email'
     const message = existingCP
-      ? 'A candidate with this email has already been submitted for this position.'
-      : 'A candidate with this email address already exists in our system.'
+      ? `A candidate with this ${what} has already been submitted for this position.`
+      : `A candidate with this ${what} already exists in our system.`
     return NextResponse.json({
       rejected: true,
       reason: 'duplicate',

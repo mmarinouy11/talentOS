@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ParsedCandidate } from '@/lib/import-jobs'
 import { isPlaceholderEmail } from '@/lib/import-jobs'
-import { hasCandidateIdentifier } from '@/lib/candidate-identity'
+import { describeInPosition, hasCandidateIdentifier } from '@/lib/candidate-identifier'
+import Link from 'next/link'
 import type { ConfirmResult } from '@/app/api/candidates/bulk-import/confirm/route'
 
 export type { ParsedCandidate }
@@ -36,14 +37,40 @@ interface Props {
 
 type FlowStep = 'upload' | 'parsing' | 'review' | 'confirming' | 'done'
 
-function StatusBadge({ candidate }: { candidate: ParsedCandidate }) {
-  if (candidate.error) {
-    return <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Parse error</span>
+const pill = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium'
+const candLink = (id: string, name: string) => (
+  <Link key={id} href={`/candidates/${id}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-900" onClick={(e) => e.stopPropagation()}>{name}</Link>
+)
+
+function MatchBadge({ candidate }: { candidate: ParsedCandidate }) {
+  if (candidate.error) return <span className={`${pill} bg-red-100 text-red-700`}>Parse error</span>
+  const m = candidate.match
+  if (!m || m.kind === 'none') return <span className={`${pill} bg-green-100 text-green-700`}>New</span>
+  if (m.kind === 'exact') {
+    const e = m.candidates[0]
+    return (
+      <div className="space-y-0.5">
+        <span className={`${pill} bg-gray-100 text-gray-700`}>Existing</span>
+        <p className="text-xs text-gray-500">{candLink(e.id, `${e.firstName} ${e.lastName}`)}</p>
+        {e.inPosition && <p className="text-xs text-amber-700">Already in this position — {describeInPosition(e.inPosition)}</p>}
+      </div>
+    )
   }
-  if (candidate.duplicate) {
-    return <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">Duplicate</span>
+  if (m.kind === 'conflict') {
+    const [a, b] = m.candidates
+    return (
+      <div className="space-y-0.5" title="This email belongs to one candidate and this LinkedIn to another. They may be duplicates — review before continuing.">
+        <span className={`${pill} bg-red-100 text-red-700`}>Conflict</span>
+        <p className="text-xs text-gray-500">email: {candLink(a.id, `${a.firstName} ${a.lastName}`)} · LinkedIn: {candLink(b.id, `${b.firstName} ${b.lastName}`)}</p>
+      </div>
+    )
   }
-  return <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">New</span>
+  return (
+    <div className="space-y-0.5">
+      <span className={`${pill} bg-amber-100 text-amber-700`}>Possible duplicate</span>
+      <p className="text-xs text-amber-700">Similar: {m.candidates.map((x, k) => <span key={x.id}>{k > 0 && ', '}{candLink(x.id, `${x.firstName} ${x.lastName}`)}</span>)}</p>
+    </div>
+  )
 }
 
 function ProgressBar({ completed, total }: { completed: number; total: number }) {
@@ -112,10 +139,11 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
           clearInterval(interval)
           const parsed: ParsedCandidate[] = data.results
           setCandidates(parsed)
+          // New and possible-duplicate rows start checked; existing and conflict rows don't
           const preselected = new Set<number>(
             parsed
               .map((c, i) => ({ c, i }))
-              .filter(({ c }) => !c.error && !c.duplicate)
+              .filter(({ c }) => !c.error && (c.match?.kind === 'none' || c.match?.kind === 'possible'))
               .map(({ i }) => i)
           )
           setSelected(preselected)
@@ -140,6 +168,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
     setError(null)
     const fd = new FormData()
     fd.append('file', file)
+    if (positionId) fd.append('positionId', positionId)
 
     try {
       const res = await fetch('/api/candidates/bulk-import', { method: 'POST', body: fd })
@@ -171,13 +200,25 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
     if (file) processFile(file)
   }, [])
 
+  // Existing rows can only be linked into a position (and not if already there); conflicts never
+  function isSelectable(i: number) {
+    const c = candidates[i]
+    if (!c || c.error) return false
+    const m = c.match
+    if (m?.kind === 'conflict') return false
+    if (m?.kind === 'exact') return !!positionId && !m.candidates[0].inPosition
+    return true
+  }
+
   function toggleAll() {
-    const eligible = candidates.map((c, i) => ({ c, i })).filter(({ c }) => !c.error)
-    if (selected.size === eligible.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(eligible.map(({ i }) => i)))
-    }
+    // "Select all" covers new and possible rows; existing rows are opted in one by one
+    const eligible = candidates.map((c, i) => ({ c, i })).filter(({ c, i }) => isSelectable(i) && c.match?.kind !== 'exact')
+    const eligibleIdx = new Set(eligible.map(({ i }) => i))
+    const allOn = eligible.every(({ i }) => selected.has(i))
+    setSelected((prev) => {
+      const keptExisting = [...prev].filter((i) => !eligibleIdx.has(i))
+      return new Set(allOn ? keptExisting : [...keptExisting, ...eligibleIdx])
+    })
   }
 
   function toggleRow(i: number) {
@@ -240,10 +281,15 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
     }
   }
 
-  const eligibleCount = candidates.filter((c) => !c.error).length
-  const newCount = candidates.filter((c) => !c.error && !c.duplicate).length
-  const dupCount = candidates.filter((c) => c.duplicate).length
+  const kindCount = (k: string) => candidates.filter((c) => !c.error && (c.match?.kind ?? 'none') === k).length
+  const eligibleCount = candidates.filter((c, i) => isSelectable(i) && c.match?.kind !== 'exact').length
+  const newCount = kindCount('none')
+  const existingCount = kindCount('exact')
+  const conflictCount = kindCount('conflict')
+  const possibleCount = kindCount('possible')
   const errCount = candidates.filter((c) => c.error).length
+  const selectedExisting = [...selected].filter((i) => candidates[i]?.match?.kind === 'exact').length
+  const selectedPossible = [...selected].filter((i) => candidates[i]?.match?.kind === 'possible').length
   const selectedPlaceholderCount = [...selected].filter((i) => isPlaceholderEmail(editedEmails[i] ?? candidates[i]?.email)).length
   function isIdentified(i: number) {
     const c = candidates[i]
@@ -314,7 +360,9 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
         <div className="flex items-center gap-4 text-sm">
           <span className="text-gray-500">{candidates.length} profiles parsed</span>
           <span className="text-green-600 font-medium">{newCount} new</span>
-          {dupCount > 0 && <span className="text-yellow-600">{dupCount} duplicate{dupCount !== 1 ? 's' : ''}</span>}
+          {existingCount > 0 && <span className="text-gray-600">{existingCount} existing</span>}
+          {possibleCount > 0 && <span className="text-amber-600">{possibleCount} possible duplicate{possibleCount !== 1 ? 's' : ''}</span>}
+          {conflictCount > 0 && <span className="text-red-600">{conflictCount} conflict{conflictCount !== 1 ? 's' : ''}</span>}
           {errCount > 0 && <span className="text-red-600">{errCount} error{errCount !== 1 ? 's' : ''}</span>}
           <span className="text-gray-500 ml-auto">{selected.size} selected</span>
         </div>
@@ -328,7 +376,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
                 <th className="px-3 py-2">
                   <input
                     type="checkbox"
-                    checked={selected.size === eligibleCount && eligibleCount > 0}
+                    checked={eligibleCount > 0 && [...selected].filter((i) => candidates[i]?.match?.kind !== 'exact').length === eligibleCount}
                     onChange={toggleAll}
                     className="rounded border-gray-300"
                   />
@@ -340,20 +388,20 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
                 {!compact && (
                   <th className="text-left px-3 py-2 font-medium text-gray-600">Skills</th>
                 )}
-                <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                <th className="text-left px-3 py-2 font-medium text-gray-600">Match</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {candidates.map((c, i) => (
                 <tr
                   key={i}
-                  className={`${selected.has(i) ? 'bg-[#fafff0]' : ''} ${c.error ? 'opacity-50' : 'cursor-pointer hover:bg-[#F5F0EB]'}`}
-                  onClick={() => { if (!c.error) toggleRow(i) }}
+                  className={`${selected.has(i) ? 'bg-[#fafff0]' : ''} ${!isSelectable(i) ? (c.error ? 'opacity-50' : '') : 'cursor-pointer hover:bg-[#F5F0EB]'}`}
+                  onClick={() => { if (isSelectable(i)) toggleRow(i) }}
                 >
                   <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
-                      disabled={!!c.error}
+                      disabled={!isSelectable(i)}
                       checked={selected.has(i)}
                       onChange={() => toggleRow(i)}
                       className="rounded border-gray-300"
@@ -415,7 +463,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
                     </td>
                   )}
                   <td className="px-3 py-2">
-                    <StatusBadge candidate={c} />
+                    <MatchBadge candidate={c} />
                   </td>
                 </tr>
               ))}
@@ -423,6 +471,12 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
           </table>
         </div>
 
+        {(selectedExisting > 0 || selectedPossible > 0) && (
+          <p className="text-xs text-gray-600">
+            {selectedExisting > 0 && <>{selectedExisting} existing candidate{selectedExisting !== 1 ? 's' : ''} will be linked to this position (not created). </>}
+            {selectedPossible > 0 && <span className="text-amber-700">{selectedPossible} possible duplicate{selectedPossible !== 1 ? 's' : ''} will be created as new candidate{selectedPossible !== 1 ? 's' : ''} — uncheck any that are the same person.</span>}
+          </p>
+        )}
         {selectedUnidentifiedCount > 0 && (
           <p className="text-xs text-red-600">
             {selectedUnidentifiedCount} selected row{selectedUnidentifiedCount !== 1 ? 's have' : ' has'} no email or LinkedIn profile URL and will be skipped unless you add one.
@@ -470,7 +524,9 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Import complete</h2>
         <div className="space-y-1 text-sm text-gray-600 mb-6">
           <p><span className="font-medium text-green-600">{result.created}</span> candidate{result.created !== 1 ? 's' : ''} created</p>
+          {result.linked > 0 && <p><span className="font-medium text-gray-700">{result.linked}</span> existing linked to the position</p>}
           {result.skipped > 0 && <p><span className="font-medium text-yellow-600">{result.skipped}</span> skipped</p>}
+          {result.conflicts.length > 0 && <p><span className="font-medium text-red-600">{result.conflicts.length}</span> not imported — email and LinkedIn belong to different candidates</p>}
           {result.errors.length > 0 && <p><span className="font-medium text-red-600">{result.errors.length}</span> failed</p>}
         </div>
         <div className="flex gap-3 justify-center">

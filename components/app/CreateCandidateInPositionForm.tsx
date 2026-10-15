@@ -1,6 +1,7 @@
 'use client'
 
-import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier } from '@/lib/candidate-identity'
+import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier, type CandidateMatch, type DuplicateResult } from '@/lib/candidate-identifier'
+import { DuplicateCandidatePanel } from './DuplicateCandidatePanel'
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,6 +62,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [duplicate, setDuplicate] = useState<DuplicateResult | null>(null)
 
   useEffect(() => {
     fetch('/api/users/options').then((r) => r.json()).then((data: UserOption[]) => setUsers(data)).catch(() => {})
@@ -97,7 +99,34 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    await submit(false)
+  }
+
+  // Link an existing candidate to this position instead of creating a new one
+  async function addExisting(m: CandidateMatch) {
+    setSubmitting(true)
     setError('')
+    const cpRes = await fetch('/api/candidate-positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId: m.id, positionId, recruiterId: recruiterId || null }),
+    })
+    const data = await cpRes.json().catch(() => ({}))
+    setSubmitting(false)
+    if (!cpRes.ok) { setError(data.error ?? 'Could not add the candidate to this position.'); return }
+    onCreated({
+      id: data.id,
+      stage: 'APPLIED',
+      status: 'ACTIVE',
+      fitScore: null,
+      createdAt: data.createdAt ?? new Date().toISOString(),
+      candidate: { id: m.id, firstName: m.firstName, lastName: m.lastName, email: m.email, country: m.country, seniority: m.seniority },
+    })
+  }
+
+  async function submit(allowPossibleDuplicate: boolean) {
+    setError('')
+    setDuplicate(null)
     if (!hasCandidateIdentifier(email, linkedinUrl)) {
       setError(MISSING_IDENTIFIER_ERROR)
       return
@@ -123,6 +152,8 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
       ...(cvParsed?.seniority ? { seniority: cvParsed.seniority } : {}),
       ...(cvParsed?.yearsOfExperience != null ? { yearsOfExperience: cvParsed.yearsOfExperience } : {}),
       ...(cvParsed?.summary ? { notes: cvParsed.summary } : {}),
+      positionId,
+      ...(allowPossibleDuplicate ? { allowPossibleDuplicate: true } : {}),
     }
 
     const candidateRes = await fetch('/api/candidates', {
@@ -133,6 +164,11 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
 
     if (!candidateRes.ok) {
       const data = await candidateRes.json()
+      if (candidateRes.status === 409 && data.duplicate) {
+        setDuplicate(data.duplicate as DuplicateResult)
+        setSubmitting(false)
+        return
+      }
       const msg = data.error?.fieldErrors
         ? Object.values(data.error.fieldErrors as Record<string, string[]>).flat()[0]
         : typeof data.error === 'string' ? data.error : 'Failed to create candidate.'
@@ -289,6 +325,17 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
           </div>
         )}
       </div>
+
+      {duplicate && (
+        <DuplicateCandidatePanel
+          duplicate={duplicate}
+          positionId={positionId}
+          busy={submitting}
+          onAddToPosition={addExisting}
+          onUseExisting={addExisting}
+          onCreateAnyway={() => submit(true)}
+        />
+      )}
 
       <div className="flex gap-3 pt-2 border-t border-gray-100">
         <Button type="submit" disabled={submitting || cvParsing}>

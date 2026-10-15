@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { findCandidateMatches } from '@/lib/candidate-identity'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { callClaudeJSON } from '@/lib/anthropic'
@@ -81,9 +82,8 @@ export async function POST(
   }
 
   // CHECK 1 — Duplicate (strict): reject if candidate email exists anywhere in DB
-  const existingCandidate = await db.candidate.findFirst({
-    where: { email: emailRaw, deletedAt: null },
-  })
+  const dup = await findCandidateMatches({ email: emailRaw })
+  const existingCandidate = dup.kind === 'exact' || dup.kind === 'conflict' ? dup.candidates[0] : null
   if (existingCandidate) {
     // Check if also linked to this position for a more specific message
     const existingCP = await db.candidatePosition.findFirst({

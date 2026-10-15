@@ -11,7 +11,9 @@ import { TagInput } from './TagInput'
 import { CVUpload, type ParsedCV } from './CVUpload'
 import { CandidateCVUpdate } from './CandidateCVUpdate'
 import type { Seniority } from '@prisma/client'
-import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier } from '@/lib/candidate-identity'
+import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier, type DuplicateResult } from '@/lib/candidate-identifier'
+import { DuplicateCandidatePanel } from './DuplicateCandidatePanel'
+import Link from 'next/link'
 
 const LATAM_COUNTRIES = [
   'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Ecuador',
@@ -71,6 +73,8 @@ interface VendorOption { id: string; name: string }
 export function CandidateForm({ mode, currentUserId, defaultValues = {} }: CandidateFormProps) {
   const router = useRouter()
   const [error, setError] = useState('')
+  const [duplicate, setDuplicate] = useState<DuplicateResult | null>(null)
+  const [conflictCandidate, setConflictCandidate] = useState<{ id: string; name: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [skills, setSkills] = useState<string[]>(defaultValues.skills ?? [])
   const [languages, setLanguages] = useState<string[]>(defaultValues.languages ?? [])
@@ -170,7 +174,13 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    await submit(false)
+  }
+
+  async function submit(allowPossibleDuplicate: boolean) {
     setError('')
+    setDuplicate(null)
+    setConflictCandidate(null)
     if (mode === 'create' && !hasCandidateIdentifier(fields.email, fields.linkedinUrl)) {
       setError(MISSING_IDENTIFIER_ERROR)
       return
@@ -201,6 +211,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
       sourcedByUserId: fields.sourcedByType === 'RECRUITER' ? fields.sourcedByUserId || null : null,
       sourcedByVendorId: fields.sourcedByType === 'VENDOR' ? fields.sourcedByVendorId || null : null,
       sourcedByOther: fields.sourcedByType === 'OTHER' ? fields.sourcedByOther || null : null,
+      ...(mode === 'create' && allowPossibleDuplicate ? { allowPossibleDuplicate: true } : {}),
     }
 
     const url = mode === 'edit' ? `/api/candidates/${defaultValues.id}` : '/api/candidates'
@@ -216,6 +227,11 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
 
     if (!res.ok) {
       const data = await res.json()
+      if (res.status === 409 && data.duplicate) {
+        setDuplicate(data.duplicate as DuplicateResult)
+        return
+      }
+      if (res.status === 409 && data.conflictCandidate) setConflictCandidate(data.conflictCandidate)
       const msg =
         data.error?.fieldErrors
           ? Object.values(data.error.fieldErrors as Record<string, string[]>).flat()[0]
@@ -236,6 +252,9 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {error}
+          {conflictCandidate && (
+            <> <Link href={`/candidates/${conflictCandidate.id}`} target="_blank" rel="noopener noreferrer" className="underline font-medium">Open {conflictCandidate.name}</Link></>
+          )}
         </p>
       )}
 
@@ -493,6 +512,15 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
           />
         )}
       </div>
+
+      {duplicate && (
+        <DuplicateCandidatePanel
+          duplicate={duplicate}
+          busy={loading}
+          onUseExisting={(m) => router.push(`/candidates/${m.id}`)}
+          onCreateAnyway={() => submit(true)}
+        />
+      )}
 
       <div className="flex gap-3 pt-2">
         <Button type="submit" disabled={loading}>

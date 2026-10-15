@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { findCandidateMatches } from '@/lib/candidate-identity'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
@@ -121,11 +122,10 @@ export async function POST(
   }
 
   // Determine which of the three cases applies
-  const existingCandidate = await db.candidate.findFirst({
-    where: { email: emailRaw, deletedAt: null },
-  })
+  const dup = await findCandidateMatches({ email: emailRaw, linkedinUrl: linkedin })
+  const existingCandidate = dup.kind === 'exact' || dup.kind === 'conflict' ? dup.candidates[0] : null
 
-  // Case 1 — Email exists AND already linked to this position → reject
+  // Case 1 — Existing candidate (email or LinkedIn) already linked to this position → reject
   if (existingCandidate) {
     const existingCP = await db.candidatePosition.findFirst({
       where: { positionId: position.id, candidateId: existingCandidate.id },
@@ -136,13 +136,13 @@ export async function POST(
         reason: 'duplicate',
         message: 'You have already applied for this position.',
         checks: [
-          { name: 'Eligibility Check', passed: false, detail: 'An application with this email address already exists for this position.' },
+          { name: 'Eligibility Check', passed: false, detail: 'An application from this candidate (same email or LinkedIn profile) already exists for this position.' },
         ],
       })
     }
   }
 
-  // Case 2 — Email exists but NOT linked to this position → re-surface existing candidate
+  // Case 2 — Existing candidate NOT linked to this position → re-surface them
   let candidate: { id: string; firstName: string; lastName: string } | null = null
   let createdCandidate = false
   let isReturning = false
