@@ -123,6 +123,7 @@ Import from `lib/anthropic.ts`:
 - Scope: OPEN requisitions, ACTIVE candidates; "Starting soon" = HIRED with startDate in the next 7 days on OPEN or FILLED requisitions; today's interviews include any candidate status
 - "Today" in America/Montevideo; business days via `lib/business-days.ts` (shared with Recruiter Performance); thresholds in `lib/home-thresholds.ts`
 - Shared: `HcFraction` (○/◐/✓), `lib/stage-labels.ts`
+- Layout: two columns on lg (Needs attention ≈60% | Today's interviews + Bottlenecks ≈40%), Open positions full width below. Stalled = non-Pipeline candidates, grouped by position (expandable); lists other than "Waiting for a decision" show 5 rows + "Show all"; decided interviews collapse at the bottom. Toggles in `components/app/home/HomeToggles.tsx` (client)
 
 ## Backlog
 

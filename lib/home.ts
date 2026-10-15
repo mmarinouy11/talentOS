@@ -18,6 +18,13 @@ type CandRef = PositionRef & { cpId: string; candidateName: string }
 
 export interface WaitingItem extends CandRef { interviewId: string; stage: string; scheduledAt: string; businessDaysWaiting: number; interviewerEmail: string | null }
 export interface StalledItem extends CandRef { stage: string; daysInStage: number }
+export interface StalledGroup extends PositionRef {
+  count: number
+  // stalled candidates per stage, most advanced stage first
+  byStage: { stage: string; count: number }[]
+  oldestDays: number
+  candidates: StalledItem[]
+}
 export interface NewApplicationItem extends CandRef { source: 'VENDOR' | 'REFERRAL' | 'DIRECT'; daysSinceAdded: number }
 export interface StartingSoonItem extends CandRef { startDate: string }
 export interface TodayInterview extends CandRef { interviewId: string; stage: string; scheduledAt: string; interviewerEmail: string | null; done: boolean; isPast: boolean }
@@ -25,6 +32,8 @@ export interface SnapshotRow {
   positionId: string; title: string; client: string; headcount: number; hired: number
   stageCounts: Record<(typeof SNAPSHOT_STAGES)[number], number>
   oldestWaitBd: number | null
+  // days since the oldest ACTIVE candidate still in APPLIED was added
+  pipeAgeDays: number | null
 }
 export interface BottleneckRow { stage: string; active: number; avgDays: number | null; overThreshold: number }
 
@@ -32,7 +41,7 @@ export interface HomeData {
   today: { label: string; isoDate: string }
   counters: { openHeadcount: number; activeCandidates: number; interviewsToday: number; needsAttention: number }
   waiting: { internal: WaitingItem[]; client: WaitingItem[] }
-  stalled: StalledItem[]
+  stalled: StalledGroup[]
   newApplications: NewApplicationItem[]
   startingSoon: StartingSoonItem[]
   todayInterviews: TodayInterview[]
@@ -102,6 +111,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
     const stageCounts = Object.fromEntries(SNAPSHOT_STAGES.map((s) => [s, 0])) as SnapshotRow['stageCounts']
     let hired = 0
     let oldestWaitBd: number | null = null
+    let pipeAgeDays: number | null = null
 
     for (const cp of p.candidatePositions) {
       const ref: CandRef = { ...posRef, cpId: cp.id, candidateName: `${cp.candidate.firstName} ${cp.candidate.lastName}`.trim() }
@@ -120,6 +130,10 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
       if (cp.status !== 'ACTIVE') continue
       activeCandidates++
       if ((SNAPSHOT_STAGES as readonly string[]).includes(cp.stage)) stageCounts[cp.stage as keyof typeof stageCounts]++
+      if (cp.stage === 'APPLIED') {
+        const age = Math.max(0, Math.floor((now.getTime() - cp.createdAt.getTime()) / DAY_MS))
+        pipeAgeDays = Math.max(pipeAgeDays ?? 0, age)
+      }
 
       // (a) Waiting for a decision: interviews before today with no decision
       let waitingForThisCp = false
@@ -143,9 +157,9 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
       const daysInStage = Math.max(0, Math.floor((now.getTime() - enteredAt.getTime()) / DAY_MS))
       bottleneckDays.get(cp.stage)?.push(daysInStage)
 
-      // (b) Stalled: long in stage, nothing scheduled ahead, not already waiting for a decision
+      // (b) Stalled: past Pipeline, long in stage, nothing scheduled ahead, not already waiting for a decision
       const hasFutureInterview = cp.interviews.some((iv) => iv.scheduledAt && iv.scheduledAt > now)
-      if (!waitingForThisCp && daysInStage >= STALLED_AMBER_DAYS && !hasFutureInterview) {
+      if (cp.stage !== 'APPLIED' && !waitingForThisCp && daysInStage >= STALLED_AMBER_DAYS && !hasFutureInterview) {
         stalled.push({ ...ref, stage: cp.stage, daysInStage })
       }
 
@@ -156,7 +170,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
       }
     }
 
-    snapshotRows.push({ positionId: p.id, title: p.title, client: p.client, headcount, hired, stageCounts, oldestWaitBd })
+    snapshotRows.push({ positionId: p.id, title: p.title, client: p.client, headcount, hired, stageCounts, oldestWaitBd, pipeAgeDays })
   }
 
   const startingSoon: StartingSoonItem[] = hiredSoon.map((cp) => ({
@@ -169,6 +183,21 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
   waitingInternal.sort((a, b) => b.businessDaysWaiting - a.businessDaysWaiting)
   waitingClient.sort((a, b) => b.businessDaysWaiting - a.businessDaysWaiting)
   stalled.sort((a, b) => b.daysInStage - a.daysInStage)
+  const stalledByPosition = new Map<string, StalledItem[]>()
+  for (const s of stalled) stalledByPosition.set(s.positionId, [...(stalledByPosition.get(s.positionId) ?? []), s])
+  const stageOrder = (st: string) => -SNAPSHOT_STAGES.indexOf(st as (typeof SNAPSHOT_STAGES)[number])
+  const stalledGroups: StalledGroup[] = [...stalledByPosition.values()].map((items) => {
+    const counts = new Map<string, number>()
+    for (const i of items) counts.set(i.stage, (counts.get(i.stage) ?? 0) + 1)
+    const { positionId, positionTitle, client, timezone } = items[0]
+    return {
+      positionId, positionTitle, client, timezone,
+      count: items.length,
+      byStage: [...counts.entries()].map(([stage, count]) => ({ stage, count })).sort((a, b) => stageOrder(b.stage) - stageOrder(a.stage)),
+      oldestDays: items[0].daysInStage,
+      candidates: items,
+    }
+  }).sort((a, b) => b.oldestDays - a.oldestDays)
   newApplications.sort((a, b) => b.daysSinceAdded - a.daysSinceAdded)
   todayInterviews.sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
 
@@ -191,7 +220,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
     today: { label: formatInTimeZone(now, HOME_TIMEZONE, 'EEEE, MMMM d'), isoDate: todayYmd },
     counters: { openHeadcount, activeCandidates, interviewsToday: todayInterviews.length, needsAttention },
     waiting: { internal: waitingInternal, client: waitingClient },
-    stalled,
+    stalled: stalledGroups,
     newApplications,
     startingSoon,
     todayInterviews,
