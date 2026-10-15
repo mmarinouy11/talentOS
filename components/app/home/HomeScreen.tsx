@@ -36,9 +36,10 @@ const LIST_LIMIT = 5
 const tr = 'hover:bg-[#F5F0EB] transition-colors'
 const candHref = (positionId: string, cpId: string) => `/positions/${positionId}/candidates/${cpId}`
 
-function Table({ headers, children }: { headers: ReactNode[]; children: ReactNode }) {
+// compact: tighter cell padding for the narrow right column
+function Table({ headers, children, compact }: { headers: ReactNode[]; children: ReactNode; compact?: boolean }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+    <div className={`overflow-x-auto rounded-lg border border-gray-200 bg-white ${compact ? '[&_td]:px-2 [&_th]:px-2' : ''}`}>
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 border-b-[2px] border-b-[#8CF000]">
@@ -108,10 +109,11 @@ function WaitingTable({ items }: { items: WaitingItem[] }) {
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <section className="min-w-0">
       <SectionHeader title={title} />
+      {subtitle && <p className="-mt-2 mb-3 text-xs text-gray-500">{subtitle}</p>}
       {children}
     </section>
   )
@@ -149,7 +151,6 @@ function InterviewRow({ i }: { i: TodayInterview }) {
 export function HomeScreen({ data }: { data: HomeData }) {
   const waitingCount = data.waiting.internal.length + data.waiting.client.length
   const stalledCandidates = data.stalled.reduce((n, g) => n + g.count, 0)
-  const maxAvg = Math.max(...data.bottlenecks.map((b) => b.avgDays ?? -1))
   // Upcoming and past-without-decision first; interviews decided today collapse at the bottom
   const openInterviews = data.todayInterviews.filter((i) => !i.done)
   const decidedInterviews = data.todayInterviews.filter((i) => i.done)
@@ -292,18 +293,29 @@ export function HomeScreen({ data }: { data: HomeData }) {
             </Group>
           </Section>
 
-          <Section title="Bottlenecks">
-            <Table headers={['Stage', 'Active', 'Avg days', `≥ ${STALLED_AMBER_DAYS}d`]}>
+          <Section title="Current waiting by stage" subtitle="Candidates in each stage right now and how long they've been there so far">
+            <Table compact headers={['Stage', 'Active', 'Avg so far', 'Typical', `≥ ${STALLED_AMBER_DAYS}d`]}>
               {data.bottlenecks.map((b) => {
-                const worst = b.avgDays != null && b.avgDays === maxAvg && maxAvg > 0
+                // Bottleneck = current stays running longer than the historical norm for that stage
+                const rowBg = b.vsTypical === 'red' ? 'bg-red-50' : b.vsTypical === 'amber' ? 'bg-amber-50' : ''
+                const avgClass = b.vsTypical === 'red' ? 'text-red-600 font-semibold' : b.vsTypical === 'amber' ? 'text-amber-600 font-medium' : b.avgDays != null ? 'text-gray-700' : 'text-gray-300'
+                const pct = b.vsTypical && b.avgDays != null && b.typicalDays ? Math.round((b.avgDays / b.typicalDays - 1) * 100) : null
                 return (
-                  <tr key={b.stage} className={`${tr} ${worst ? 'bg-amber-50' : ''}`}>
+                  <tr key={b.stage} className={`${tr} ${rowBg}`}>
                     <td className={`${td} font-medium text-gray-900 whitespace-nowrap`}>
                       {STAGE_LABELS[b.stage] ?? b.stage}
-                      {worst && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">slowest</span>}
+                      {b.vsTypical && (
+                        <span
+                          title={`${pct}% above the typical ${b.typicalDays}d for this stage`}
+                          className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${b.vsTypical === 'red' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}
+                        >
+                          +{pct}%
+                        </span>
+                      )}
                     </td>
                     <td className={`${td} tabular-nums text-gray-700`}>{b.active || '—'}</td>
-                    <td className={`${td} tabular-nums ${b.avgDays != null ? stalledClass(b.avgDays) : 'text-gray-300'}`}>{b.avgDays != null ? `${b.avgDays}d` : '—'}</td>
+                    <td className={`${td} tabular-nums whitespace-nowrap ${avgClass}`}>{b.avgDays != null ? `${b.avgDays}d` : '—'}</td>
+                    <td className={`${td} tabular-nums whitespace-nowrap ${b.typicalDays != null ? 'text-gray-500' : 'text-gray-300'}`}>{b.typicalDays != null ? `${b.typicalDays}d` : '—'}</td>
                     <td className={`${td} tabular-nums ${b.overThreshold > 0 ? 'text-amber-600 font-medium' : 'text-gray-300'}`}>{b.overThreshold || '—'}</td>
                   </tr>
                 )

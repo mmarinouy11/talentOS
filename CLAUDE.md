@@ -123,6 +123,7 @@ Import from `lib/anthropic.ts`:
 - Scope: OPEN requisitions, ACTIVE candidates; "Starting soon" = HIRED with startDate in the next 7 days on OPEN or FILLED requisitions; today's interviews include any candidate status
 - "Today" in America/Montevideo; business days via `lib/business-days.ts` (shared with Recruiter Performance); thresholds in `lib/home-thresholds.ts`
 - Shared: `HcFraction` (○/◐/✓), `lib/stage-labels.ts`
+- "Current waiting by stage" (formerly Bottlenecks): Avg so far vs Typical (`getTimeInStage()` from `lib/analytics.ts`, same as /reports Time in Stage); amber when above typical, red when ≥50% above
 - Fulfilled positions (HIRED count ≥ headcount, null = 1) are excluded from Feedback pending, No next step, New applications, Bottlenecks and their counters; still in Today's interviews and Starting soon; shown muted at the bottom of their client in Open positions
 - Layout: two columns on lg (Needs attention ≈60% | Today's interviews + Bottlenecks ≈40%), Open positions full width below. "Feedback pending" (interviews before today with no decision; Owner = CandidatePosition recruiter) and "No next step" (non-Pipeline, ≥7d in stage, nothing pending or scheduled; grouped by position, expandable) each have a counter; lists other than "Waiting for a decision" show 5 rows + "Show all"; decided interviews collapse at the bottom. Toggles in `components/app/home/HomeToggles.tsx` (client)
 

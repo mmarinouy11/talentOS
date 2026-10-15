@@ -1,6 +1,7 @@
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { db } from '@/lib/db'
 import { elapsedBusinessDaysInTz } from '@/lib/business-days'
+import { getTimeInStage } from '@/lib/analytics'
 import {
   HOME_TIMEZONE, STALLED_AMBER_DAYS, STARTING_SOON_DAYS,
 } from '@/lib/home-thresholds'
@@ -38,7 +39,17 @@ export interface SnapshotRow {
   // HIRED candidates >= headcount: no pending actions; listed muted at the bottom of its client
   fulfilled: boolean
 }
-export interface BottleneckRow { stage: string; active: number; avgDays: number | null; overThreshold: number }
+export interface BottleneckRow {
+  stage: string
+  active: number
+  // average days the current candidates have been in this stage so far
+  avgDays: number | null
+  overThreshold: number
+  // historical average of completed stays, same calculation as /reports "Time in Stage"
+  typicalDays: number | null
+  // 'amber' when avgDays exceeds typical, 'red' when 50%+ above it
+  vsTypical: 'amber' | 'red' | null
+}
 
 export interface HomeData {
   today: { label: string; isoDate: string }
@@ -59,7 +70,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
   const tomorrowStart = new Date(todayStart.getTime() + DAY_MS)
   const soonEnd = new Date(todayStart.getTime() + (STARTING_SOON_DAYS + 1) * DAY_MS)
 
-  const [positions, hiredSoon] = await Promise.all([
+  const [positions, hiredSoon, timeInStage] = await Promise.all([
     db.position.findMany({
       where: { deletedAt: null, type: 'REQUISITION', status: 'OPEN' },
       select: {
@@ -95,6 +106,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
       },
       orderBy: { startDate: 'asc' },
     }),
+    getTimeInStage(),
   ])
 
   const waitingInternal: WaitingItem[] = []
@@ -213,13 +225,21 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
   // Fulfilled positions go to the bottom of their client group (stable, so title order is kept)
   for (const [client, rows] of byClient) byClient.set(client, [...rows.filter((r) => !r.fulfilled), ...rows.filter((r) => r.fulfilled)])
 
+  const typicalByStage = new Map(timeInStage.map((t) => [t.stage as string, t.sampleSize > 0 ? t.avgDays : null]))
   const bottlenecks: BottleneckRow[] = BOTTLENECK_STAGES.map((stage) => {
     const days = bottleneckDays.get(stage) ?? []
+    const avgDays = days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null
+    const typicalDays = typicalByStage.get(stage) ?? null
+    const vsTypical = avgDays != null && typicalDays != null && typicalDays > 0 && avgDays > typicalDays
+      ? (avgDays >= typicalDays * 1.5 ? 'red' : 'amber')
+      : null
     return {
       stage,
       active: days.length,
-      avgDays: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
+      avgDays,
       overThreshold: days.filter((d) => d >= STALLED_AMBER_DAYS).length,
+      typicalDays,
+      vsTypical,
     }
   })
 
