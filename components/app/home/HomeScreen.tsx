@@ -51,12 +51,22 @@ function Table({ headers, children }: { headers: ReactNode[]; children: ReactNod
   )
 }
 
-function Group({ title, count, empty, children }: { title: string; count: number; empty: string; children: ReactNode }) {
+// Fixed-height headers (section → group → sub-label) so content in both columns starts at the same height
+function SectionHeader({ title }: { title: string }) {
+  return <h2 className="h-8 mb-3 flex items-center text-base font-semibold text-gray-900">{title}</h2>
+}
+
+function SubLabel({ children }: { children: ReactNode }) {
+  return <p className="h-5 mb-1.5 flex items-center text-xs font-semibold text-gray-500 uppercase tracking-wide">{children}</p>
+}
+
+function Group({ title, count, subtitle, empty, children }: { title: string; count: number; subtitle?: string; empty: string; children: ReactNode }) {
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-900">
-        {title} <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{count}</span>
+    <div>
+      <h3 className="h-6 mb-2 flex items-center text-sm font-semibold text-gray-900">
+        {title} <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{count}</span>
       </h3>
+      {subtitle && <p className="-mt-1.5 mb-2 text-xs text-gray-500">{subtitle}</p>}
       {count === 0 ? <p className="text-sm text-gray-400">{empty}</p> : children}
     </div>
   )
@@ -82,15 +92,16 @@ function PosCell({ title, client }: { title: string; client: string }) {
 
 function WaitingTable({ items }: { items: WaitingItem[] }) {
   return (
-    <Table headers={['Candidate', 'Position', 'Stage', 'Interview', 'Waiting', 'Interviewer']}>
+    <Table headers={['Candidate', 'Position', 'Stage', 'Waiting', 'Owner']}>
       {items.map((w) => (
         <tr key={w.interviewId} className={tr}>
           <td className={td}><CandCell positionId={w.positionId} cpId={w.cpId} name={w.candidateName} /></td>
           <td className={td}><PosCell title={w.positionTitle} client={w.client} /></td>
           <td className={`${td} text-gray-600 whitespace-nowrap`}>{STAGE_LABELS[w.stage] ?? w.stage}</td>
-          <td className={`${td} text-gray-500 whitespace-nowrap`}>{fmtDate(w.scheduledAt, w.timezone)}</td>
-          <td className={`${td} whitespace-nowrap ${waitClass(w.businessDaysWaiting)}`}>{w.businessDaysWaiting} bd</td>
-          <td className={`${td} text-xs text-gray-500 max-w-[12rem] truncate`} title={w.interviewerEmail ?? undefined}>{w.interviewerEmail ?? '—'}</td>
+          <td className={`${td} whitespace-nowrap ${waitClass(w.businessDaysWaiting)}`}>
+            <span title={`Interview on ${fmtDate(w.scheduledAt, w.timezone)}`} className="cursor-help">{w.businessDaysWaiting} bd</span>
+          </td>
+          <td className={`${td} text-gray-600 whitespace-nowrap`}>{w.ownerName ?? '—'}</td>
         </tr>
       ))}
     </Table>
@@ -99,8 +110,8 @@ function WaitingTable({ items }: { items: WaitingItem[] }) {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-3 min-w-0">
-      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+    <section className="min-w-0">
+      <SectionHeader title={title} />
       {children}
     </section>
   )
@@ -115,20 +126,17 @@ function Counter({ label, value, highlight }: { label: string; value: number; hi
   )
 }
 
-// One line per interview: time, candidate, position, stage, interviewer
+// One line per interview: time, candidate, position, stage
 function InterviewRow({ i }: { i: TodayInterview }) {
-  const nw = 'px-3 py-1.5 whitespace-nowrap'
+  const nw = 'px-2 py-1.5 whitespace-nowrap'
   return (
     <tr className={`${tr} ${i.done ? 'text-gray-400' : ''}`}>
       <td className={`${nw} font-medium tabular-nums ${i.done ? 'text-gray-400' : 'text-gray-900'}`}>{fmtTime(i.scheduledAt, i.timezone)}</td>
       <td className={nw}>
-        <Link href={candHref(i.positionId, i.cpId)} title={i.candidateName} className="block max-w-[9rem] truncate font-medium text-gray-900 hover:underline">{i.candidateName}</Link>
+        <Link href={candHref(i.positionId, i.cpId)} title={i.candidateName} className="block max-w-[8rem] truncate font-medium text-gray-900 hover:underline">{i.candidateName}</Link>
       </td>
-      <td className={`${nw} text-gray-600`}><span className="block max-w-[10rem] truncate" title={`${i.positionTitle} · ${i.client}`}>{i.positionTitle}</span></td>
+      <td className={`${nw} text-gray-600`}><span className="block max-w-[6rem] truncate" title={`${i.positionTitle} · ${i.client}`}>{i.positionTitle}</span></td>
       <td className={`${nw} text-gray-600`}>{STAGE_SHORT_LABELS[i.stage] ?? i.stage}</td>
-      <td className={`${nw} text-xs text-gray-500`}>
-        <span className="block max-w-[9rem] truncate" title={i.interviewerEmail ?? undefined}>{i.interviewerEmail ?? '—'}</span>
-      </td>
       <td className={`${nw} text-xs`}>
         {i.done ? <span className="text-[#2F2C29] font-medium">✓</span> : i.isPast ? <span className="text-amber-600" title="No decision yet">◐</span> : null}
       </td>
@@ -151,11 +159,12 @@ export function HomeScreen({ data }: { data: HomeData }) {
       {/* Header */}
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold text-gray-900">Today — {data.today.label}</h1>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <Counter label="Open headcount" value={data.counters.openHeadcount} />
           <Counter label="Active candidates" value={data.counters.activeCandidates} />
           <Counter label="Interviews today" value={data.counters.interviewsToday} />
-          <Counter label="Need attention" value={data.counters.needsAttention} highlight />
+          <Counter label="Feedback pending" value={data.counters.feedbackPending} highlight />
+          <Counter label="No next step" value={data.counters.noNextStep} highlight />
         </div>
       </div>
 
@@ -164,24 +173,29 @@ export function HomeScreen({ data }: { data: HomeData }) {
         <div className="lg:col-span-3 min-w-0">
           <Section title="Needs attention">
             <div className="space-y-6">
-              <Group title="Waiting for a decision" count={waitingCount} empty="Nothing waiting">
+              <Group title="Feedback pending" count={waitingCount} empty="Nothing pending">
                 <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Internal panel ({data.waiting.internal.length})</p>
+                  <div>
+                    <SubLabel>Internal panel ({data.waiting.internal.length})</SubLabel>
                     {data.waiting.internal.length === 0
-                      ? <p className="text-sm text-gray-400">Nothing waiting</p>
+                      ? <p className="text-sm text-gray-400">Nothing pending</p>
                       : <WaitingTable items={data.waiting.internal} />}
                   </div>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Client / hiring manager ({data.waiting.client.length})</p>
+                  <div>
+                    <SubLabel>Client / hiring manager ({data.waiting.client.length})</SubLabel>
                     {data.waiting.client.length === 0
-                      ? <p className="text-sm text-gray-400">Nothing waiting</p>
+                      ? <p className="text-sm text-gray-400">Nothing pending</p>
                       : <WaitingTable items={data.waiting.client} />}
                   </div>
                 </div>
               </Group>
 
-              <Group title="Stalled candidates" count={stalledCandidates} empty="No stalled candidates">
+              <Group
+                title="No next step"
+                count={stalledCandidates}
+                subtitle="No interview pending a decision and none scheduled"
+                empty="Every candidate has a next step"
+              >
                 <Table headers={['Position', 'Stalled', 'Oldest', '']}>
                   <LimitedRows
                     limit={LIST_LIMIT}
@@ -255,29 +269,31 @@ export function HomeScreen({ data }: { data: HomeData }) {
 
         <div className="lg:col-span-2 min-w-0 space-y-8">
           <Section title="Today's interviews">
-            {data.todayInterviews.length === 0 ? <p className="text-sm text-gray-400">No interviews today</p> : (
+            {/* Same group + sub-label headers as the left column so both tables start at the same height */}
+            <Group title="Scheduled today" count={data.todayInterviews.length} empty="No interviews today">
+              <SubLabel>Upcoming &amp; pending decision ({openInterviews.length})</SubLabel>
               <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b-[2px] border-b-[#8CF000]">
-                      {['Time', 'Candidate', 'Position', 'Stage', 'Interviewer', ''].map((h, k) => <th key={k} className={th}>{h}</th>)}
+                      {['Time', 'Candidate', 'Position', 'Stage', ''].map((h, k) => <th key={k} className={`${th} px-2`}>{h}</th>)}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {openInterviews.map((i) => <InterviewRow key={i.interviewId} i={i} />)}
                     <CollapsedRows
-                      colSpan={6}
+                      colSpan={5}
                       label={`${decidedInterviews.length} already decided`}
                       rows={decidedInterviews.map((i) => <InterviewRow key={i.interviewId} i={i} />)}
                     />
                   </tbody>
                 </table>
               </div>
-            )}
+            </Group>
           </Section>
 
           <Section title="Bottlenecks">
-            <Table headers={['Stage', 'Active', 'Avg in stage', `Over ${STALLED_AMBER_DAYS}d`]}>
+            <Table headers={['Stage', 'Active', 'Avg days', `≥ ${STALLED_AMBER_DAYS}d`]}>
               {data.bottlenecks.map((b) => {
                 const worst = b.avgDays != null && b.avgDays === maxAvg && maxAvg > 0
                 return (

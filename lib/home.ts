@@ -16,7 +16,8 @@ export const BOTTLENECK_STAGES = ['SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_I
 type PositionRef = { positionId: string; positionTitle: string; client: string; timezone: string }
 type CandRef = PositionRef & { cpId: string; candidateName: string }
 
-export interface WaitingItem extends CandRef { interviewId: string; stage: string; scheduledAt: string; businessDaysWaiting: number; interviewerEmail: string | null }
+// ownerName: first name of the recruiter assigned to the candidate in this position
+export interface WaitingItem extends CandRef { interviewId: string; stage: string; scheduledAt: string; businessDaysWaiting: number; ownerName: string | null }
 export interface StalledItem extends CandRef { stage: string; daysInStage: number }
 export interface StalledGroup extends PositionRef {
   count: number
@@ -27,7 +28,7 @@ export interface StalledGroup extends PositionRef {
 }
 export interface NewApplicationItem extends CandRef { source: 'VENDOR' | 'REFERRAL' | 'DIRECT'; daysSinceAdded: number }
 export interface StartingSoonItem extends CandRef { startDate: string }
-export interface TodayInterview extends CandRef { interviewId: string; stage: string; scheduledAt: string; interviewerEmail: string | null; done: boolean; isPast: boolean }
+export interface TodayInterview extends CandRef { interviewId: string; stage: string; scheduledAt: string; done: boolean; isPast: boolean }
 export interface SnapshotRow {
   positionId: string; title: string; client: string; headcount: number; hired: number
   stageCounts: Record<(typeof SNAPSHOT_STAGES)[number], number>
@@ -39,7 +40,7 @@ export interface BottleneckRow { stage: string; active: number; avgDays: number 
 
 export interface HomeData {
   today: { label: string; isoDate: string }
-  counters: { openHeadcount: number; activeCandidates: number; interviewsToday: number; needsAttention: number }
+  counters: { openHeadcount: number; activeCandidates: number; interviewsToday: number; feedbackPending: number; noNextStep: number }
   waiting: { internal: WaitingItem[]; client: WaitingItem[] }
   stalled: StalledGroup[]
   newApplications: NewApplicationItem[]
@@ -66,10 +67,11 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
           select: {
             id: true, stage: true, status: true, stageEnteredAt: true, createdAt: true,
             candidate: { select: { firstName: true, lastName: true, sourcedByType: true } },
+            recruiter: { select: { name: true } },
             stageHistory: { orderBy: { movedAt: 'desc' }, take: 1, select: { movedAt: true } },
             interviews: {
               where: { status: { not: 'CANCELLED' } },
-              select: { id: true, stage: true, scheduledAt: true, decision: true, interviewerEmail: true },
+              select: { id: true, stage: true, scheduledAt: true, decision: true },
             },
           },
         },
@@ -122,7 +124,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
         if (iv.scheduledAt && iv.scheduledAt >= todayStart && iv.scheduledAt < tomorrowStart) {
           todayInterviews.push({
             ...ref, interviewId: iv.id, stage: iv.stage, scheduledAt: iv.scheduledAt.toISOString(),
-            interviewerEmail: iv.interviewerEmail, done: iv.decision != null, isPast: iv.scheduledAt < now,
+            done: iv.decision != null, isPast: iv.scheduledAt < now,
           })
         }
       }
@@ -145,7 +147,7 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
         const bd = elapsedBusinessDaysInTz(iv.scheduledAt, now, HOME_TIMEZONE)
         const item: WaitingItem = {
           ...ref, interviewId: iv.id, stage: iv.stage, scheduledAt: iv.scheduledAt.toISOString(),
-          businessDaysWaiting: bd, interviewerEmail: iv.interviewerEmail,
+          businessDaysWaiting: bd, ownerName: cp.recruiter.name?.trim().split(/\s+/)[0] ?? null,
         }
         ;(internal ? waitingInternal : waitingClient).push(item)
         waitingForThisCp = true
@@ -214,11 +216,14 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
     }
   })
 
-  const needsAttention = waitingInternal.length + waitingClient.length + stalled.length + newApplications.length + startingSoon.length
 
   return {
     today: { label: formatInTimeZone(now, HOME_TIMEZONE, 'EEEE, MMMM d'), isoDate: todayYmd },
-    counters: { openHeadcount, activeCandidates, interviewsToday: todayInterviews.length, needsAttention },
+    counters: {
+      openHeadcount, activeCandidates, interviewsToday: todayInterviews.length,
+      feedbackPending: waitingInternal.length + waitingClient.length,
+      noNextStep: stalled.length,
+    },
     waiting: { internal: waitingInternal, client: waitingClient },
     stalled: stalledGroups,
     newApplications,

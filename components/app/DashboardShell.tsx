@@ -42,34 +42,35 @@ export async function DashboardShell({
 
   return (
     <div className="flex min-h-screen bg-white">
-      <aside className="w-56 flex-shrink-0 bg-[#F5F0EB] border-r border-[#DADADA] flex flex-col">
-        <div className="px-5 py-5 border-b border-[#DADADA]">
+      <aside className="w-44 flex-shrink-0 bg-[#F5F0EB] border-r border-[#DADADA] flex flex-col">
+        <div className="px-4 py-4 border-b border-[#DADADA]">
           {/* Replace /public/tenarai-logo-black.png with the real logo asset */}
-          <div className="flex items-center gap-2">
+          {/* Logo and product name stacked so they fit the narrow sidebar without wrapping */}
+          <div className="flex flex-col items-start gap-1">
             <Image
               src="/tenarai-logo-black.png"
               alt="Tenarai"
               height={22}
               width={100}
             />
-            <span className="text-sm text-[#6E6A65]">TalentOS</span>
+            <span className="text-xs text-[#6E6A65] whitespace-nowrap">TalentOS</span>
           </div>
         </div>
 
         <SidebarNav items={items} />
 
-        <div className="px-5 py-4 border-t border-[#DADADA]">
+        <div className="px-4 py-4 border-t border-[#DADADA] min-w-0">
           <p className="text-sm font-medium text-[#000000] truncate">
             {user.name ?? user.email}
           </p>
-          <p className="text-xs text-[#6E6A65] mt-0.5">
+          <p className="text-xs text-[#6E6A65] mt-0.5 truncate">
             {user.role?.replace(/_/g, ' ')}
           </p>
           <SidebarLogout />
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0">
         {!gmailConnected && <GmailReminderBanner />}
         <div className="px-2 py-4 md:px-4 md:py-8 flex-1">{children}</div>
       </main>

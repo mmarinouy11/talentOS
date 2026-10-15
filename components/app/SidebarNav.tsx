@@ -9,7 +9,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
 
   return (
-    <nav className="flex-1 px-3 py-4 space-y-0.5">
+    <nav className="flex-1 px-2 py-4 space-y-0.5">
       {items.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
         return (
@@ -27,7 +27,7 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
               className="flex-shrink-0 self-stretch w-[3px] rounded-sm mr-3 ml-0"
               style={{ background: isActive ? '#8CF000' : 'transparent' }}
             />
-            {item.label}
+            <span className="truncate whitespace-nowrap">{item.label}</span>
           </Link>
         )
       })}
