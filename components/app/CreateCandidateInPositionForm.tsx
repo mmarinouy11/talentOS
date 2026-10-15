@@ -1,5 +1,6 @@
 'use client'
 
+import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier } from '@/lib/candidate-identity'
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ interface ParsedCV {
   firstName?: string | null
   lastName?: string | null
   email?: string | null
+  linkedinUrl?: string | null
   phone?: string | null
   country?: string | null
   seniority?: string | null
@@ -39,6 +41,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [linkedinUrl, setLinkedinUrl] = useState('')
   const [country, setCountry] = useState('')
   const [recruiterId, setRecruiterId] = useState(currentUserId ?? '')
   const [sourcedByType, setSourcedByType] = useState<'RECRUITER' | 'VENDOR' | 'OTHER' | ''>('')
@@ -83,6 +86,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
       if (parsed.firstName && !firstName) setFirstName(parsed.firstName)
       if (parsed.lastName && !lastName) setLastName(parsed.lastName)
       if (parsed.email && !email) setEmail(parsed.email)
+      if (parsed.linkedinUrl && !linkedinUrl) setLinkedinUrl(parsed.linkedinUrl)
       if (parsed.country && !country) setCountry(parsed.country)
     } catch {
       setError('Failed to parse CV — you can still submit without it.')
@@ -93,14 +97,19 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setSubmitting(true)
     setError('')
+    if (!hasCandidateIdentifier(email, linkedinUrl)) {
+      setError(MISSING_IDENTIFIER_ERROR)
+      return
+    }
+    setSubmitting(true)
 
     // 1. Create candidate
     const candidatePayload: Record<string, unknown> = {
       firstName,
       lastName,
-      email,
+      email: email.trim() || null,
+      linkedinUrl: linkedinUrl.trim() || null,
       country: country || null,
       recruiterId: recruiterId || null,
       sourcedByType: sourcedByType || null,
@@ -188,9 +197,14 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="cn-email">Email *</Label>
-          <Input id="cn-email" className="mt-1" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Label htmlFor="cn-email">Email</Label>
+          <Input id="cn-email" className="mt-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
+        <div>
+          <Label htmlFor="cn-linkedin">LinkedIn URL</Label>
+          <Input id="cn-linkedin" className="mt-1" placeholder="linkedin.com/in/…" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} />
+        </div>
+        <p className="col-span-2 -mt-1 text-xs text-gray-400">Email or LinkedIn URL is required.</p>
         <div>
           <Label htmlFor="cn-country">Country</Label>
           <Select id="cn-country" className="mt-1" value={country} onChange={(e) => setCountry(e.target.value)}>

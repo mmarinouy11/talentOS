@@ -430,7 +430,7 @@ function GenericEmailPreviewModal({
 }: {
   title: string
   candidateName: string
-  candidateEmail: string
+  candidateEmail: string | null
   defaultSubject: string
   defaultHtml: string
   sendEndpoint: string
@@ -473,7 +473,7 @@ function GenericEmailPreviewModal({
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <p className="text-sm text-gray-500">
             To: <span className="font-medium text-gray-700">{candidateName}</span>{' '}
-            <span className="text-gray-400">{'<'}{candidateEmail}{'>'}</span>
+            <span className="text-gray-400">{candidateEmail ? <>{'<'}{candidateEmail}{'>'}</> : '(no email)'}</span>
           </p>
         </div>
 
@@ -498,9 +498,11 @@ function GenericEmailPreviewModal({
           </div>
         </div>
 
-        {isPlaceholderEmail(candidateEmail) && (
+        {(!candidateEmail || isPlaceholderEmail(candidateEmail)) && (
           <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-            This candidate has a placeholder email address. Please update their email before sending any communications.
+            {candidateEmail
+              ? 'This candidate has a placeholder email address. Please update their email before sending any communications.'
+              : 'This candidate has no email address. Please add one before sending any communications.'}
           </p>
         )}
 
@@ -516,7 +518,7 @@ function GenericEmailPreviewModal({
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4">
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
           <Button type="button" variant="outline" onClick={onSkip}>Skip for now</Button>
-          <Button type="button" onClick={send} disabled={sending || isPlaceholderEmail(candidateEmail)}>{sending ? 'Sending…' : 'Send Email'}</Button>
+          <Button type="button" onClick={send} disabled={sending || !candidateEmail || isPlaceholderEmail(candidateEmail)}>{sending ? 'Sending…' : 'Send Email'}</Button>
         </div>
       </div>
     </div>
@@ -540,7 +542,7 @@ function NextRoundModal({
   fromStage: PipelineStage
   userProfile: UserProfile | null
   candidateName: string
-  candidateEmail: string
+  candidateEmail: string | null
   positionTitle: string
   clientName: string
   onCreated: (interview: Interview) => void
@@ -728,7 +730,7 @@ function AddInterviewModal({
   candidatePositionId: string
   userProfile: UserProfile | null
   candidateName: string
-  candidateEmail: string
+  candidateEmail: string | null
   positionTitle: string
   clientName: string
   initialStage?: PipelineStage
@@ -904,7 +906,7 @@ function EditInterviewModal({
   interview: Interview
   userProfile: UserProfile | null
   candidateName: string
-  candidateEmail: string
+  candidateEmail: string | null
   candidatePositionId: string
   positionTitle: string
   clientName: string
@@ -1350,7 +1352,7 @@ export function InterviewsSection({
 }: {
   candidatePositionId: string
   candidateName: string
-  candidateEmail: string
+  candidateEmail: string | null
   positionTitle: string
   clientName: string
   positionTimezone?: string

@@ -217,7 +217,7 @@ interface CandidatePosition {
     id: string
     firstName: string
     lastName: string
-    email: string
+    email: string | null
     country: string | null
     seniority: string | null
   }
@@ -305,7 +305,7 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
     startPolling(newRow.id)
   }
 
-  function handleTalentAdded(added: { id: string; candidateId: string; candidate: { id: string; firstName: string; lastName: string; email: string; country: string | null; seniority: string | null } }[]) {
+  function handleTalentAdded(added: { id: string; candidateId: string; candidate: { id: string; firstName: string; lastName: string; email: string | null; country: string | null; seniority: string | null } }[]) {
     for (const cp of added) {
       const row: CandidatePosition = {
         id: cp.id,
@@ -354,8 +354,8 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
         av = `${a.candidate.firstName} ${a.candidate.lastName}`
         bv = `${b.candidate.firstName} ${b.candidate.lastName}`
       } else if (sortKey === 'email') {
-        av = a.candidate.email
-        bv = b.candidate.email
+        av = a.candidate.email ?? null
+        bv = b.candidate.email ?? null
       } else if (sortKey === 'seniority') {
         av = a.candidate.seniority ?? ''
         bv = b.candidate.seniority ?? ''

@@ -13,7 +13,7 @@ interface Candidate {
   id: string
   firstName: string
   lastName: string
-  email: string
+  email: string | null
   seniority: Seniority | null
 }
 
@@ -51,7 +51,7 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
     return allCandidates.filter(
       (c) =>
         `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q)
+        (c.email ?? '').toLowerCase().includes(q)
     )
   }, [allCandidates, filter])
 
@@ -148,7 +148,7 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
                           <p className="text-sm font-medium text-gray-900 truncate">
                             {c.firstName} {c.lastName}
                           </p>
-                          <p className="text-xs text-gray-500 truncate">{c.email}</p>
+                          <p className="text-xs text-gray-500 truncate">{c.email ?? '—'}</p>
                         </div>
                         <div className="flex items-center gap-3 ml-4 shrink-0">
                           {c.seniority && <SeniorityBadge seniority={c.seniority} />}

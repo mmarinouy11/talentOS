@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { normalizeLinkedinHandle } from '@/lib/linkedin'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { callClaudeJSON } from '@/lib/anthropic'
@@ -158,6 +159,7 @@ export async function POST(
         email: emailRaw,
         phone: phone || null,
         linkedinUrl: linkedin || null,
+        linkedinHandle: normalizeLinkedinHandle(linkedin),
         country: countryRaw,
         desiredCompensation,
         currentCompensation: currentCompensation ?? null,

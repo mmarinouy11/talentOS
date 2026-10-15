@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ParsedCandidate } from '@/lib/import-jobs'
 import { isPlaceholderEmail } from '@/lib/import-jobs'
+import { hasCandidateIdentifier } from '@/lib/candidate-identity'
 import type { ConfirmResult } from '@/app/api/candidates/bulk-import/confirm/route'
 
 export type { ParsedCandidate }
@@ -20,7 +21,7 @@ export interface NewCandidatePosition {
     id: string
     firstName: string
     lastName: string
-    email: string
+    email: string | null
     country: string | null
     seniority: string | null
   }
@@ -78,6 +79,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
   const [candidates, setCandidates] = useState<ParsedCandidate[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [editedEmails, setEditedEmails] = useState<Record<number, string>>({})
+  const [editedLinkedins, setEditedLinkedins] = useState<Record<number, string>>({})
 
   // done state
   const [result, setResult] = useState<ConfirmResult | null>(null)
@@ -192,6 +194,7 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
     setCandidates([])
     setSelected(new Set())
     setEditedEmails({})
+    setEditedLinkedins({})
     setJobId(null)
     setJobTotal(0)
     setJobCompleted(0)
@@ -201,10 +204,16 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
 
   async function handleConfirm() {
     setStep('confirming')
-    const payload = [...selected].map((i) => {
+    // Rows with neither a real email nor a LinkedIn profile URL are skipped
+    const payload = [...selected].filter(isIdentified).map((i) => {
       const c = candidates[i]
-      return { ...c, email: editedEmails[i] ?? c.email }
+      return { ...c, email: (editedEmails[i] ?? c.email)?.trim() || null, linkedinUrl: (editedLinkedins[i] ?? c.linkedinUrl)?.trim() || null }
     })
+    if (payload.length === 0) {
+      setError('None of the selected rows has an email or a LinkedIn profile URL.')
+      setStep('review')
+      return
+    }
 
     try {
       const res = await fetch('/api/candidates/bulk-import/confirm', {
@@ -236,6 +245,12 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
   const dupCount = candidates.filter((c) => c.duplicate).length
   const errCount = candidates.filter((c) => c.error).length
   const selectedPlaceholderCount = [...selected].filter((i) => isPlaceholderEmail(editedEmails[i] ?? candidates[i]?.email)).length
+  function isIdentified(i: number) {
+    const c = candidates[i]
+    return !!c && hasCandidateIdentifier(editedEmails[i] ?? c.email, editedLinkedins[i] ?? c.linkedinUrl)
+  }
+  const selectedUnidentifiedCount = [...selected].filter((i) => !isIdentified(i)).length
+  const importableCount = selected.size - selectedUnidentifiedCount
 
   // --- Upload zone (shared by upload + parsing steps) ---
   const uploadZone = (
@@ -370,7 +385,25 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
                             !
                           </span>
                         )}
+                        {!isIdentified(i) && (
+                          <span
+                            className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 cursor-help shrink-0"
+                            title="No email or LinkedIn profile URL — add one or this row will be skipped"
+                          >
+                            No ID
+                          </span>
+                        )}
                       </div>
+                    )}
+                    {!c.error && (!c.linkedinUrl || editedLinkedins[i] !== undefined) && !hasCandidateIdentifier(editedEmails[i] ?? c.email, null) && (
+                      <Input
+                        value={editedLinkedins[i] ?? c.linkedinUrl ?? ''}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setEditedLinkedins((prev) => ({ ...prev, [i]: e.target.value }))
+                        }
+                        className="h-6 text-xs w-40 mt-1"
+                        placeholder="linkedin.com/in/…"
+                      />
                     )}
                   </td>
                   {!compact && <td className="px-3 py-2 text-gray-600">{c.country ?? '—'}</td>}
@@ -390,6 +423,11 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
           </table>
         </div>
 
+        {selectedUnidentifiedCount > 0 && (
+          <p className="text-xs text-red-600">
+            {selectedUnidentifiedCount} selected row{selectedUnidentifiedCount !== 1 ? 's have' : ' has'} no email or LinkedIn profile URL and will be skipped unless you add one.
+          </p>
+        )}
         {selectedPlaceholderCount > 0 && (
           <p className="text-xs text-amber-600">
             {selectedPlaceholderCount} selected candidate{selectedPlaceholderCount !== 1 ? 's have' : ' has'} a placeholder email (!) — update with a real email before sending any communications.
@@ -398,14 +436,14 @@ export function LinkedInImportFlow({ positionId, onDone, onCancel, compact = fal
         <div className="flex items-center gap-2">
           <Button
             onClick={handleConfirm}
-            disabled={selected.size === 0 || step === 'confirming'}
+            disabled={importableCount === 0 || step === 'confirming'}
             size={compact ? 'sm' : 'default'}
           >
             {step === 'confirming'
               ? 'Creating…'
               : positionId
-                ? `Add ${selected.size} to position`
-                : `Import ${selected.size} candidate${selected.size !== 1 ? 's' : ''}`}
+                ? `Add ${importableCount} to position`
+                : `Import ${importableCount} candidate${importableCount !== 1 ? 's' : ''}`}
           </Button>
           <Button variant="outline" size={compact ? 'sm' : 'default'} onClick={reset}>
             Start over

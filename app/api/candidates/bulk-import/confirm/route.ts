@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
+import { normalizeLinkedinHandle } from '@/lib/linkedin'
+import { hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
 
 interface CandidateInput {
   firstName: string | null
   lastName: string | null
-  email: string
+  email: string | null
   phone: string | null
   country: string | null
   linkedinUrl: string | null
@@ -34,7 +36,7 @@ export interface ConfirmResult {
       id: string
       firstName: string
       lastName: string
-      email: string
+      email: string | null
       seniority: string | null
     }
   }>
@@ -65,19 +67,24 @@ export async function POST(request: Request) {
     const createdPositions: ConfirmResult['candidatePositions'] = []
 
     for (const c of candidates) {
-      if (!c.email) { skipped++; continue }
+      // Rows with neither a real email nor a LinkedIn profile URL are skipped
+      if (!hasCandidateIdentifier(c.email, c.linkedinUrl)) { skipped++; continue }
+      const email = realEmailOrNull(c.email)?.toLowerCase() ?? null
+      const label = email ?? c.linkedinUrl ?? `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()
 
       try {
-        let candidate = await db.candidate.findFirst({
-          where: { email: c.email.toLowerCase(), deletedAt: null },
-        })
+        let candidate = email
+          ? await db.candidate.findFirst({ where: { email, deletedAt: null } })
+          : null
 
         if (!candidate) {
           candidate = await db.candidate.create({
             data: {
               firstName: c.firstName ?? '',
               lastName: c.lastName ?? '',
-              email: c.email.toLowerCase(),
+              email,
+              linkedinUrl: c.linkedinUrl || null,
+              linkedinHandle: normalizeLinkedinHandle(c.linkedinUrl),
               phone: c.phone ?? null,
               country: c.country ?? null,
               seniority: c.seniority ?? null,
@@ -139,8 +146,8 @@ export async function POST(request: Request) {
           }
         }
       } catch (err) {
-        console.error(`Failed to process candidate ${c.email}:`, err)
-        errors.push(c.email)
+        console.error(`Failed to process candidate ${label}:`, err)
+        errors.push(label)
       }
     }
 

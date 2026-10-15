@@ -6,6 +6,7 @@ import { uploadFileToDrive } from '@/lib/google'
 import AdmZip from 'adm-zip'
 import { randomUUID } from 'crypto'
 import { importJobs, scheduleJobCleanup, type ParsedCandidate } from '@/lib/import-jobs'
+import { realEmailOrNull } from '@/lib/candidate-identity'
 
 const LINKEDIN_SYSTEM_PROMPT = `You are a LinkedIn profile PDF parser. Extract structured information from a LinkedIn profile export.
 Return ONLY valid JSON with these exact fields:
@@ -49,7 +50,7 @@ async function processJob(
         const fileName = entry.entryName.split('/').pop() ?? entry.entryName
         const fallback = {
           fileName,
-          firstName: null, lastName: null, email: `unknown@import.linkedin.com`, phone: null,
+          firstName: null, lastName: null, email: null, phone: null,
           country: null, linkedinUrl: null, seniority: null,
           yearsOfExperience: null, skills: [], languages: [], summary: null,
           experience: [], education: [], cvDriveId: null, cvOriginalName: null,
@@ -80,15 +81,10 @@ async function processJob(
             ),
           ])
 
-          const rawEmail = parsed.email ?? null
-          const email: string = rawEmail ?? (() => {
-            const first = (parsed.firstName ?? '').toLowerCase().replace(/[^a-z0-9]/g, '.')
-            const last  = (parsed.lastName  ?? '').toLowerCase().replace(/[^a-z0-9]/g, '.')
-            const base  = [first, last].filter(Boolean).join('.') || 'unknown'
-            return `${base}@import.linkedin.com`
-          })()
-          const isDuplicate = emailMap.has(email.toLowerCase())
-          const existingId = isDuplicate ? emailMap.get(email.toLowerCase()) : undefined
+          // No placeholder emails: a profile without an email keeps email = null
+          const email = realEmailOrNull(parsed.email)
+          const existingId = email ? emailMap.get(email.toLowerCase()) : undefined
+          const isDuplicate = existingId !== undefined
 
           return {
             fileName,
@@ -152,10 +148,10 @@ export async function POST(request: Request) {
     // Fetch existing emails for dedup check
     const { db } = await import('@/lib/db')
     const existingCandidates = await db.candidate.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, email: { not: null } },
       select: { id: true, email: true },
     })
-    const emailMap = new Map(existingCandidates.map((c) => [c.email.toLowerCase(), c.id]))
+    const emailMap = new Map(existingCandidates.map((c) => [c.email!.toLowerCase(), c.id]))
 
     // Create job and return immediately
     const jobId = randomUUID()
