@@ -325,6 +325,10 @@ model CandidatePosition {
   fitStrengths          String[]
   fitGaps               String[]
   fitScoredAt           DateTime?
+  strongestRoles          String[]
+  suggestedPositionId     String?
+  suggestedPositionScore  Int?
+  suggestedPositionReason String?
   startDate             DateTime?
   noticePeriodDays      Int?
   earliestStartDate     DateTime?
