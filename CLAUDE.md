@@ -123,6 +123,7 @@ Import from `lib/anthropic.ts`:
 - Suggestion kept only if its positionId was offered and its estimated score is ≥ fitScore + 10; stored on CandidatePosition (`strongestRoles`, `suggestedPositionId/Score/Reason`), cleared on re-score otherwise
 - UI: FitScoreCard shows "Strongest in" chips and "Better match" (only while that position is OPEN and not fulfilled) with "Add to that position" (POST /api/candidate-positions, same recruiter, triggers scoring) or "Already in that position"; /candidates/[id] shows strongest roles from the latest scoring
 - No bulk re-scoring: applies to new scorings and manual re-scores
+- Fit scoring runs at `temperature: 0` (`callClaude`/`callClaudeJSON` accept an optional `{ temperature }`; other callers keep the API default). The prompt evaluates the current position first and states the other-positions list must not affect it
 
 ## Home Screen
 

@@ -76,11 +76,18 @@ function otherPositionsSection(others: OtherPosition[]): string {
     .join('\n')
   return `
 
-OTHER OPEN POSITIONS (for "suggestedPosition"):
+OTHER OPEN POSITIONS — for "suggestedPosition" ONLY. Do NOT use this list when scoring the POSITION above:
 ${list}`
 }
 
 const EXTRA_OUTPUT_RULES = (hasOthers: boolean) => `
+
+Evaluation order:
+1. First, complete the full evaluation of the current POSITION (all scores, fitSummary, fitStrengths, fitGaps) using ONLY the POSITION and CANDIDATE sections.${hasOthers
+    ? ` The OTHER OPEN POSITIONS list must NOT influence that evaluation in any way: do not raise or lower any score, and do not mention other positions in the summary, strengths or gaps. It exists only for the suggestion in step 3.`
+    : ''}
+2. Then determine strongestRoles.
+3. Then, separately, consider the suggestion.
 
 Also include in the JSON:
 - "strongestRoles": 2-3 generic role types where this candidate is strongest overall, independent of this position (e.g. "Backend Engineer (Node.js)", "Data Engineer")
@@ -137,7 +144,7 @@ Summary: ${candidate.summary ?? 'Not specified'}${otherPositionsSection(others)}
     fitGaps: string[]
     strongestRoles?: string[]
     suggestedPosition?: { positionId?: string; estimatedScore?: number; reason?: string } | null
-  }>(prompt, 'SMART', SYSTEM_PROMPT + EXTRA_OUTPUT_RULES(others.length > 0))
+  }>(prompt, 'SMART', SYSTEM_PROMPT + EXTRA_OUTPUT_RULES(others.length > 0), { temperature: 0 })
 
   // Only accept a suggestion for a position we offered, and only if it clearly beats this one
   const sp = scored.suggestedPosition
