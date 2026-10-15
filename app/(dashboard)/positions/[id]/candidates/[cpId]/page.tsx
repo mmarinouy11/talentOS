@@ -108,7 +108,7 @@ export default async function CandidateInPositionPage({
             <div className="text-sm space-y-3">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</p>
-                <p className="text-gray-900 mt-0.5">{candidate.email}</p>
+                <p className="text-gray-900 mt-0.5">{candidate.email ?? <span className="text-gray-400">—</span>}</p>
               </div>
               {candidate.phone && (
                 <div>

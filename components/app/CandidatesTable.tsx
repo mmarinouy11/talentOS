@@ -46,7 +46,7 @@ export interface CandidateRow {
   id: string
   firstName: string
   lastName: string
-  email: string
+  email: string | null
   phone: string | null
   country: string | null
   seniority: Seniority | null
@@ -183,7 +183,7 @@ export function CandidatesTable({
       const matchesSearch = (
         c.firstName.toLowerCase().includes(q) ||
         c.lastName.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q) ||
         c.skills.some((s) => s.toLowerCase().includes(q))
       )
       if (!matchesSearch) return false
@@ -270,7 +270,7 @@ export function CandidatesTable({
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.email}</td>
+                  <td className="px-4 py-3 text-gray-600">{c.email ?? <span className="text-gray-400">—</span>}</td>
                   <td className="px-4 py-3 text-gray-600">{c.country ?? '—'}</td>
                   <td className="px-4 py-3">{c.seniority ? <SeniorityBadge seniority={c.seniority} /> : <span className="text-gray-400">—</span>}</td>
                   <td className="px-4 py-3"><SkillTags tags={c.skills} max={3} /></td>

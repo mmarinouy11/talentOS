@@ -2,11 +2,13 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { normalizeLinkedinHandle } from '@/lib/linkedin'
+import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
 
 const candidateSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  email: z.string().email(),
+  email: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().email().nullable().optional()),
   phone: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   linkedinUrl: z.string().refine((v) => !v || v.includes('linkedin.com') || v.startsWith('/in/'), { message: 'Invalid LinkedIn URL' }).optional().nullable(),
@@ -95,14 +97,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  const existing = await db.candidate.findFirst({
-    where: { email: parsed.data.email, deletedAt: null },
-  })
-  if (existing) {
-    return NextResponse.json({ error: 'A candidate with this email already exists.' }, { status: 409 })
+  if (!hasCandidateIdentifier(parsed.data.email, parsed.data.linkedinUrl)) {
+    return NextResponse.json({ error: MISSING_IDENTIFIER_ERROR }, { status: 400 })
+  }
+  const email = realEmailOrNull(parsed.data.email)
+
+  if (email) {
+    const existing = await db.candidate.findFirst({
+      where: { email, deletedAt: null },
+    })
+    if (existing) {
+      return NextResponse.json({ error: 'A candidate with this email already exists.' }, { status: 409 })
+    }
   }
 
-  const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { linkedinUrl, notes: _n, email: _e, ...rest } = parsed.data
   const sessionUser = session.user as { id?: string }
   const recruiterId = rest.recruiterId ?? sessionUser.id
   if (!recruiterId) return NextResponse.json({ error: 'recruiterId is required' }, { status: 400 })
@@ -110,6 +120,9 @@ export async function POST(request: Request) {
   const candidate = await db.candidate.create({
     data: {
       ...coreRest,
+      email,
+      linkedinUrl: linkedinUrl || null,
+      linkedinHandle: normalizeLinkedinHandle(linkedinUrl),
       cvDriveId: coreRest.cvDriveId ?? null,
       cvOriginalName: coreRest.cvOriginalName ?? null,
       recruiterId,

@@ -12,7 +12,7 @@ export interface ParsedCandidate {
   fileName: string
   firstName: string | null
   lastName: string | null
-  email: string
+  email: string | null
   phone: string | null
   country: string | null
   linkedinUrl: string | null

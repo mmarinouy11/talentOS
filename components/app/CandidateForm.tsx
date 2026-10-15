@@ -11,6 +11,7 @@ import { TagInput } from './TagInput'
 import { CVUpload, type ParsedCV } from './CVUpload'
 import { CandidateCVUpdate } from './CandidateCVUpdate'
 import type { Seniority } from '@prisma/client'
+import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier } from '@/lib/candidate-identity'
 
 const LATAM_COUNTRIES = [
   'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Ecuador',
@@ -43,7 +44,7 @@ interface CandidateFormProps {
     id?: string
     firstName?: string
     lastName?: string
-    email?: string
+    email?: string | null
     phone?: string | null
     country?: string | null
     linkedinUrl?: string | null
@@ -169,13 +170,17 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setLoading(true)
     setError('')
+    if (mode === 'create' && !hasCandidateIdentifier(fields.email, fields.linkedinUrl)) {
+      setError(MISSING_IDENTIFIER_ERROR)
+      return
+    }
+    setLoading(true)
 
     const payload: Record<string, unknown> = {
       firstName: fields.firstName,
       lastName: fields.lastName,
-      email: fields.email,
+      email: fields.email.trim() || null,
       phone: fields.phone || null,
       country: fields.country || null,
       linkedinUrl: fields.linkedinUrl || null,
@@ -267,14 +272,14 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
         </div>
 
         <div>
-          <Label htmlFor="email">Email *</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
             id="email"
             type="email"
-            required
             value={fields.email}
             onChange={(e) => setField('email', e.target.value)}
           />
+          <p className="text-xs text-gray-400 mt-1">Email or LinkedIn URL is required.</p>
         </div>
         <div>
           <Label htmlFor="phone">Phone</Label>

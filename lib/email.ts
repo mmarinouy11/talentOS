@@ -170,7 +170,7 @@ export async function sendEmail({
   sentById,
   userId,
 }: {
-  to: string
+  to: string | null
   subject: string
   html: string
   template: string
@@ -180,6 +180,10 @@ export async function sendEmail({
   sentById?: string
   userId?: string
 }): Promise<{ success: boolean; error?: string; gmailExpired?: boolean }> {
+  if (!to) {
+    console.log('[email] Skipped send: candidate has no email address')
+    return { success: false, error: 'no_email' }
+  }
   if (isPlaceholderEmail(to)) {
     console.log('[email] Skipped send to placeholder email:', to)
     return { success: false, error: 'placeholder_email' }

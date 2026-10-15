@@ -75,7 +75,7 @@ export default async function CandidateDetailPage({
             </h1>
             {candidate.seniority && <SeniorityBadge seniority={candidate.seniority} />}
           </div>
-          <p className="text-sm text-gray-500 mt-1">{candidate.email}</p>
+          <p className="text-sm text-gray-500 mt-1">{candidate.email ?? <span className="text-gray-400">—</span>}</p>
         </div>
         <Link href={`/candidates/${id}/edit`}>
           <Button variant="outline">Edit</Button>

@@ -74,6 +74,9 @@ export async function POST(
   }
 
   const recruiterId = recruiter.id
+  if (!candidate.email) {
+    return NextResponse.json({ error: 'This candidate has no email address. Add one before sending any communications.' }, { status: 400 })
+  }
   const sendResult = await sendEmail({
     to: candidate.email,
     subject,

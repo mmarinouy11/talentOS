@@ -106,6 +106,13 @@ Import from `lib/anthropic.ts`:
 - Proactive backups: `POST /api/positions/[id]/backup` clones a REQUISITION (any status) into a PROACTIVE position with `sourcePositionId`; copies JD intelligence as-is (no re-parse), not candidates/partners/headcount. Detail page shows "Backup for" / "Backups" links
 - Backup modal option "Bring active candidates (N)" (default on): in the same transaction copies each ACTIVE CandidatePosition (stage, recruiter, fit scores, createdAt, stageEnteredAt) plus one StageHistory entry (null → stage, movedAt = stageEnteredAt); interviews/history stay on the original, which is not modified
 
+## Candidate Identity
+
+- `Candidate.email` is optional (`String? @unique`); `linkedinHandle` (indexed, not unique yet) is set from `linkedinUrl` on every write via `normalizeLinkedinHandle()` (`lib/linkedin.ts`)
+- Creation requires a real email or a LinkedIn profile URL (`lib/candidate-identity.ts`); no placeholder emails are generated anymore (`isPlaceholderEmail()` kept for legacy data)
+- Portals (vendor, referral, direct apply) still require an email
+- Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
+
 ## Backlog
 
 - Automatic interview scheduling confirmation: currently moving an Interview to

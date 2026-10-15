@@ -2,11 +2,13 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { normalizeLinkedinHandle } from '@/lib/linkedin'
+import { MISSING_IDENTIFIER_ERROR, hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
 
 const patchSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
-  email: z.string().email().optional(),
+  email: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().email().nullable().optional()),
   phone: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   linkedinUrl: z.string().refine((v) => !v || v.includes('linkedin.com') || v.startsWith('/in/'), { message: 'Invalid LinkedIn URL' }).optional().nullable(),
@@ -70,12 +72,24 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  // Drop fields not in Candidate model
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { linkedinUrl: _li, notes: _n, ...rest } = parsed.data
+  const { linkedinUrl, notes: _n, email, ...rest } = parsed.data
+
+  const identity: { email?: string | null; linkedinUrl?: string | null; linkedinHandle?: string | null } = {}
+  if (email !== undefined) identity.email = realEmailOrNull(email)
+  if (linkedinUrl !== undefined) {
+    identity.linkedinUrl = linkedinUrl || null
+    identity.linkedinHandle = normalizeLinkedinHandle(linkedinUrl)
+  }
+  const nextEmail = identity.email !== undefined ? identity.email : existing.email
+  const nextLinkedin = identity.linkedinUrl !== undefined ? identity.linkedinUrl : existing.linkedinUrl
+  // Legacy records without any identifier stay editable; an edit just can't remove the last one
+  if (hasCandidateIdentifier(existing.email, existing.linkedinUrl) && !hasCandidateIdentifier(nextEmail, nextLinkedin)) {
+    return NextResponse.json({ error: MISSING_IDENTIFIER_ERROR }, { status: 400 })
+  }
 
   try {
-    const candidate = await db.candidate.update({ where: { id }, data: { ...rest } })
+    const candidate = await db.candidate.update({ where: { id }, data: { ...rest, ...identity } })
     return NextResponse.json(candidate)
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code
