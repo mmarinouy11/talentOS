@@ -277,7 +277,7 @@ model Candidate {
   cvDriveId             String?
   cvOriginalName        String?
   linkedinUrl           String?
-  linkedinHandle        String?
+  linkedinHandle        String?     @unique
   notes                 String?     @db.Text
   skills                String[]
   languages             String[]
@@ -307,8 +307,6 @@ model Candidate {
   sourcedByVendor    Vendor?             @relation(fields: [sourcedByVendorId], references: [id])
   recruiter          User?               @relation("CandidateRecruiter", fields: [recruiterId], references: [id])
   emailLogs          EmailLog[]
-
-  @@index([linkedinHandle])
 }
 
 model CandidatePosition {
