@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { findCandidateMatches } from '@/lib/candidate-identity'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
+import type { Prisma } from '@prisma/client'
 import { NextResponse } from 'next/server'
 import { extractPdfText } from '@/lib/pdf-extract'
 import { callClaudeJSON } from '@/lib/anthropic'
@@ -18,7 +19,9 @@ Return ONLY valid JSON with these exact fields:
   "yearsOfExperience": number or null,
   "skills": array of strings,
   "languages": array of strings,
-  "summary": string or null
+  "summary": string or null,
+  "phone": the candidate's phone number if present, else null,
+  "linkedinUrl": the candidate's own LinkedIn profile URL (linkedin.com/in/...) if present, else null
 }`
 
 export async function POST(
@@ -93,8 +96,10 @@ export async function POST(
     skills: string[]
     languages: string[]
     summary: string | null
+    phone?: string | null
+    linkedinUrl?: string | null
   }
-  const defaultParsed: ParsedCV = { seniority: null, yearsOfExperience: null, skills: [], languages: [], summary: null }
+  const defaultParsed: ParsedCV = { seniority: null, yearsOfExperience: null, skills: [], languages: [], summary: null, phone: null, linkedinUrl: null }
 
   // Parallelize Drive upload and Claude parsing — both are non-fatal and independent
   const [driveResult, parsedResult] = await Promise.all([
@@ -252,6 +257,47 @@ export async function POST(
           { name: 'Compensation', passed: false, detail: `Your desired compensation ($${desiredCompensation.toLocaleString()}/month) exceeds the budget for this position.` },
         ],
       })
+    }
+  }
+
+  // Accepted returning candidate: the new CV becomes their current CV, and only EMPTY profile
+  // fields are filled (form values first, then the CV parse); existing values are never overwritten.
+  // The previous CV stays in Drive and is picked up by scripts/orphan-cvs-report.ts.
+  if (isReturning) {
+    try {
+      const current = await db.candidate.findUniqueOrThrow({ where: { id: candidate.id } })
+      const blank = (v: unknown) => v == null || (typeof v === 'string' && v.trim() === '')
+      const data: Prisma.CandidateUpdateInput = {}
+      if (cvDriveId) {
+        data.cvDriveId = cvDriveId
+        data.cvOriginalName = cvOriginalName ?? null
+      }
+      const newPhone = phone || parsed.phone?.trim() || null
+      if (blank(current.phone) && newPhone) data.phone = newPhone
+      if (blank(current.country) && countryRaw) data.country = countryRaw
+      if (blank(current.seniority) && parsed.seniority) data.seniority = parsed.seniority
+      if (current.yearsOfExperience == null && parsed.yearsOfExperience != null) data.yearsOfExperience = Math.round(parsed.yearsOfExperience)
+      if (blank(current.summary) && parsed.summary) data.summary = parsed.summary
+      if (current.languages.length === 0 && parsed.languages?.length) data.languages = parsed.languages
+      const known = new Set(current.skills.map((x) => x.toLowerCase()))
+      const newSkills = (parsed.skills ?? []).filter((x) => !known.has(x.toLowerCase()) && (known.add(x.toLowerCase()), true))
+      if (newSkills.length) data.skills = [...current.skills, ...newSkills]
+      if (blank(current.linkedinUrl)) {
+        const newLinkedin = normalizeLinkedinHandle(linkedin) ? linkedin : normalizeLinkedinHandle(parsed.linkedinUrl) ? parsed.linkedinUrl!.trim() : null
+        const handle = normalizeLinkedinHandle(newLinkedin)
+        // linkedinHandle is unique: skip it if another candidate already owns this profile
+        const owner = handle ? await db.candidate.findFirst({ where: { linkedinHandle: handle, id: { not: candidate.id } }, select: { id: true } }) : null
+        if (handle && !owner) {
+          data.linkedinUrl = newLinkedin
+          data.linkedinHandle = handle
+        } else if (owner) {
+          console.warn(`[apply] LinkedIn ${handle} belongs to candidate ${owner.id}; not added to ${candidate.id}`)
+        }
+      }
+      if (Object.keys(data).length > 0) await db.candidate.update({ where: { id: candidate.id }, data })
+    } catch (err) {
+      console.error(`[apply] Failed to refresh returning candidate ${candidate.id}:`, err)
+      // Non-fatal — the application itself was accepted
     }
   }
 
