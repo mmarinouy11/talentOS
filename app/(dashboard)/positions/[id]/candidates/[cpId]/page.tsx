@@ -7,6 +7,7 @@ import { getMonthlyHoursBaseline, hourlyToMonthly } from '@/lib/dgm'
 import { SeniorityBadge } from '@/components/app/SeniorityBadge'
 import { SkillTags } from '@/components/app/SkillTags'
 import { FitScoreCard } from '@/components/app/FitScoreCard'
+import { HIRED_CANDIDATE_POSITION_WHERE, isPositionFulfilled } from '@/lib/position-fulfillment'
 import { InterviewsSection } from '@/components/app/InterviewsSection'
 import { CandidateInPositionHeader } from '@/components/app/CandidateInPositionHeader'
 
@@ -60,12 +61,12 @@ export default async function CandidateInPositionPage({
         where: { id: cp.suggestedPositionId, deletedAt: null, status: 'OPEN' },
         select: {
           id: true, title: true, client: true, headcount: true,
-          _count: { select: { candidatePositions: { where: { status: 'HIRED' } } } },
+          _count: { select: { candidatePositions: { where: HIRED_CANDIDATE_POSITION_WHERE } } },
         },
       })
     : null
   const suggestion = suggestedPosition && cp.suggestedPositionScore != null
-    && suggestedPosition._count.candidatePositions < (suggestedPosition.headcount ?? 1)
+    && !isPositionFulfilled(suggestedPosition.headcount, suggestedPosition._count.candidatePositions)
     ? {
         positionId: suggestedPosition.id,
         title: suggestedPosition.title,

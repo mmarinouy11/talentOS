@@ -1,6 +1,7 @@
 import { db } from './db'
 import { callClaudeJSON } from './anthropic'
 import { locationAllowed } from './location'
+import { HIRED_CANDIDATE_POSITION_WHERE, isPositionFulfilled } from './position-fulfillment'
 
 const SYSTEM_PROMPT = `You are a recruiting intelligence system. Score how well a candidate matches a job position.
 Return ONLY valid JSON with no markdown:
@@ -46,12 +47,12 @@ async function findOtherPositions(
     where: { deletedAt: null, status: 'OPEN', type: { in: ['REQUISITION', 'PROACTIVE'] }, id: { not: currentPositionId } },
     select: {
       id: true, title: true, headcount: true, location: true, jdSeniority: true, coreSkills: true, jdSkills: true,
-      _count: { select: { candidatePositions: { where: { status: 'HIRED' } } } },
+      _count: { select: { candidatePositions: { where: HIRED_CANDIDATE_POSITION_WHERE } } },
     },
   })
 
   return positions
-    .filter((p) => p._count.candidatePositions < (p.headcount ?? 1))
+    .filter((p) => !isPositionFulfilled(p.headcount, p._count.candidatePositions))
     .filter((p) => locationAllowed(p.location, country))
     .map((p) => {
       const skills = [...new Set([...p.coreSkills, ...p.jdSkills].map((s) => s.trim().toLowerCase()))]

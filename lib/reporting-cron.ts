@@ -1,5 +1,6 @@
 import cron from 'node-cron'
 import { db } from './db'
+import { isHiredCandidatePosition, isPositionFulfilled } from './position-fulfillment'
 import { sendEmailViaSystemGmail } from './email'
 import type { Stage, InterviewDecision } from '@prisma/client'
 import { isCandidateInactive } from './candidate-status'
@@ -112,6 +113,12 @@ export async function runReportingCron() {
   }
 
   for (const position of positions) {
+    // No update emails for fulfilled positions (hired candidates cover the headcount), whatever their status
+    if (isPositionFulfilled(position.headcount, position.candidatePositions.filter(isHiredCandidatePosition).length)) {
+      console.log(`[reporting-cron] Skipping fulfilled position: ${position.title}`)
+      continue
+    }
+
     // lastReportSentAt = null means this is the first-ever report for this position.
     // In that case we skip the movements section rather than fabricating a 24h window,
     // since the cron may have been broken for days and the window would be misleading.
