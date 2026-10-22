@@ -52,7 +52,8 @@ const SKILL_CATEGORY_MAP: Record<string, SkillCategory> = {
 const CATEGORY_ORDER: SkillCategory[] = ['Languages', 'Frameworks', 'Cloud & DevOps', 'AI & Data', 'Soft Skills', 'Other']
 
 export function categorizeSkill(skill: string): SkillCategory {
-  const lower = skill.toLowerCase()
+  const lower = (skill ?? '').toLowerCase()
+  if (!lower) return 'Other'
   if (SKILL_CATEGORY_MAP[lower]) return SKILL_CATEGORY_MAP[lower]
   // Substring fallback: check if any map key is contained in the skill or vice-versa
   for (const [key, cat] of Object.entries(SKILL_CATEGORY_MAP)) {
@@ -104,11 +105,12 @@ function skillChip(skill: string, matching: boolean): string {
   return `<span style="display:inline-block;color:${CHARCOAL};font-size:13px;margin:2px 8px 2px 0;font-family:${FONT};">${esc(skill)}</span>`
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function esc(s: unknown): string {
+  return (typeof s === 'string' ? s : s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function renderSkillsSection(skills: string[], matchingSkillSet: Set<string>): string {
+  skills = (skills ?? []).filter((s) => typeof s === 'string' && s.trim())
   if (skills.length === 0) return ''
 
   const grouped = new Map<SkillCategory, string[]>()
@@ -136,20 +138,22 @@ function renderSkillsSection(skills: string[], matchingSkillSet: Set<string>): s
 }
 
 function renderExperienceSection(experience: CvExperienceEntry[]): string {
-  if (experience.length === 0) {
+  if (!experience?.length) {
     return sectionHeader('Professional Experience') +
       `<p style="font-family:${FONT};font-size:13px;color:${WARM_GRAY};font-style:italic;margin:0;">Detailed experience available upon request.</p>`
   }
 
   const blocks = experience.map((e) => {
-    const bullets = e.bullets.length > 0
-      ? `<ul style="margin:6px 0 0 0;padding-left:18px;color:${CHARCOAL};font-size:13px;line-height:1.65;font-family:${FONT};">${e.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`
+    const list = Array.isArray(e.bullets) ? e.bullets.filter(Boolean) : []
+    const dates = [e.startDate, e.endDate].filter(Boolean).map(esc).join(' – ')
+    const bullets = list.length > 0
+      ? `<ul style="margin:6px 0 0 0;padding-left:18px;color:${CHARCOAL};font-size:13px;line-height:1.65;font-family:${FONT};">${list.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`
       : ''
     return `
       <div style="margin-bottom:20px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px;">
           <span style="font-family:${FONT};font-size:14px;font-weight:700;color:${CARBON};">${esc(e.title)}</span>
-          <span style="font-family:${FONT};font-size:12px;color:${WARM_GRAY};white-space:nowrap;">${esc(e.startDate)} – ${esc(e.endDate)}</span>
+          <span style="font-family:${FONT};font-size:12px;color:${WARM_GRAY};white-space:nowrap;">${dates}</span>
         </div>
         <span style="font-family:${FONT};font-size:13px;color:${WARM_GRAY};font-style:italic;display:block;margin-top:1px;">${esc(e.company)}</span>
         ${bullets}
@@ -160,7 +164,7 @@ function renderExperienceSection(experience: CvExperienceEntry[]): string {
 }
 
 function renderEducationSection(education: CvEducationEntry[]): string {
-  if (education.length === 0) return ''
+  if (!education?.length) return ''
   const rows = education.map((e) => `
     <div style="margin-bottom:10px;">
       <span style="font-family:${FONT};font-size:14px;font-weight:700;color:${CARBON};">${esc(e.degree)}</span>
@@ -183,7 +187,7 @@ export function renderTenoraiCv(data: TenoraiCvData): string {
       `<p style="font-family:${FONT};font-size:14px;line-height:1.7;color:${CHARCOAL};margin:0 0 4px 0;">${esc(summary)}</p>`
     : ''
 
-  const languagesHtml = languages.length > 0
+  const languagesHtml = languages?.length
     ? sectionHeader('Languages') +
       `<p style="font-family:${FONT};font-size:13px;color:${CHARCOAL};margin:0;">${languages.map(esc).join(' · ')}</p>`
     : ''
