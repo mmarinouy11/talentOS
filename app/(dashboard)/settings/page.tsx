@@ -28,6 +28,11 @@ export default async function SettingsPage({
       create: { key: 'VENDOR_MIN_FIT_SCORE', value: '70', description: 'Minimum fit score (0–100) for vendor-submitted candidates. Submissions below this threshold are automatically rejected.' },
     }),
     db.systemSettings.upsert({
+      where: { key: 'BETTER_MATCH_MIN_DELTA' },
+      update: {},
+      create: { key: 'BETTER_MATCH_MIN_DELTA', value: '8', description: 'Minimum points a suggested position\'s real fit score must exceed the current position\'s score by to show "Better match".' },
+    }),
+    db.systemSettings.upsert({
       where: { key: 'DIRECT_MIN_FIT_SCORE' },
       update: {},
       create: { key: 'DIRECT_MIN_FIT_SCORE', value: '30', description: 'Minimum fit score (0–100) for direct (portal) applications. Applications below this threshold are automatically rejected.' },

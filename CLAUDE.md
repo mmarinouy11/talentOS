@@ -118,12 +118,12 @@ Import from `lib/anthropic.ts`:
 
 ## Fit Scoring Suggestions
 
-- `scoreCandidateForPosition()` (`lib/fit-scorer.ts`) also returns `strongestRoles` (2–3 generic role types) and an optional `suggestedPosition` in the same Claude call
-- Other positions offered: OPEN, REQUISITION or PROACTIVE, not fulfilled, not the current one, location allows the candidate's country (`locationAllowed`), ≥1 skill overlap; sorted by overlap, max 10. Skipped when none qualify
-- Suggestion kept only if its positionId was offered and its estimated score is ≥ fitScore + 10; stored on CandidatePosition (`strongestRoles`, `suggestedPositionId/Score/Reason`), cleared on re-score otherwise
-- UI: FitScoreCard shows "Strongest in" chips and "Better match" (only while that position is OPEN and not fulfilled) with "Add to that position" (POST /api/candidate-positions, same recruiter, triggers scoring) or "Already in that position"; /candidates/[id] shows strongest roles from the latest scoring
-- No bulk re-scoring: applies to new scorings and manual re-scores
-- Fit scoring runs at `temperature: 0` (`callClaude`/`callClaudeJSON` accept an optional `{ temperature }`; other callers keep the API default). The prompt evaluates the current position first and states the other-positions list must not affect it
+- Single source of truth: `getOrComputeFitScore(candidateId, positionId)` (`lib/fit-scorer.ts`). inputsHash = sha256(FIT_PROMPT_VERSION + model + system prompt + cvDriveId + full prompt with candidate profile and position JD/requirements); cached in `FitScoreCache` (unique candidate+position+hash). Same inputs → cached result, no AI call. Every scoring path goes through it (scoreCandidateForPosition, better match, recompute script, future Redeployment matching). Bump `FIT_PROMPT_VERSION` when the prompt/rubric changes
+- Real score: SMART, temperature 0, 4-dimension rubric, also returns `strongestRoles`; only the current position is in the prompt
+- Better match: candidates = OPEN, REQUISITION or PROACTIVE, not fulfilled, not current, `locationAllowed`, ≥1 skill overlap (max 10, by overlap) → cheap FAST shortlist of max 2 (its output is never shown) → real score via getOrComputeFitScore → kept only if round(real) ≥ round(current fitScore) + `BETTER_MATCH_MIN_DELTA` (SystemSettings, default 8, /settings). Stored on CandidatePosition (`suggestedPositionId/Score/Reason`; reason = suggested position's fitSummary), cleared otherwise
+- UI: FitScoreCard shows "Strongest in" chips and "Better match: <real> vs <current> here" (only while that position is OPEN and not fulfilled) with "Add to that position" (POST /api/candidate-positions → cache hit, identical numbers) or "Already in that position"
+- Re-score returns the cached result unless the inputs changed
+- `scripts/recompute-better-match.ts`: dry run (default) / `--apply` — re-checks stored suggestions against real scores, keeps or clears them
 
 ## Home Screen
 

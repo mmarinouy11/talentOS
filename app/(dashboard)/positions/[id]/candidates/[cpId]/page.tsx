@@ -71,7 +71,7 @@ export default async function CandidateInPositionPage({
         positionId: suggestedPosition.id,
         title: suggestedPosition.title,
         client: suggestedPosition.client,
-        estimatedScore: cp.suggestedPositionScore,
+        score: cp.suggestedPositionScore,
         reason: cp.suggestedPositionReason,
         existingCpId: candidate.candidatePositions.find((o) => o.positionId === suggestedPosition.id)?.id ?? null,
       }
