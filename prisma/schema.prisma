@@ -262,6 +262,7 @@ model Position {
 
   recruiter          User                @relation("RecruiterPositions", fields: [recruiterId], references: [id])
   candidatePositions CandidatePosition[]
+  fitScoreCache      FitScoreCache[]
   positionVendors    PositionVendor[]
   sourcePosition     Position?           @relation("PositionBackups", fields: [sourcePositionId], references: [id])
   backups            Position[]          @relation("PositionBackups")
@@ -303,6 +304,7 @@ model Candidate {
   deletedAt             DateTime?
 
   candidatePositions CandidatePosition[]
+  fitScoreCache      FitScoreCache[]
   sourcedByUser      User?               @relation("CandidateSourcedByUser", fields: [sourcedByUserId], references: [id])
   sourcedByVendor    Vendor?             @relation(fields: [sourcedByVendorId], references: [id])
   recruiter          User?               @relation("CandidateRecruiter", fields: [recruiterId], references: [id])
@@ -438,6 +440,22 @@ model GlobalInsights {
   bottleneckPattern String?
   recommendation    String?  @db.Text
   generatedAt       DateTime @default(now())
+}
+
+// Real fit-score results keyed by the scoring inputs; the single source of truth for fit scores
+model FitScoreCache {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  positionId  String
+  position    Position  @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  inputsHash  String
+  result      Json
+  model       String
+  createdAt   DateTime  @default(now())
+
+  @@unique([candidateId, positionId, inputsHash])
+  @@index([candidateId, positionId])
 }
 
 model SystemSettings {
