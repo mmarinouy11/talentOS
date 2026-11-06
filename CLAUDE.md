@@ -116,6 +116,15 @@ Import from `lib/anthropic.ts`:
 - CV files: `cvOriginalName` stores the user's file name (Drive names carry a timestamp prefix). Rejected portal submissions move their CV to the Drive trash (`trashDriveFileQuietly`). `scripts/orphan-cvs-report.ts`: dry run / `--apply` (trash, never permanent delete) / `--match [--apply]` to attach orphan CVs to candidates without one
 - Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
 
+## Fit Scoring Suggestions
+
+- `scoreCandidateForPosition()` (`lib/fit-scorer.ts`) also returns `strongestRoles` (2–3 generic role types) and an optional `suggestedPosition` in the same Claude call
+- Other positions offered: OPEN, REQUISITION or PROACTIVE, not fulfilled, not the current one, location allows the candidate's country (`locationAllowed`), ≥1 skill overlap; sorted by overlap, max 10. Skipped when none qualify
+- Suggestion kept only if its positionId was offered and its estimated score is ≥ fitScore + 10; stored on CandidatePosition (`strongestRoles`, `suggestedPositionId/Score/Reason`), cleared on re-score otherwise
+- UI: FitScoreCard shows "Strongest in" chips and "Better match" (only while that position is OPEN and not fulfilled) with "Add to that position" (POST /api/candidate-positions, same recruiter, triggers scoring) or "Already in that position"; /candidates/[id] shows strongest roles from the latest scoring
+- No bulk re-scoring: applies to new scorings and manual re-scores
+- Fit scoring runs at `temperature: 0` (`callClaude`/`callClaudeJSON` accept an optional `{ temperature }`; other callers keep the API default). The prompt evaluates the current position first and states the other-positions list must not affect it
+
 ## Home Screen
 
 - `/` renders the daily home for signed-in users (inside `DashboardShell`, shared with the `(dashboard)` layout); visitors keep the landing page. "Home" is the first sidebar item
@@ -124,6 +133,7 @@ Import from `lib/anthropic.ts`:
 - "Today" in America/Montevideo; business days via `lib/business-days.ts` (shared with Recruiter Performance); thresholds in `lib/home-thresholds.ts`
 - Shared: `HcFraction` (○/◐/✓), `lib/stage-labels.ts`
 - "Current waiting by stage" (formerly Bottlenecks): Avg so far vs Typical (`getTimeInStage()` from `lib/analytics.ts`, same as /reports Time in Stage); amber when above typical, red when ≥50% above
+- Fulfilled = `isPositionFulfilled()` in `lib/position-fulfillment.ts` (hired = status or stage HIRED; null headcount = 1), shared by the home screen, fit-scoring suggestions and reporting-cron (per-position update emails skip fulfilled positions)
 - Fulfilled positions (HIRED count ≥ headcount, null = 1) are excluded from Feedback pending, No next step, New applications, Bottlenecks and their counters; still in Today's interviews and Starting soon; shown muted at the bottom of their client in Open positions
 - Layout: two columns on lg (Needs attention ≈60% | Today's interviews + Bottlenecks ≈40%), Open positions full width below. "Feedback pending" (interviews before today with no decision; Owner = CandidatePosition recruiter) and "No next step" (non-Pipeline, ≥7d in stage, nothing pending or scheduled; grouped by position, expandable) each have a counter; lists other than "Waiting for a decision" show 5 rows + "Show all"; decided interviews collapse at the bottom. Toggles in `components/app/home/HomeToggles.tsx` (client)
 

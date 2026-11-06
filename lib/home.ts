@@ -2,6 +2,7 @@ import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import { db } from '@/lib/db'
 import { elapsedBusinessDaysInTz } from '@/lib/business-days'
 import { getTimeInStage } from '@/lib/analytics'
+import { isHiredCandidatePosition, isPositionFulfilled } from '@/lib/position-fulfillment'
 import {
   HOME_TIMEZONE, STALLED_AMBER_DAYS, STARTING_SOON_DAYS,
 } from '@/lib/home-thresholds'
@@ -125,10 +126,10 @@ export async function getHomeData(now = new Date()): Promise<HomeData> {
     const headcount = p.headcount ?? 1
     openHeadcount += headcount
     const stageCounts = Object.fromEntries(SNAPSHOT_STAGES.map((s) => [s, 0])) as SnapshotRow['stageCounts']
-    const hired = p.candidatePositions.filter((cp) => cp.status === 'HIRED' || cp.stage === 'HIRED').length
+    const hired = p.candidatePositions.filter(isHiredCandidatePosition).length
     // Fulfilled positions are left out of the pending-action sections (feedback, no next step,
     // new applications, bottlenecks); today's interviews and starting soon still include them
-    const fulfilled = hired >= headcount
+    const fulfilled = isPositionFulfilled(p.headcount, hired)
     let oldestWaitBd: number | null = null
     let pipeAgeDays: number | null = null
 

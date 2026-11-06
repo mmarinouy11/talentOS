@@ -53,6 +53,7 @@ export interface PipelinePeriodHighlights {
   movedToOffer: number
   notMovingForward: number
   filledThisPeriod: number
+  newRequisitions: { title: string; client: string }[]
 }
 
 export interface PipelineReportData {
@@ -120,6 +121,10 @@ function buildHeaderSection(data: PipelineReportData, _emailMode: boolean): stri
   }
   if (ph.movedToOffer > 0) {
     bullets.push(`✉️ ${ph.movedToOffer} candidate${ph.movedToOffer !== 1 ? 's' : ''} moved to Offer`)
+  }
+  const newReqs = ph.newRequisitions ?? []
+  if (newReqs.length > 0) {
+    bullets.push(`📋 ${newReqs.length} new requisition${newReqs.length !== 1 ? 's' : ''}: ${newReqs.map((r) => `${r.title} (${r.client})`).join(', ')}`)
   }
   bullets.push(`➡️ ${ph.candidatesAdvanced} candidate${ph.candidatesAdvanced !== 1 ? 's' : ''} advanced to next stage`)
   if (ph.interviewsConducted > 0) {

@@ -1,3 +1,4 @@
+import { getNewRequisitions } from '@/lib/pipeline-new-requisitions'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -287,7 +288,7 @@ export async function GET(request: Request) {
       newCandidatePositions: newCPPositionIds.size,
       movedToOffer: movedToOfferCount,
       notMovingForward: rejectedCount,
-      filledThisPeriod: filledPositionIds.size,
+      filledThisPeriod: filledPositionIds.size, newRequisitions: await getNewRequisitions(fromDate, toDate),
     },
     clients,
   })

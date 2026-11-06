@@ -1,3 +1,4 @@
+import { getNewRequisitions } from './pipeline-new-requisitions'
 import { db } from './db'
 import { sendEmailViaSystemGmail } from './email'
 import { renderPipelineHtml } from './pipeline-report'
@@ -132,7 +133,7 @@ async function buildPipelineData(fromDate: Date, toDate: Date): Promise<Pipeline
     generatedAt: now.toISOString(),
     summary: { totalPositions, totalActive, totalHeadcount, interviewsInPeriod: conductedInterviews.length },
     atAGlance: { openPositions: totalPositions, totalHeadcount, activeCandidates: totalActive, offerCount, clientCount, managerCount, techCount, interviewsInPeriod: conductedInterviews.length },
-    periodHighlights: { interviewsConducted: conductedInterviews.length, interviewsByStage, candidatesAdvanced: advancedCount, newCandidates: newCPsRaw.length, newCandidatePositions: newCPPositionIds.size, movedToOffer: movedToOfferCount, notMovingForward: rejectedCount, filledThisPeriod: filledPositionIds.size },
+    periodHighlights: { interviewsConducted: conductedInterviews.length, interviewsByStage, candidatesAdvanced: advancedCount, newCandidates: newCPsRaw.length, newCandidatePositions: newCPPositionIds.size, movedToOffer: movedToOfferCount, notMovingForward: rejectedCount, filledThisPeriod: filledPositionIds.size, newRequisitions: await getNewRequisitions(fromDate, toDate) },
     clients,
   }
 }

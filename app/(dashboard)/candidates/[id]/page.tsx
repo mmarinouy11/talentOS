@@ -59,6 +59,12 @@ export default async function CandidateDetailPage({
     position: cp.position,
   }))
 
+  // Strongest role types from the most recent fit scoring that produced them
+  const latestScored = [...candidate.candidatePositions]
+    .filter((cp) => cp.strongestRoles.length > 0 && cp.fitScoredAt)
+    .sort((a, b) => b.fitScoredAt!.getTime() - a.fitScoredAt!.getTime())[0]
+  const strongestRoles = latestScored?.strongestRoles ?? []
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -76,6 +82,14 @@ export default async function CandidateDetailPage({
             {candidate.seniority && <SeniorityBadge seniority={candidate.seniority} />}
           </div>
           <p className="text-sm text-gray-500 mt-1">{candidate.email ?? <span className="text-gray-400">—</span>}</p>
+          {strongestRoles.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2" title={`From the fit scoring for ${latestScored!.position.title}`}>
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">Strongest in:</span>
+              {strongestRoles.map((r) => (
+                <span key={r} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{r}</span>
+              ))}
+            </div>
+          )}
         </div>
         <Link href={`/candidates/${id}/edit`}>
           <Button variant="outline">Edit</Button>

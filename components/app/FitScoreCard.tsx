@@ -15,6 +15,19 @@ interface FitScoreCardProps {
   fitStrengths: string[]
   fitGaps: string[]
   fitScoredAt: string | null
+  strongestRoles?: string[]
+  // Shown only when the suggested position is still OPEN and not fulfilled
+  suggestion?: {
+    positionId: string
+    title: string
+    client: string
+    estimatedScore: number
+    reason: string | null
+    // candidate-position id when the candidate is already in that position
+    existingCpId: string | null
+  } | null
+  candidateId?: string
+  recruiterId?: string
 }
 
 function scoreColor(score: number): string {
@@ -60,9 +73,35 @@ export function FitScoreCard({
   fitStrengths,
   fitGaps,
   fitScoredAt,
+  strongestRoles = [],
+  suggestion = null,
+  candidateId,
+  recruiterId,
 }: FitScoreCardProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState('')
+
+  // Same recruiter; the candidate-positions API triggers the full fit scoring for the new position
+  async function addToSuggested() {
+    if (!suggestion || !candidateId) return
+    setAdding(true); setAddError('')
+    try {
+      const res = await fetch('/api/candidate-positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidateId, positionId: suggestion.positionId, recruiterId: recruiterId ?? null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setAddError(data.error ?? 'Could not add to that position'); return }
+      router.push(`/positions/${suggestion.positionId}/candidates/${data.id}`)
+    } catch {
+      setAddError('Could not add to that position')
+    } finally {
+      setAdding(false)
+    }
+  }
 
   async function score() {
     setLoading(true)
@@ -108,6 +147,39 @@ export function FitScoreCard({
       </div>
 
       {fitSummary && <p className="text-sm text-gray-700">{fitSummary}</p>}
+
+      {strongestRoles.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">Strongest in:</span>
+          {strongestRoles.map((r) => (
+            <span key={r} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{r}</span>
+          ))}
+        </div>
+      )}
+
+      {suggestion && fitScore !== null && (
+        <div className="rounded-lg border border-[#8CF000] bg-[#f9ffe6] px-3 py-2 space-y-2">
+          <p className="text-sm text-gray-800" title={suggestion.reason ?? undefined}>
+            <span className="font-semibold">Better match:</span>{' '}
+            <a href={`/positions/${suggestion.positionId}`} className="font-medium underline underline-offset-2 hover:text-black">{suggestion.title}</a>
+            <span className="text-gray-500"> · {suggestion.client}</span>
+            <span className="text-gray-600"> — est. {suggestion.estimatedScore} vs {Math.round(fitScore)} here</span>
+          </p>
+          {suggestion.reason && <p className="text-xs text-gray-500">{suggestion.reason}</p>}
+          {suggestion.existingCpId ? (
+            <a href={`/positions/${suggestion.positionId}/candidates/${suggestion.existingCpId}`} className="inline-block text-xs font-medium text-gray-600 underline underline-offset-2">
+              Already in that position
+            </a>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={addToSuggested} disabled={adding || !candidateId}>
+                {adding ? 'Adding…' : 'Add to that position'}
+              </Button>
+              {addError && <span className="text-xs text-red-600">{addError}</span>}
+            </div>
+          )}
+        </div>
+      )}
 
       {fitStrengths.length > 0 && (
         <div>

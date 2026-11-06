@@ -64,16 +64,23 @@ export const MODELS = {
 } as const
 
 // Helper: call Claude and get text response
+export interface ClaudeCallOptions {
+  // Omitted = API default (1.0). Use 0 for deterministic outputs such as scoring.
+  temperature?: number
+}
+
 export async function callClaude(
   prompt: string,
   model: keyof typeof MODELS = 'SMART',
-  systemPrompt?: string
+  systemPrompt?: string,
+  options: ClaudeCallOptions = {}
 ): Promise<string> {
   const anthropic = getAnthropic()
   const response = await anthropic.messages.create({
     model: MODELS[model],
     max_tokens: 4096,
     system: systemPrompt,
+    ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
     messages: [{ role: 'user', content: prompt }],
   })
   const block = response.content[0]
@@ -85,12 +92,13 @@ export async function callClaude(
 export async function callClaudeJSON<T>(
   prompt: string,
   model: keyof typeof MODELS = 'SMART',
-  systemPrompt?: string
+  systemPrompt?: string,
+  options: ClaudeCallOptions = {}
 ): Promise<T> {
   const system =
     (systemPrompt ?? '') +
     '\nRespond ONLY with valid JSON. No markdown, no backticks, no explanation.'
-  const text = await callClaude(prompt, model, system)
+  const text = await callClaude(prompt, model, system, options)
   try {
     const clean = text
       .replace(/^```json\s*/i, '')
