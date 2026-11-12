@@ -81,13 +81,13 @@ export function RedeploymentTable({ rows, canAct }: { rows: RedeploymentRow[]; c
     }
   }
 
-  // Same flow as adding from a position: first stage, StageHistory, fit score via getOrComputeFitScore
+  // Validated server-side against getAssignablePositions; then first stage, StageHistory, fit score via getOrComputeFitScore
   async function addToPosition(row: RedeploymentRow) {
     const positionId = target[row.id]
     if (!positionId || !row.candidateId) return
     setBusyRow(row.id); setRowMsg((m) => ({ ...m, [row.id]: { text: '', error: false } }))
     try {
-      await post('/api/candidate-positions', { candidateId: row.candidateId, positionId })
+      await post('/api/redeployment/add-to-position', { candidateId: row.candidateId, positionId })
       setRowMsg((m) => ({ ...m, [row.id]: { text: 'Added — scoring in progress', error: false } }))
       setTarget((t) => ({ ...t, [row.id]: '' }))
       router.refresh()
