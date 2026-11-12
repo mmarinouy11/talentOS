@@ -79,6 +79,7 @@ enum SourceType {
   DIRECT
   OTHER
   REFERRAL
+  REDEPLOYMENT
 }
 
 enum VendorType {
@@ -316,6 +317,7 @@ model Candidate {
   // Availability to start, as told by the candidate; availabilityUpdatedAt set server-side when it changes
   startAvailability     StartAvailability?
   availabilityUpdatedAt DateTime?
+  redeploymentProfile   RedeploymentProfile?
 
   candidatePositions CandidatePosition[]
   fitScoreCache      FitScoreCache[]
@@ -470,6 +472,49 @@ model FitScoreCache {
 
   @@unique([candidateId, positionId, inputsHash])
   @@index([candidateId, positionId])
+}
+
+enum RedeploymentStatus {
+  ACTIVE
+  OUT_OF_WINDOW
+  REMOVED
+}
+
+// Delivery-center people released recently or about to be released, flagged for rehire (HR roster sheet).
+// Only the minimal roster fields below are stored; candidateId is null while a duplicate decision is pending.
+model RedeploymentProfile {
+  id                    String             @id @default(cuid())
+  rosterId              String             @unique
+  candidateId           String?            @unique
+  candidate             Candidate?         @relation(fields: [candidateId], references: [id])
+  possibleDuplicateOfId String?
+  parsedSnapshot        Json?
+  lwd                   DateTime?
+  lastJobTitle          String?
+  lastClient            String?
+  grade                 String?
+  primarySkill          String?
+  subSkill              String?
+  yearsExperience       Float?
+  yearsInPrimarySkill   Float?
+  subLocation           String?
+  rosterState           String?
+  rehireFlag            String?
+  personalEmail         String?
+  workEmail             String?
+  phone                 String?
+  firstName             String?
+  lastName              String?
+  preferredName         String?
+  cvFileName            String?
+  sourceCvDriveFileId   String?
+  status                RedeploymentStatus @default(ACTIVE)
+  firstSeenAt           DateTime           @default(now())
+  lastSyncedAt          DateTime
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([status])
 }
 
 enum BulkUploadStatus {

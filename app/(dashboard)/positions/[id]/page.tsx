@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { BulkUploadBanner } from '@/components/app/BulkUploadBanner'
 import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -358,6 +359,8 @@ export default async function PositionDetailPage({
           </div>
         </div>
       </div>
+
+      <BulkUploadBanner positionId={position.id} />
 
       {/* Candidates */}
       <PositionCandidatesPanel

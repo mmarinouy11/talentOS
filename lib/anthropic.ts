@@ -23,7 +23,7 @@ export class AnthropicQuotaError extends Error {
   constructor(cause?: string) { super(cause ?? 'Anthropic quota/rate limit exceeded'); this.name = 'AnthropicQuotaError' }
 }
 
-function classifyAnthropicError(err: unknown): AnthropicConfigError | AnthropicQuotaError | null {
+export function classifyAnthropicError(err: unknown): AnthropicConfigError | AnthropicQuotaError | null {
   if (err instanceof AnthropicConfigError || err instanceof AnthropicQuotaError) return err
   if (!err || typeof err !== 'object') return null
   const e = err as Record<string, unknown>

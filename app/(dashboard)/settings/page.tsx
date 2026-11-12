@@ -38,6 +38,11 @@ export default async function SettingsPage({
       create: { key: 'BETTER_MATCH_MIN_SCORE', value: '70', description: 'Minimum real fit score (0–100) a suggested position needs to show "Better match", unless that position sets its own vendor/direct minimum for the candidate\'s source.' },
     }),
     db.systemSettings.upsert({
+      where: { key: 'BULK_UPLOAD_PRESELECT_SCORE' },
+      update: {},
+      create: { key: 'BULK_UPLOAD_PRESELECT_SCORE', value: '70', description: 'Fit score (0–100) at or above which bulk CV upload rows are preselected for "Add to pipeline".' },
+    }),
+    db.systemSettings.upsert({
       where: { key: 'DIRECT_MIN_FIT_SCORE' },
       update: {},
       create: { key: 'DIRECT_MIN_FIT_SCORE', value: '30', description: 'Minimum fit score (0–100) for direct (portal) applications. Applications below this threshold are automatically rejected.' },

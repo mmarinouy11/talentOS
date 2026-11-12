@@ -287,16 +287,8 @@ export async function findBetterMatch(
   return best
 }
 
-export async function scoreCandidateForPosition(candidatePositionId: string): Promise<void> {
-  const cp = await db.candidatePosition.findFirst({
-    where: { id: candidatePositionId },
-    include: { candidate: true },
-  })
-  if (!cp) return
-
-  const result = await getOrComputeFitScore(cp.candidateId, cp.positionId)
-  if (!result) return
-
+// Writes a (cached) fit result onto a CandidatePosition; no AI call
+export async function applyFitResult(candidatePositionId: string, result: FitScoreResult): Promise<void> {
   await db.candidatePosition.update({
     where: { id: candidatePositionId },
     data: {
@@ -312,6 +304,19 @@ export async function scoreCandidateForPosition(candidatePositionId: string): Pr
       strongestRoles: result.strongestRoles,
     },
   })
+}
+
+export async function scoreCandidateForPosition(candidatePositionId: string): Promise<void> {
+  const cp = await db.candidatePosition.findFirst({
+    where: { id: candidatePositionId },
+    include: { candidate: true },
+  })
+  if (!cp) return
+
+  const result = await getOrComputeFitScore(cp.candidateId, cp.positionId)
+  if (!result) return
+
+  await applyFitResult(candidatePositionId, result)
 
   // The suggestion is best-effort: a failure here never loses the score saved above
   let match: BetterMatch | null = null

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { BulkCvUploadForm } from './BulkCvUploadForm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SeniorityBadge } from './SeniorityBadge'
@@ -25,7 +26,7 @@ interface Props {
   onClose: () => void
 }
 
-type Tab = 'search' | 'create' | 'import'
+type Tab = 'search' | 'create' | 'import' | 'upload'
 
 export function AddCandidateToPositionModal({ positionId, existingCandidateIds, currentUserId, onCandidateAdded, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('search')
@@ -116,6 +117,7 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
           <button className={tabClass('search')} onClick={() => setTab('search')}>Search Existing</button>
           <button className={tabClass('create')} onClick={() => setTab('create')}>Create New</button>
           <button className={tabClass('import')} onClick={() => setTab('import')}>Import from LinkedIn</button>
+          <button className={tabClass('upload')} onClick={() => setTab('upload')}>Upload CVs</button>
         </div>
 
         {/* Search tab */}
@@ -187,6 +189,13 @@ export function AddCandidateToPositionModal({ positionId, existingCandidateIds, 
               onCreated={handleCreated}
               onCancel={onClose}
             />
+          </div>
+        )}
+
+        {/* Upload CVs tab: background batch linked to this position */}
+        {tab === 'upload' && (
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <BulkCvUploadForm positionId={positionId} onClose={onClose} />
           </div>
         )}
 
