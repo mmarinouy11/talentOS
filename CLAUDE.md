@@ -116,6 +116,13 @@ Import from `lib/anthropic.ts`:
 - CV files: `cvOriginalName` stores the user's file name (Drive names carry a timestamp prefix). Rejected portal submissions move their CV to the Drive trash (`trashDriveFileQuietly`). `scripts/orphan-cvs-report.ts`: dry run / `--apply` (trash, never permanent delete) / `--match [--apply]` to attach orphan CVs to candidates without one
 - Cleanup: `scripts/dedupe-candidates.ts` — dry run (default), `--report` (CSV in `reports/`, gitignored), `--apply` (backfill), `--apply --groups=certain` or `--apply --approve=file.csv` to merge
 
+## Candidate Availability to Start
+
+- Candidate property (not CandidatePosition.startDate, which is a hire's actual start): `startAvailability StartAvailability?` (IMMEDIATE|ONE_WEEK|TWO_WEEKS|ONE_MONTH|TWO_MONTHS|THREE_MONTHS_PLUS) + `availabilityUpdatedAt`
+- `lib/start-availability.ts` (client-safe): labels ("Immediate", "1 week", … "3+ months"), `availabilityWriteData()` sets availabilityUpdatedAt server-side only when the value changes (clearing clears both), `availabilityStaleHint()` → "updated Nd ago" when > 30 days. No date calculations: always the label as entered
+- Input: CandidateForm, CreateCandidateInPositionForm, vendor/referral portal (`PortalPage`), Zod `z.enum` on POST/PATCH /api/candidates and the portal submit routes (invalid portal value ignored)
+- Display (`AvailabilityLabel` component): candidate detail card, candidate-in-position header, Position → Candidates "Availability" column, Tenarai CV "Availability:" line (only when set, no stale hint). Not used in fit scoring
+
 ## Fit Scoring Suggestions
 
 - Single source of truth: `getOrComputeFitScore(candidateId, positionId)` (`lib/fit-scorer.ts`). inputsHash = sha256(FIT_PROMPT_VERSION + model + system prompt + cvDriveId + full prompt with candidate profile and position JD/requirements); cached in `FitScoreCache` (unique candidate+position+hash). Same inputs → cached result, no AI call. Every scoring path goes through it (scoreCandidateForPosition, better match, recompute script, future Redeployment matching). Bump `FIT_PROMPT_VERSION` when the prompt/rubric changes

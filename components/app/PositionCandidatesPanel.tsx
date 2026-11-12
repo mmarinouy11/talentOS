@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { AvailabilityLabel } from './AvailabilityLabel'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { AddCandidateToPositionModal } from './AddCandidateToPositionModal'
@@ -220,6 +221,8 @@ interface CandidatePosition {
     email: string | null
     country: string | null
     seniority: string | null
+    startAvailability?: string | null
+    availabilityUpdatedAt?: string | null
   }
 }
 
@@ -482,6 +485,9 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
         </td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.country ?? '—'}</td>
         <td className="px-4 py-3 text-gray-600">{cp.candidate.seniority ?? '—'}</td>
+        <td className="px-4 py-3 text-gray-600">
+          <AvailabilityLabel value={cp.candidate.startAvailability} updatedAt={cp.candidate.availabilityUpdatedAt} empty="—" />
+        </td>
         <td className="px-4 py-3">
           <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
             {STAGE_LABELS[cp.stage]}
@@ -537,6 +543,7 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
         {sh('Recruiter', 'recruiter')}
         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Country</th>
         {sh('Seniority', 'seniority')}
+        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Availability</th>
         {sh('Stage', 'stage')}
         <th className="px-4 py-3 text-left font-medium text-gray-600">Round Status</th>
         {sh('Fit', 'fitScore', 'text-right')}

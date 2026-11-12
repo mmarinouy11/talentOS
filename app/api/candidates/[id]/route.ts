@@ -1,3 +1,4 @@
+import { START_AVAILABILITY_VALUES, availabilityWriteData } from '@/lib/start-availability'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
@@ -25,6 +26,7 @@ const patchSchema = z.object({
   sourcedByUserId: z.string().optional().nullable(),
   sourcedByVendorId: z.string().optional().nullable(),
   sourcedByOther: z.string().optional().nullable(),
+  startAvailability: z.enum(START_AVAILABILITY_VALUES).optional().nullable(),
   recruiterId: z.string().optional(),
 })
 
@@ -73,7 +75,7 @@ export async function PATCH(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { linkedinUrl, notes: _n, email, ...rest } = parsed.data
+  const { linkedinUrl, notes: _n, email, startAvailability, ...rest } = parsed.data
 
   const identity: { email?: string | null; linkedinUrl?: string | null; linkedinHandle?: string | null } = {}
   if (email !== undefined) identity.email = realEmailOrNull(email)
@@ -107,7 +109,7 @@ export async function PATCH(
   }
 
   try {
-    const candidate = await db.candidate.update({ where: { id }, data: { ...rest, ...identity } })
+    const candidate = await db.candidate.update({ where: { id }, data: { ...rest, ...identity, ...availabilityWriteData(startAvailability, existing.startAvailability) } })
     return NextResponse.json(candidate)
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code

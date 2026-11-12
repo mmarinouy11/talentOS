@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { START_AVAILABILITY_VALUES, START_AVAILABILITY_LABELS, type StartAvailabilityValue } from '@/lib/start-availability'
 import type { NewCandidatePosition } from './LinkedInImportFlow'
 
 const LATAM_COUNTRIES = [
@@ -49,6 +50,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
   const [sourcedByUserId, setSourcedByUserId] = useState('')
   const [sourcedByVendorId, setSourcedByVendorId] = useState('')
   const [sourcedByOther, setSourcedByOther] = useState('')
+  const [startAvailability, setStartAvailability] = useState<StartAvailabilityValue | ''>('')
 
   const [users, setUsers] = useState<UserOption[]>([])
   const [vendors, setVendors] = useState<VendorOption[]>([])
@@ -145,6 +147,7 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
       sourcedByUserId: sourcedByType === 'RECRUITER' ? sourcedByUserId || null : null,
       sourcedByVendorId: sourcedByType === 'VENDOR' ? sourcedByVendorId || null : null,
       sourcedByOther: sourcedByType === 'OTHER' ? sourcedByOther || null : null,
+      startAvailability: startAvailability || null,
       skills: cvParsed?.skills ?? [],
       languages: cvParsed?.languages ?? [],
       ...(cvDriveId ? { cvDriveId, cvOriginalName } : {}),
@@ -324,6 +327,13 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
             <Input id="cn-sourcedOther" className="mt-1" value={sourcedByOther} onChange={(e) => setSourcedByOther(e.target.value)} placeholder="e.g. Referral, Job board" />
           </div>
         )}
+        <div>
+          <Label htmlFor="cn-availability">Availability to start</Label>
+          <Select id="cn-availability" className="mt-1" value={startAvailability} onChange={(e) => setStartAvailability(e.target.value as StartAvailabilityValue | '')}>
+            <option value="">— Not specified —</option>
+            {START_AVAILABILITY_VALUES.map((v) => <option key={v} value={v}>{START_AVAILABILITY_LABELS[v]}</option>)}
+          </Select>
+        </div>
       </div>
 
       {duplicate && (

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { renderTenoraiCv, type CvExperienceEntry, type CvEducationEntry } from '@/lib/templates/tenarai-cv'
 import { downloadFileFromDrive } from '@/lib/google'
 import { parseCvFromBuffer } from '@/lib/cv-parser'
+import { availabilityLabel } from '@/lib/start-availability'
 
 const PARSE_TIMEOUT_MS = 45_000
 const PDF_MAGIC = '%PDF'
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         candidate: {
           select: {
             id: true, firstName: true, lastName: true, country: true, summary: true,
-            skills: true, languages: true, seniority: true, yearsOfExperience: true,
+            skills: true, languages: true, seniority: true, yearsOfExperience: true, startAvailability: true,
             cvExperience: true, cvEducation: true, cvDriveId: true, deletedAt: true,
           },
         },
@@ -175,6 +176,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       positionTitle: str(position.title) || 'Open position',
       country: str(candidate.country) || null,
       seniority: null,
+      availability: availabilityLabel(candidate.startAvailability),
       yearsOfExperience: typeof years === 'number' && Number.isFinite(years) && years > 0 ? years : null,
       summary,
       skills,

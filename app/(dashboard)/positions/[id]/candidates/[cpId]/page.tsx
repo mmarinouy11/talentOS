@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { AvailabilityLabel } from '@/components/app/AvailabilityLabel'
 import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -120,7 +121,12 @@ export default async function CandidateInPositionPage({
           {candidate.seniority && <SeniorityBadge seniority={candidate.seniority} />}
           <CandidateInPositionHeader candidatePositionId={cp.id} stage={cp.stage} />
         </div>
-        <p className="text-sm text-gray-500 mt-0.5">{position.title} · {position.client}</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          {position.title} · {position.client}
+          {candidate.startAvailability && (
+            <> · Available: <AvailabilityLabel value={candidate.startAvailability} updatedAt={candidate.availabilityUpdatedAt} /></>
+          )}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-4">
