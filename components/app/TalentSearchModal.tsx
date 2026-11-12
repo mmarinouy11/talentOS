@@ -15,7 +15,6 @@ interface TalentCandidate {
   seniority: Seniority | null
   yearsOfExperience: number | null
   matchingSkills: string[]
-  matchCount: number
   redeploy?: { lwd: string | null } | null
   score?: number
   reason?: string
@@ -35,6 +34,8 @@ interface TalentSearchModalProps {
   onAdded: (added: AddedCP[]) => void
 }
 
+const SCORE_BATCH = 15
+
 const SENIORITY_LABEL: Record<Seniority, string> = {
   JUNIOR: 'Junior',
   MID: 'Mid',
@@ -48,9 +49,48 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [scoring, setScoring] = useState(false)
+  // Candidates (prefilter order) still without a real score; scored 15 at a time on request
+  const [pending, setPending] = useState<string[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Real fit scores: cached ones come back free; at most 15 new ones are computed per request
+  const scoreBatch = useCallback(async (ids: string[]) => {
+    setScoring(true)
+    setCandidates((prev) => prev.map((c) => (ids.includes(c.id) && c.score === undefined ? { ...c, scoring: true } : c)))
+    try {
+      const res = await fetch(`/api/positions/${positionId}/talent-search/score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidateIds: ids, limit: SCORE_BATCH }),
+      })
+      if (!res.ok) throw new Error('Scoring failed')
+      const data = await res.json() as { scores: { candidateId: string; score: number; reason: string }[]; pending: string[]; failed: string[] }
+      const scoreMap = new Map(data.scores.map((x) => [x.candidateId, x]))
+      setPending(data.pending ?? [])
+      setCandidates((prev) => {
+        // Scored first (best real score first); unscored keep the prefilter order below
+        const order = new Map(prev.map((c, i) => [c.id, i]))
+        return prev
+          .map((c) => {
+            const x = scoreMap.get(c.id)
+            return x ? { ...c, score: x.score, reason: x.reason, scoring: false } : { ...c, scoring: false }
+          })
+          .sort((a, b) => {
+            if (a.score !== undefined && b.score !== undefined) return b.score - a.score
+            if (a.score !== undefined) return -1
+            if (b.score !== undefined) return 1
+            return order.get(a.id)! - order.get(b.id)!
+          })
+      })
+    } catch {
+      setCandidates((prev) => prev.map((c) => ({ ...c, scoring: false })))
+      setPending((prev) => (prev.length > 0 ? prev : ids))
+    } finally {
+      setScoring(false)
+    }
+  }, [positionId])
 
   const runSearch = useCallback(async () => {
     setLoading(true)
@@ -68,48 +108,13 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
       setLoading(false)
 
       if (initial.length === 0) return
-
-      // Step 2: quick Claude scoring
-      setScoring(true)
-      const scoreRes = await fetch(`/api/positions/${positionId}/talent-search/score`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          candidates: initial.map((c) => ({
-            id: c.id,
-            skills: c.skills,
-            seniority: c.seniority,
-            yearsOfExperience: c.yearsOfExperience,
-          })),
-        }),
-      })
-
-      if (scoreRes.ok) {
-        const scoreData = await scoreRes.json()
-        const scoreMap = new Map<string, { score: number; reason: string }>(
-          (scoreData.scores ?? []).map((s: { candidateId: string; score: number; reason: string }) => [
-            s.candidateId,
-            { score: s.score, reason: s.reason },
-          ])
-        )
-        setCandidates((prev) =>
-          [...prev]
-            .map((c) => {
-              const s = scoreMap.get(c.id)
-              return s ? { ...c, score: s.score, reason: s.reason, scoring: false } : { ...c, scoring: false }
-            })
-            .sort((a, b) => (b.score ?? b.matchCount) - (a.score ?? a.matchCount))
-        )
-      } else {
-        setCandidates((prev) => prev.map((c) => ({ ...c, scoring: false })))
-      }
-      setScoring(false)
+      await scoreBatch(initial.map((c) => c.id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
       setScoring(false)
     }
-  }, [positionId])
+  }, [positionId, scoreBatch])
 
   useEffect(() => { runSearch() }, [runSearch])
 
@@ -176,8 +181,13 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
           {scoring && !loading && (
             <span className="text-xs text-gray-400 flex items-center gap-1.5">
               <span className="inline-block h-2 w-2 rounded-full bg-[#8CF000] animate-pulse" />
-              Analyzing candidates…
+              Scoring candidates…
             </span>
+          )}
+          {!scoring && !loading && pending.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => scoreBatch(pending)}>
+              Score {Math.min(SCORE_BATCH, pending.length)} more
+            </Button>
           )}
         </div>
 
@@ -260,11 +270,11 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
                       {c.scoring ? (
                         <span className="inline-block h-4 w-4 rounded-full border-2 border-gray-200 border-t-[#8CF000] animate-spin" />
                       ) : c.score !== undefined ? (
-                        <span className={`text-sm font-semibold ${c.score >= 70 ? 'text-green-700' : c.score >= 50 ? 'text-amber-600' : 'text-gray-400'}`}>
+                        <span className={`text-sm font-semibold ${c.score >= 70 ? 'text-[#2F2C29]' : c.score >= 50 ? 'text-amber-600' : 'text-gray-400'}`}>
                           {c.score}
                         </span>
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-xs text-gray-300" title="Not scored yet">—</span>
                       )}
                     </td>
                   </tr>
