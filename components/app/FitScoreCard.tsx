@@ -21,7 +21,8 @@ interface FitScoreCardProps {
     positionId: string
     title: string
     client: string
-    estimatedScore: number
+    // Real fit score for that position (same scoring as this card)
+    score: number
     reason: string | null
     // candidate-position id when the candidate is already in that position
     existingCpId: string | null
@@ -163,7 +164,7 @@ export function FitScoreCard({
             <span className="font-semibold">Better match:</span>{' '}
             <a href={`/positions/${suggestion.positionId}`} className="font-medium underline underline-offset-2 hover:text-black">{suggestion.title}</a>
             <span className="text-gray-500"> · {suggestion.client}</span>
-            <span className="text-gray-600"> — est. {suggestion.estimatedScore} vs {Math.round(fitScore)} here</span>
+            <span className="text-gray-600"> — {suggestion.score} vs {Math.round(fitScore)} here</span>
           </p>
           {suggestion.reason && <p className="text-xs text-gray-500">{suggestion.reason}</p>}
           {suggestion.existingCpId ? (
