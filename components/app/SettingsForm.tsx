@@ -29,6 +29,7 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   REDEPLOYMENT_REHIRE_VALUES: { label: 'Redeployment — Rehire Values (comma-separated)' },
   REDEPLOYMENT_PAST_DAYS: { label: 'Redeployment — Released Up To (days ago)', type: 'number', min: 0, max: 3650 },
   REDEPLOYMENT_FUTURE_DAYS: { label: 'Redeployment — Releasing Within (days)', type: 'number', min: 0, max: 3650 },
+  REDEPLOYMENT_LWD_FORMAT: { label: 'Redeployment — LWD Text Format (MDY or DMY)' },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -104,6 +105,7 @@ const DISPLAY_ORDER = [
   'REDEPLOYMENT_REHIRE_VALUES',
   'REDEPLOYMENT_PAST_DAYS',
   'REDEPLOYMENT_FUTURE_DAYS',
+  'REDEPLOYMENT_LWD_FORMAT',
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {

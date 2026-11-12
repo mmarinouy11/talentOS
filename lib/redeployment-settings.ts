@@ -8,6 +8,7 @@ export const REDEPLOYMENT_SETTING_DEFAULTS = {
   REDEPLOYMENT_REHIRE_VALUES: { value: 'Yes', description: 'Comma-separated "Open/Recommended for Rehire" values that make a person eligible (case-insensitive).' },
   REDEPLOYMENT_PAST_DAYS: { value: '90', description: 'Include people released up to this many days ago (by LWD).' },
   REDEPLOYMENT_FUTURE_DAYS: { value: '60', description: 'Include people releasing within this many days (by LWD).' },
+  REDEPLOYMENT_LWD_FORMAT: { value: 'MDY', description: 'Order of LWD dates stored as text in the roster: MDY (month/day/year) or DMY (day/month/year). Real date cells and yyyy-mm-dd are always understood.' },
 } as const
 
 export type RedeploymentSettingKey = keyof typeof REDEPLOYMENT_SETTING_DEFAULTS
@@ -34,6 +35,7 @@ export interface RedeploymentSettings {
   rehireValues: string[]
   pastDays: number
   futureDays: number
+  lwdFormat: 'MDY' | 'DMY'
 }
 
 export async function getRedeploymentSettings(): Promise<RedeploymentSettings> {
@@ -51,5 +53,6 @@ export async function getRedeploymentSettings(): Promise<RedeploymentSettings> {
     rehireValues: get('REDEPLOYMENT_REHIRE_VALUES').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     pastDays: num('REDEPLOYMENT_PAST_DAYS'),
     futureDays: num('REDEPLOYMENT_FUTURE_DAYS'),
+    lwdFormat: get('REDEPLOYMENT_LWD_FORMAT').toUpperCase() === 'DMY' ? 'DMY' : 'MDY',
   }
 }

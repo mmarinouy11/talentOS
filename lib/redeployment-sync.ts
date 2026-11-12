@@ -35,7 +35,8 @@ const COLUMNS = {
   cv: 'CV',
 } as const
 type ColumnKey = keyof typeof COLUMNS
-type RosterRow = Record<ColumnKey, string | null>
+// lwd is read separately (lwdRaw: serial number or text); the formatted lwd column is never fetched
+type RosterRow = Record<ColumnKey, string | null> & { lwdRaw?: number | string | null }
 
 export interface RedeploymentSyncSummary {
   created: number
@@ -45,6 +46,7 @@ export interface RedeploymentSyncSummary {
   outOfWindow: number
   removed: number
   cvMissing: number
+  invalidLwd: number
   errors: { rosterId: string | null; error: string }[]
   finishedAt: string
 }
@@ -86,44 +88,58 @@ async function readRoster(s: RedeploymentSettings): Promise<RosterRow[]> {
   }
   if (missing.length > 0) throw new Error(`Roster sheet is missing required headers: ${missing.join(', ')}`)
 
-  const keys = Object.keys(COLUMNS) as ColumnKey[]
+  // Every column but LWD as displayed (phones and IDs keep leading zeros and "+")
+  const keys = (Object.keys(COLUMNS) as ColumnKey[]).filter((k) => k !== 'lwd')
   const res = await sheets.spreadsheets.values.batchGet({
     spreadsheetId: s.sheetId,
     ranges: keys.map((k) => `${tab}!${letters[k]}2:${letters[k]}`),
     majorDimension: 'COLUMNS',
+    valueRenderOption: 'FORMATTED_VALUE',
+  })
+  // LWD on its own: real date cells come back as sheet serial numbers, text stays text
+  const lwdRes = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId: s.sheetId,
+    ranges: [`${tab}!${letters.lwd}2:${letters.lwd}`],
+    majorDimension: 'COLUMNS',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+    dateTimeRenderOption: 'SERIAL_NUMBER',
   })
   const columns = keys.map((_, i) => (res.data.valueRanges?.[i]?.values?.[0] ?? []) as unknown[])
-  const rowCount = Math.max(0, ...columns.map((c) => c.length))
+  const lwdColumn = (lwdRes.data.valueRanges?.[0]?.values?.[0] ?? []) as unknown[]
+  const rowCount = Math.max(0, lwdColumn.length, ...columns.map((c) => c.length))
   const rows: RosterRow[] = []
   for (let r = 0; r < rowCount; r++) {
-    const row = {} as RosterRow
+    const row = { lwd: null } as RosterRow
     keys.forEach((k, i) => {
       const v = columns[i][r]
       const t = v == null ? '' : String(v).trim()
       row[k] = t === '' ? null : t
     })
+    const lwd = lwdColumn[r]
+    row.lwdRaw = typeof lwd === 'number' ? lwd : typeof lwd === 'string' && lwd.trim() !== '' ? lwd.trim() : null
     rows.push(row)
   }
   return rows
 }
 
-// dd/mm/yyyy (or dd-mm-yyyy, dd.mm.yyyy), yyyy-mm-dd, sheet serial numbers, then a last-resort Date.parse
-export function parseLwd(raw: string | null): Date | null {
-  if (!raw) return null
-  const v = raw.trim()
-  if (/^\d+(\.\d+)?$/.test(v)) {
-    const serial = Number(v)
-    if (serial > 20000 && serial < 80000) return new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * DAY_MS)
-    return null
+// LWD: a sheet serial number (real date cell), yyyy-mm-dd text, or a/b/yyyy text read in the configured
+// order (MDY or DMY). Anything else, or an impossible date (e.g. month 13), is 'invalid' — never guessed.
+export function parseLwd(raw: number | string | null | undefined, format: 'MDY' | 'DMY'): Date | null | 'invalid' {
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'number') {
+    if (!Number.isFinite(raw) || raw < 20000 || raw > 80000) return 'invalid'
+    return new Date(Date.UTC(1899, 11, 30) + Math.floor(raw) * DAY_MS)
   }
-  let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
-  if (m) return utc(+m[1], +m[2], +m[3])
-  m = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/)
-  if (m) return utc(m[3].length === 2 ? 2000 + +m[3] : +m[3], +m[2], +m[1])
-  const t = Date.parse(v)
-  if (Number.isNaN(t)) return null
-  const d = new Date(t)
-  return utc(d.getFullYear(), d.getMonth() + 1, d.getDate())
+  const v = raw.trim()
+  let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (m) return utc(+m[1], +m[2], +m[3]) ?? 'invalid'
+  m = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})$/)
+  if (m) {
+    const year = m[3].length === 2 ? 2000 + +m[3] : +m[3]
+    const [month, day] = format === 'MDY' ? [+m[1], +m[2]] : [+m[2], +m[1]]
+    return utc(year, month, day) ?? 'invalid'
+  }
+  return 'invalid'
 }
 
 function utc(y: number, mo: number, d: number): Date | null {
@@ -325,7 +341,7 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
   const now = new Date()
   const today = todayUtc(now)
   const summary: RedeploymentSyncSummary = {
-    created: 0, linked: 0, pendingDecision: 0, updated: 0, outOfWindow: 0, removed: 0, cvMissing: 0, errors: [], finishedAt: '',
+    created: 0, linked: 0, pendingDecision: 0, updated: 0, outOfWindow: 0, removed: 0, cvMissing: 0, invalidLwd: 0, errors: [], finishedAt: '',
   }
 
   const rows = await readRoster(s)
@@ -339,9 +355,23 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
     if (!rosterId || seen.has(rosterId)) continue
     seen.add(rosterId)
     try {
-      const lwd = parseLwd(row.lwd)
-      const eligible = isEligible(row, lwd, s, today)
+      const parsedLwd = parseLwd(row.lwdRaw, s.lwdFormat)
       const existing = await db.redeploymentProfile.findUnique({ where: { rosterId } })
+      if (parsedLwd === 'invalid') {
+        // No eligibility decision on a date we can't read: new rows are skipped, known profiles keep
+        // their status and previous LWD and only refresh the other roster fields
+        summary.invalidLwd++
+        console.warn(`[redeployment] Roster ${rosterId}: invalid LWD`)
+        if (existing) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { lwd: _lwd, ...rest } = rosterFields(row, existing.lwd)
+          await db.redeploymentProfile.update({ where: { id: existing.id }, data: { ...rest, lastSyncedAt: now } })
+          summary.updated++
+        }
+        continue
+      }
+      const lwd = parsedLwd
+      const eligible = isEligible(row, lwd, s, today)
       if (!existing && !eligible) continue
 
       const fields = rosterFields(row, lwd)
