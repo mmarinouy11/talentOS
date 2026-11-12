@@ -22,6 +22,7 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   DIRECT_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Direct Applications', type: 'number', min: 0, max: 100 },
   BETTER_MATCH_MIN_DELTA: { label: 'Better Match — Minimum Score Difference', type: 'number', min: 0, max: 100 },
   BETTER_MATCH_MIN_SCORE: { label: 'Better Match — Minimum Score', type: 'number', min: 0, max: 100 },
+  BULK_UPLOAD_PRESELECT_SCORE: { label: 'Bulk CV Upload — Preselect Score', type: 'number', min: 0, max: 100 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -90,6 +91,7 @@ const DISPLAY_ORDER = [
   'DIRECT_MIN_FIT_SCORE',
   'BETTER_MATCH_MIN_DELTA',
   'BETTER_MATCH_MIN_SCORE',
+  'BULK_UPLOAD_PRESELECT_SCORE',
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {

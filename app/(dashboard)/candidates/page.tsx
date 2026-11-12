@@ -4,10 +4,13 @@ import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CandidatesDashboard } from '@/components/app/CandidatesDashboard'
+import { BulkCvUploadButton } from '@/components/app/BulkCvUploadButton'
 
 export default async function CandidatesPage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
+  const role = (session.user as { role?: string }).role
+  const canBulkUpload = role === 'RECRUITER' || role === 'ADMIN'
 
   const candidates = await db.candidate.findMany({
     where: { deletedAt: null },
@@ -76,6 +79,10 @@ export default async function CandidatesPage() {
           <p className="text-sm text-gray-500 mt-0.5">{candidates.length} total candidates</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/bulk-uploads">
+            <Button variant="outline">Bulk uploads</Button>
+          </Link>
+          {canBulkUpload && <BulkCvUploadButton />}
           <Link href="/candidates/import">
             <Button variant="outline">Import from LinkedIn</Button>
           </Link>

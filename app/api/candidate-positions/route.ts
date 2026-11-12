@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { scoreCandidateForPosition } from '@/lib/fit-scorer'
+import { addCandidateToPosition } from '@/lib/candidate-position-create'
 
 const schema = z.object({
   candidateId: z.string(),
@@ -33,31 +34,7 @@ export async function POST(request: Request) {
   const userId = (session.user as { id?: string }).id!
   const resolvedRecruiterId = recruiterId ?? userId
 
-  const cp = await db.candidatePosition.create({
-    data: {
-      candidateId,
-      positionId,
-      stage: 'APPLIED',
-      stageEnteredAt: new Date(),
-      notes,
-      recruiterId: resolvedRecruiterId,
-    },
-    select: {
-      id: true,
-      createdAt: true,
-      candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true } },
-    },
-  })
-
-  await db.stageHistory.create({
-    data: {
-      candidatePositionId: cp.id,
-      fromStage: null,
-      toStage: 'APPLIED',
-      movedById: userId,
-      notes,
-    },
-  })
+  const cp = await addCandidateToPosition({ candidateId, positionId, recruiterId: resolvedRecruiterId, movedById: userId, notes })
 
   scoreCandidateForPosition(cp.id).catch(console.error)
 

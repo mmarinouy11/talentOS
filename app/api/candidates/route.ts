@@ -1,9 +1,9 @@
-import { START_AVAILABILITY_VALUES, availabilityWriteData } from '@/lib/start-availability'
+import { START_AVAILABILITY_VALUES } from '@/lib/start-availability'
+import { createCandidateRecord } from '@/lib/candidate-create'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { normalizeLinkedinHandle } from '@/lib/linkedin'
 import { MISSING_IDENTIFIER_ERROR, findCandidateMatches, hasCandidateIdentifier, realEmailOrNull } from '@/lib/candidate-identity'
 
 const candidateSchema = z.object({
@@ -125,19 +125,14 @@ export async function POST(request: Request) {
   const { cvExperience, cvEducation, startAvailability, ...coreRest } = rest
   let candidate
   try {
-   candidate = await db.candidate.create({
-    data: {
-      ...coreRest,
-      email,
-      linkedinUrl: linkedinUrl || null,
-      linkedinHandle: normalizeLinkedinHandle(linkedinUrl),
-      cvDriveId: coreRest.cvDriveId ?? null,
-      cvOriginalName: coreRest.cvOriginalName ?? null,
-      recruiterId,
-      ...availabilityWriteData(startAvailability, null),
-      ...(Array.isArray(cvExperience) && cvExperience.length > 0 ? { cvExperience } : {}),
-      ...(Array.isArray(cvEducation) && cvEducation.length > 0 ? { cvEducation } : {}),
-    },
+   candidate = await createCandidateRecord({
+    ...coreRest,
+    email,
+    linkedinUrl,
+    recruiterId,
+    startAvailability,
+    cvExperience,
+    cvEducation,
    })
   } catch (err: unknown) {
     // Unique email/LinkedIn held by a soft-deleted candidate (not visible to the duplicate check)

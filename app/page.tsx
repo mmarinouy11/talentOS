@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { getReadyBulkUploads } from '@/lib/bulk-upload-data'
 import Link from 'next/link'
 import { DashboardShell } from '@/components/app/DashboardShell'
 import { HomeScreen } from '@/components/app/home/HomeScreen'
@@ -90,10 +91,14 @@ export default async function RootPage() {
 
   // Signed-in users get the daily home screen inside the app shell; visitors keep the landing page
   if (isAuthenticated) {
-    const data = await getHomeData()
+    const user = session.user as { id?: string; role?: string }
+    const [data, bulkUploads] = await Promise.all([
+      getHomeData(),
+      user.id ? getReadyBulkUploads(user.id, user.role === 'ADMIN') : Promise.resolve([]),
+    ])
     return (
       <DashboardShell>
-        <HomeScreen data={data} />
+        <HomeScreen data={data} bulkUploads={bulkUploads} />
       </DashboardShell>
     )
   }

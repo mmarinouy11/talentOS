@@ -148,7 +148,9 @@ function InterviewRow({ i }: { i: TodayInterview }) {
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
-export function HomeScreen({ data }: { data: HomeData }) {
+type ReadyBulkUpload = { id: string; label: string; totalFiles: number; createdBy: string }
+
+export function HomeScreen({ data, bulkUploads = [] }: { data: HomeData; bulkUploads?: ReadyBulkUpload[] }) {
   const waitingCount = data.waiting.internal.length + data.waiting.client.length
   const stalledCandidates = data.stalled.reduce((n, g) => n + g.count, 0)
   // Upcoming and past-without-decision first; interviews decided today collapse at the bottom
@@ -167,6 +169,15 @@ export function HomeScreen({ data }: { data: HomeData }) {
           <Counter label="Feedback pending" value={data.counters.feedbackPending} highlight />
           <Counter label="No next step" value={data.counters.noNextStep} highlight />
         </div>
+        {bulkUploads.map((b) => (
+          <Link key={b.id} href={`/bulk-uploads/${b.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-[#8CF000] bg-[#F5F0EB] px-4 py-3 text-sm hover:bg-[#EDE6DD] transition-colors">
+            <span className="text-[#2F2C29]">
+              <strong>Bulk upload ready to review</strong> — {b.label} · {b.totalFiles} CV{b.totalFiles === 1 ? '' : 's'}
+              <span className="text-gray-500"> · by {b.createdBy}</span>
+            </span>
+            <span className="shrink-0 font-medium text-[#2F2C29] underline underline-offset-2">Review</span>
+          </Link>
+        ))}
       </div>
 
       {/* Two columns on desktop: needs attention (≈60%) | today + bottlenecks (≈40%) */}

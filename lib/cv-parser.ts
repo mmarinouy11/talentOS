@@ -59,7 +59,38 @@ function isGlyphGarbage(text: string): boolean {
   return tokens.filter((t) => t.length <= 1).length / tokens.length > 0.6
 }
 
-export async function parseCvFromBuffer(buffer: Buffer): Promise<ParsedCv> {
+// Scanned PDF that could not be rendered to images: send the PDF itself to Claude as a document
+async function parsePdfAsDocument(buffer: Buffer): Promise<ParsedCv> {
+  const response = await getAnthropic().messages.create({
+    model: MODELS.SMART,
+    max_tokens: 4096,
+    system: CV_PARSE_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buffer.toString('base64') } },
+        { type: 'text', text: 'Parse this CV and return the structured JSON.' },
+      ],
+    }],
+  })
+  const block = response.content[0]
+  if (block.type !== 'text') throw new Error('Unexpected document response type')
+  const clean = block.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+  return JSON.parse(clean) as ParsedCv
+}
+
+export async function parseCvFromBuffer(buffer: Buffer, kind: 'pdf' | 'docx' = 'pdf'): Promise<ParsedCv> {
+  if (kind === 'docx') {
+    const mammoth = await import('mammoth')
+    const text = (await mammoth.extractRawText({ buffer })).value
+    if (text.trim().length < 20) throw new Error('Could not extract text from this DOCX file.')
+    return callClaudeJSON<ParsedCv>(
+      `Parse this CV and return the structured JSON:\n\n${text.slice(0, 8000)}`,
+      'FAST',
+      CV_PARSE_SYSTEM_PROMPT
+    )
+  }
+
   let text = ''
   try {
     text = await extractPdfText(buffer)
@@ -70,8 +101,8 @@ export async function parseCvFromBuffer(buffer: Buffer): Promise<ParsedCv> {
   const useVision = text.trim().length < MIN_TEXT_LENGTH || isGlyphGarbage(text)
 
   if (useVision) {
-    const pageImages = await renderPdfToImages(buffer, 6)
-    if (pageImages.length === 0) throw new Error('Could not render PDF pages for extraction.')
+    const pageImages = await renderPdfToImages(buffer, 6).catch(() => [] as Buffer[])
+    if (pageImages.length === 0) return parsePdfAsDocument(buffer)
 
     const anthropic = getAnthropic()
     const imageBlocks = pageImages.map((buf) => ({
