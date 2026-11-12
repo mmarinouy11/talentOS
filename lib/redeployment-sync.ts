@@ -171,13 +171,31 @@ function rosterFields(row: RosterRow, lwd: Date | null): Omit<Prisma.Redeploymen
   }
 }
 
-// Exact name first, then case-insensitive contains
-function findCvFile(files: DriveFolderFile[], name: string | null): DriveFolderFile | null {
+// The CV column may hold an AppSheet path ("Roster_Files_/Juan_Perez_CV.pdf"): match on the file name only.
+// Exact name first; the case-insensitive "contains" fallback counts only when it matches exactly one file.
+function findCvFile(files: DriveFolderFile[], raw: string | null, rosterId: string): DriveFolderFile | null {
+  const name = raw?.split('/').pop()?.trim()
   if (!name) return null
   const exact = files.find((f) => f.name === name)
   if (exact) return exact
   const lower = name.toLowerCase()
-  return files.find((f) => f.name.toLowerCase().includes(lower)) ?? null
+  const partial = files.filter((f) => f.name.toLowerCase().includes(lower))
+  if (partial.length === 1) return partial[0]
+  if (partial.length > 1) console.warn(`[redeployment] Roster ${rosterId}: ambiguous CV match (${partial.length} files)`)
+  return null
+}
+
+// Never read CVs from TalentOS's own CV folder by mistake
+function assertCvFolderIsNotOurs(s: RedeploymentSettings) {
+  const ours = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim()
+  if (s.cvFolderId && ours && s.cvFolderId === ours) {
+    throw new Error('REDEPLOYMENT_CV_FOLDER_ID points to the TalentOS CV folder (GOOGLE_DRIVE_FOLDER_ID). Set it to the roster CV folder in /settings.')
+  }
+}
+
+// Empty REDEPLOYMENT_CV_FOLDER_ID: CV lookup is skipped (rows count as cvMissing)
+async function listRosterCvFiles(s: RedeploymentSettings): Promise<DriveFolderFile[]> {
+  return s.cvFolderId ? listDriveFolderFiles(s.cvFolderId) : []
 }
 
 function cvKind(file: { name: string; mimeType: string }): 'pdf' | 'docx' | null {
@@ -303,6 +321,7 @@ export async function runRedeploymentSync(opts: { recruiterId?: string } = {}): 
 
 async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSummary> {
   const s = await getRedeploymentSettings()
+  assertCvFolderIsNotOurs(s)
   const now = new Date()
   const today = todayUtc(now)
   const summary: RedeploymentSyncSummary = {
@@ -311,7 +330,7 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
 
   const rows = await readRoster(s)
   let files: DriveFolderFile[] | null = null
-  const cvFiles = async () => (files ??= await listDriveFolderFiles(s.cvFolderId))
+  const cvFiles = async () => (files ??= await listRosterCvFiles(s))
   const recruiterId = opts.recruiterId ?? await defaultRecruiterId()
 
   const seen = new Set<string>()
@@ -329,7 +348,7 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
       if (existing) {
         const status = eligible ? 'ACTIVE' : 'OUT_OF_WINDOW'
         // Roster CV reference for linked candidates; their own CV is never replaced
-        const cv = fields.cvFileName ? findCvFile(await cvFiles(), fields.cvFileName) : null
+        const cv = fields.cvFileName ? findCvFile(await cvFiles(), fields.cvFileName, rosterId) : null
         const updated = await db.redeploymentProfile.update({
           where: { id: existing.id },
           data: { ...fields, status, lastSyncedAt: now, sourceCvDriveFileId: cv?.id ?? existing.sourceCvDriveFileId },
@@ -341,7 +360,7 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
         continue
       }
 
-      const cv = findCvFile(await cvFiles(), fields.cvFileName ?? null)
+      const cv = findCvFile(await cvFiles(), fields.cvFileName ?? null, rosterId)
       const profile = await db.redeploymentProfile.create({
         data: { ...fields, rosterId, status: 'ACTIVE', lastSyncedAt: now, sourceCvDriveFileId: cv?.id ?? null },
       })
@@ -393,7 +412,8 @@ export async function decideRedeploymentProfile(profileId: string, decision: 'sa
     return
   }
   const s = await getRedeploymentSettings()
-  const cv = profile.cvFileName ? findCvFile(await listDriveFolderFiles(s.cvFolderId), profile.cvFileName) : null
+  assertCvFolderIsNotOurs(s)
+  const cv = profile.cvFileName ? findCvFile(await listRosterCvFiles(s), profile.cvFileName, profile.rosterId) : null
   const { candidateId } = await createCandidateFromProfile(profile, recruiterId, cv)
   await db.redeploymentProfile.update({ where: { id: profileId }, data: { candidateId, possibleDuplicateOfId: null, parsedSnapshot: Prisma.DbNull } })
 }
