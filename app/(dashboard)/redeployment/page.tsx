@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getLastSyncSummary } from '@/lib/redeployment-sync'
+import { getAssignablePositionsForCandidates } from '@/lib/assignable-positions'
 import { RedeploymentTable, type RedeploymentRow } from '@/components/app/RedeploymentTable'
 import { RedeploymentSyncButton } from '@/components/app/RedeploymentSyncButton'
 
@@ -12,7 +13,7 @@ export default async function RedeploymentPage() {
   const isAdmin = role === 'ADMIN'
   const canAct = isAdmin || role === 'RECRUITER'
 
-  const [profiles, positions, lastSync] = await Promise.all([
+  const [profiles, lastSync] = await Promise.all([
     db.redeploymentProfile.findMany({
       orderBy: [{ lwd: 'asc' }],
       include: {
@@ -27,13 +28,11 @@ export default async function RedeploymentPage() {
         },
       },
     }),
-    db.position.findMany({
-      where: { deletedAt: null, status: 'OPEN' },
-      orderBy: [{ client: 'asc' }, { title: 'asc' }],
-      select: { id: true, title: true, client: true },
-    }),
     getLastSyncSummary(),
   ])
+
+  const linkedIds = profiles.map((p) => p.candidateId).filter((x): x is string => !!x)
+  const assignable = await getAssignablePositionsForCandidates(linkedIds)
 
   const dupIds = profiles.map((p) => p.possibleDuplicateOfId).filter((x): x is string => !!x)
   const dups = await db.candidate.findMany({ where: { id: { in: dupIds } }, select: { id: true, firstName: true, lastName: true, email: true } })
@@ -61,6 +60,7 @@ export default async function RedeploymentPage() {
       pipelines: candidate?.candidatePositions.map((cp) => ({ cpId: cp.id, positionId: cp.position.id, title: cp.position.title, client: cp.position.client, stage: cp.stage })) ?? [],
       rosterCvId: p.sourceCvDriveFileId,
       duplicateOf: !p.candidateId && dup ? { id: dup.id, name: `${dup.firstName} ${dup.lastName}`.trim(), email: dup.email } : null,
+      assignable: candidate ? assignable.get(candidate.id) ?? [] : [],
       noEmail: !p.candidateId && !p.possibleDuplicateOfId && !p.personalEmail && !p.workEmail,
     }
   })
@@ -81,7 +81,7 @@ export default async function RedeploymentPage() {
         </div>
         {isAdmin && <RedeploymentSyncButton />}
       </div>
-      <RedeploymentTable rows={rows} positions={positions} canAct={canAct} />
+      <RedeploymentTable rows={rows} canAct={canAct} />
     </div>
   )
 }

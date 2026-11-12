@@ -24,15 +24,16 @@ export interface RedeploymentRow {
   pipelines: { cpId: string; positionId: string; title: string; client: string; stage: string }[]
   rosterCvId: string | null
   duplicateOf: { id: string; name: string; email: string | null } | null
+  // Open, not fulfilled, requisition or proactive, and not already linked to this candidate (lib/assignable-positions)
+  assignable: { id: string; title: string; client: string; type: 'REQUISITION' | 'PROACTIVE' }[]
   noEmail: boolean
 }
 
-type Position = { id: string; title: string; client: string }
 type Timing = 'all' | 'soon' | 'released'
 
 const selectCls = 'rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-[#2F2C29] focus:outline-none'
 
-export function RedeploymentTable({ rows, positions, canAct }: { rows: RedeploymentRow[]; positions: Position[]; canAct: boolean }) {
+export function RedeploymentTable({ rows, canAct }: { rows: RedeploymentRow[]; canAct: boolean }) {
   const router = useRouter()
   const [status, setStatus] = useState<'ACTIVE' | 'OUT_OF_WINDOW' | 'REMOVED' | 'ALL'>('ACTIVE')
   const [skill, setSkill] = useState('')
@@ -182,15 +183,23 @@ export function RedeploymentTable({ rows, positions, canAct }: { rows: Redeploym
                     </div>
                   )}
                   {r.noEmail && <span className="text-gray-500">No email in the roster — add one in the sheet; the next sync creates the candidate.</span>}
-                  {r.candidateId && canAct && r.status === 'ACTIVE' && (
+                  {r.candidateId && canAct && r.status === 'ACTIVE' && r.assignable.length === 0 && (
+                    <span className="text-gray-400">No open positions to add to</span>
+                  )}
+                  {r.candidateId && canAct && r.status === 'ACTIVE' && r.assignable.length > 0 && (
+                    <div className="space-y-1">
                     <div className="flex gap-1.5">
                       <select className={`${selectCls} text-xs py-1 max-w-[160px]`} value={target[r.id] ?? ''} onChange={(e) => setTarget((t) => ({ ...t, [r.id]: e.target.value }))} aria-label={`Position for ${r.name}`}>
                         <option value="">Add to position…</option>
-                        {positions.filter((p) => !r.pipelines.some((x) => x.positionId === p.id)).map((p) => (
-                          <option key={p.id} value={p.id}>{p.title} · {p.client}</option>
+                        {r.assignable.map((p) => (
+                          <option key={p.id} value={p.id}>{p.title} · {p.client}{p.type === 'PROACTIVE' ? ' (Proactive)' : ''}</option>
                         ))}
                       </select>
                       <Button size="sm" onClick={() => addToPosition(r)} disabled={!target[r.id] || busyRow !== null}>{busyRow === r.id ? '…' : 'Add'}</Button>
+                    </div>
+                    {r.assignable.find((p) => p.id === target[r.id])?.type === 'PROACTIVE' && (
+                      <span className="inline-flex rounded-full bg-[#F5F0EB] px-2 py-0.5 text-xs font-medium text-[#2F2C29]">Proactive</span>
+                    )}
                     </div>
                   )}
                   {rowMsg[r.id]?.text && <p className={`mt-1 ${rowMsg[r.id].error ? 'text-red-600' : 'text-gray-600'}`}>{rowMsg[r.id].text}</p>}
