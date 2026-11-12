@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { RedeployBadge, LwdChip } from './RedeployBadge'
 import { Button } from '@/components/ui/button'
 
 type Seniority = 'JUNIOR' | 'MID' | 'SENIOR' | 'STAFF' | 'PRINCIPAL'
@@ -15,6 +16,7 @@ interface TalentCandidate {
   yearsOfExperience: number | null
   matchingSkills: string[]
   matchCount: number
+  redeploy?: { lwd: string | null } | null
   score?: number
   reason?: string
   scoring?: boolean
@@ -230,7 +232,10 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
                       />
                     </td>
                     <td className="py-3 px-3">
-                      <p className="font-medium text-gray-900">{c.firstName} {c.lastName}</p>
+                      <p className="font-medium text-gray-900 flex items-center gap-1.5 flex-wrap">
+                        {c.firstName} {c.lastName}
+                        {c.redeploy && <><RedeployBadge /><LwdChip lwd={c.redeploy.lwd} /></>}
+                      </p>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {c.seniority ? SENIORITY_LABEL[c.seniority] : null}
                         {c.seniority && c.country ? ' · ' : ''}

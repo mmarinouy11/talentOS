@@ -284,14 +284,15 @@ export async function GET(req: NextRequest) {
       JOIN "Candidate" c ON c.id = cp."candidateId"
       WHERE cp."createdAt" >= ${monthStart} AND cp."createdAt" <= ${monthEnd}
     `
-    const actSourcingMap = new Map<string, { manual: number; direct: number; partner: number }>()
+    const actSourcingMap = new Map<string, { manual: number; direct: number; partner: number; redeployment: number }>()
     for (const cp of cpActivityRaw) {
       if (!cp.recruiterId) continue
-      if (!actSourcingMap.has(cp.recruiterId)) actSourcingMap.set(cp.recruiterId, { manual: 0, direct: 0, partner: 0 })
+      if (!actSourcingMap.has(cp.recruiterId)) actSourcingMap.set(cp.recruiterId, { manual: 0, direct: 0, partner: 0, redeployment: 0 })
       const e = actSourcingMap.get(cp.recruiterId)!
       if (cp.sourcedByType === 'RECRUITER') e.manual++
       else if (cp.sourcedByType === 'OTHER') e.direct++
       else if (cp.sourcedByType === 'VENDOR') e.partner++
+      else if (cp.sourcedByType === 'REDEPLOYMENT') e.redeployment++
     }
 
     const fitScoresRaw = await db.$queryRaw<{ recruiterId: string; avg_fit: number | null }[]>`
@@ -465,7 +466,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Activity section
-      const sourcing = actSourcingMap.get(rid) ?? { manual: 0, direct: 0, partner: 0 }
+      const sourcing = actSourcingMap.get(rid) ?? { manual: 0, direct: 0, partner: 0, redeployment: 0 }
       const myIv = ivInMonth.filter((i) => i.recruiterId === rid)
       const screenIvs = myIv.filter((i) => i.stage === 'SCREENING')
       const actAdv = screenIvs.filter((i) => i.decision === 'ADVANCE').length
@@ -536,6 +537,7 @@ export async function GET(req: NextRequest) {
           manual: sourcing.manual,
           direct: sourcing.direct,
           partner: sourcing.partner,
+          redeployment: sourcing.redeployment,
           interviewsScheduled: myIv.length,
           screeningHrsPerDay: Math.round((screenIvs.length * 30 / 60 / workingDays) * 10) / 10,
           advances: actAdv,

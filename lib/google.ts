@@ -68,3 +68,37 @@ export async function trashDriveFileQuietly(fileId: string | null | undefined, c
     console.error(`[${context}] Failed to move Drive file ${fileId} to trash:`, err)
   }
 }
+
+// Read-only Sheets client on the same service account (redeployment roster)
+export function getSheetsClient() {
+  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY!)
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  })
+  return google.sheets({ version: 'v4', auth })
+}
+
+export type DriveFolderFile = { id: string; name: string; mimeType: string }
+
+// All non-trashed files directly in a folder (works for Shared Drives)
+export async function listDriveFolderFiles(folderId: string): Promise<DriveFolderFile[]> {
+  const drive = getDriveClient()
+  const files: DriveFolderFile[] = []
+  let pageToken: string | undefined
+  do {
+    const res = await drive.files.list({
+      q: `'${folderId.replace(/'/g, "\\'")}' in parents and trashed = false`,
+      fields: 'nextPageToken, files(id, name, mimeType)',
+      pageSize: 1000,
+      pageToken,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    })
+    for (const f of res.data.files ?? []) {
+      if (f.id && f.name) files.push({ id: f.id, name: f.name, mimeType: f.mimeType ?? '' })
+    }
+    pageToken = res.data.nextPageToken ?? undefined
+  } while (pageToken)
+  return files
+}

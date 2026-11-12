@@ -4,5 +4,7 @@ export async function register() {
     startReportingCron()
     const { startBulkUploadWorker } = await import('./lib/bulk-upload-worker')
     startBulkUploadWorker()
+    const { startRedeploymentCron } = await import('./lib/redeployment-cron')
+    startRedeploymentCron()
   }
 }

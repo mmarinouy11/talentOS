@@ -46,6 +46,7 @@ function sourceLabel(type: SourceType | null): string {
   if (type === 'VENDOR') return 'Partner'
   if (type === 'RECRUITER') return 'Internal'
   if (type === 'OTHER') return 'Direct'
+  if (type === 'REDEPLOYMENT') return 'Redeployment'
   return 'Internal'
 }
 

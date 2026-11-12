@@ -22,6 +22,7 @@ function sourceLabel(type: SourceType | null | undefined): string {
   if (type === 'RECRUITER') return 'Internal'
   if (type === 'DIRECT') return 'Direct'
   if (type === 'REFERRAL') return 'Referral'
+  if (type === 'REDEPLOYMENT') return 'Redeployment'
   return 'Internal'
 }
 

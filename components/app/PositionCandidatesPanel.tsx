@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { RedeployBadge, LwdChip } from './RedeployBadge'
 import { AvailabilityLabel } from './AvailabilityLabel'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -223,6 +224,8 @@ interface CandidatePosition {
     seniority: string | null
     startAvailability?: string | null
     availabilityUpdatedAt?: string | null
+    // Set (possibly '') for an ACTIVE redeployment profile
+    redeployLwd?: string | null
   }
 }
 
@@ -468,6 +471,9 @@ export function PositionCandidatesPanel({ positionId, positionTitle = '', positi
           <Link href={`/positions/${positionId}/candidates/${cp.id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
             {cp.candidate.firstName} {cp.candidate.lastName}
           </Link>
+          {cp.candidate.redeployLwd != null && (
+            <span className="ml-1.5 inline-flex gap-1 align-middle"><RedeployBadge />{cp.candidate.redeployLwd && <LwdChip lwd={cp.candidate.redeployLwd} />}</span>
+          )}
           {cp.compensationOutOfRange && (
             <span className="ml-1.5 text-red-600" title="Compensation out of range">💰</span>
           )}

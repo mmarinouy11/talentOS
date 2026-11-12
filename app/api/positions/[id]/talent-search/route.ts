@@ -42,7 +42,8 @@ export async function POST(
     where: {
       deletedAt: null,
       id: { notIn: [...excluded] },
-      skills: { isEmpty: false },
+      // Redeployment people are included even when their CV gave no skills (roster skills are used instead)
+      OR: [{ skills: { isEmpty: false } }, { redeploymentProfile: { status: 'ACTIVE' } }],
     },
     select: {
       id: true,
@@ -52,6 +53,7 @@ export async function POST(
       skills: true,
       seniority: true,
       yearsOfExperience: true,
+      redeploymentProfile: { select: { status: true, lwd: true, primarySkill: true, subSkill: true } },
     },
   })
 
@@ -65,6 +67,8 @@ export async function POST(
     yearsOfExperience: number | null
     matchingSkills: string[]
     matchCount: number
+    // ACTIVE redeployment profile only; no score boost
+    redeploy: { lwd: string | null } | null
   }
 
   const matches: Match[] = []
@@ -77,7 +81,8 @@ export async function POST(
     }
 
     // Skills overlap
-    const candidateSkillsLower = c.skills.map((s) => s.toLowerCase())
+    const rp = c.redeploymentProfile?.status === 'ACTIVE' ? c.redeploymentProfile : null
+    const candidateSkillsLower = [...c.skills, ...(rp ? [rp.primarySkill, rp.subSkill].filter((s): s is string => !!s) : [])].map((s) => s.toLowerCase())
     const matchingSkills: string[] = []
     for (const jdSkill of jdSkillsLower) {
       if (candidateSkillsLower.some((cs) => cs.includes(jdSkill) || jdSkill.includes(cs))) {
@@ -97,6 +102,7 @@ export async function POST(
       yearsOfExperience: c.yearsOfExperience,
       matchingSkills,
       matchCount: matchingSkills.length,
+      redeploy: rp ? { lwd: rp.lwd?.toISOString() ?? null } : null,
     })
   }
 

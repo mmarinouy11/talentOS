@@ -58,7 +58,7 @@ export default async function EditCandidatePage({
           minimumCompensation: candidate.minimumCompensation,
           skills: candidate.skills,
           languages: candidate.languages,
-          sourcedByType: (candidate.sourcedByType === 'DIRECT' ? 'OTHER' : candidate.sourcedByType) as 'RECRUITER' | 'VENDOR' | 'OTHER' | null,
+          sourcedByType: (candidate.sourcedByType === 'DIRECT' ? 'OTHER' : candidate.sourcedByType) as 'RECRUITER' | 'VENDOR' | 'OTHER' | 'REDEPLOYMENT' | null,
           sourcedByUserId: candidate.sourcedByUserId,
           sourcedByVendorId: candidate.sourcedByVendorId,
           sourcedByOther: candidate.sourcedByOther,

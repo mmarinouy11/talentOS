@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { RedeployBadge, LwdChip } from '@/components/app/RedeployBadge'
 import { AvailabilityLabel } from '@/components/app/AvailabilityLabel'
 import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
@@ -9,7 +10,8 @@ import { SkillTags } from '@/components/app/SkillTags'
 import { CandidateDetailClient } from '@/components/app/CandidateDetailClient'
 import { CvSection } from '@/components/app/CvSection'
 
-function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' | 'DIRECT' | 'REFERRAL' }) {
+function SourceBadge({ type }: { type: 'RECRUITER' | 'VENDOR' | 'OTHER' | 'DIRECT' | 'REFERRAL' | 'REDEPLOYMENT' }) {
+  if (type === 'REDEPLOYMENT') return <RedeployBadge />
   const config = {
     RECRUITER: { label: 'Internal', className: 'bg-blue-100 text-blue-700' },
     VENDOR: { label: 'Partner', className: 'bg-purple-100 text-purple-700' },
@@ -46,6 +48,7 @@ export default async function CandidateDetailPage({
       },
       sourcedByUser: { select: { id: true, name: true, email: true } },
       sourcedByVendor: { select: { id: true, name: true } },
+      redeploymentProfile: true,
       recruiter: { select: { id: true, name: true, email: true } },
     },
   })
@@ -149,6 +152,9 @@ export default async function CandidateDetailPage({
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sourced By</p>
+                {candidate.redeploymentProfile?.status === 'ACTIVE' && candidate.sourcedByType !== 'REDEPLOYMENT' && (
+                  <div className="mt-0.5 flex items-center gap-2"><RedeployBadge /><LwdChip lwd={candidate.redeploymentProfile.lwd} /></div>
+                )}
                 <div className="mt-0.5">
                   {!candidate.sourcedByType ? (
                     <p className="text-gray-400">Not specified</p>
@@ -187,6 +193,11 @@ export default async function CandidateDetailPage({
                       )}
                       <SourceBadge type="REFERRAL" />
                     </div>
+                  ) : candidate.sourcedByType === 'REDEPLOYMENT' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-900">Redeployment</span>
+                      <SourceBadge type="REDEPLOYMENT" />
+                    </div>
                   ) : candidate.sourcedByType === 'DIRECT' ? (
                     <div className="flex items-center gap-2">
                       <span className="text-gray-900">Direct Application</span>
@@ -216,6 +227,30 @@ export default async function CandidateDetailPage({
               )}
             </div>
           </div>
+
+          {candidate.redeploymentProfile && (() => {
+            const rp = candidate.redeploymentProfile
+            const statusLabel = rp.status === 'ACTIVE' ? 'Active' : rp.status === 'OUT_OF_WINDOW' ? 'Out of window' : 'Removed from roster'
+            return (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-medium text-gray-900">Redeployment</h2>
+                  <RedeployBadge />
+                  <LwdChip lwd={rp.lwd} />
+                </div>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div><dt className="text-xs text-gray-500">Last role</dt><dd className="text-gray-900">{rp.lastJobTitle ?? '—'}</dd></div>
+                  <div><dt className="text-xs text-gray-500">Last client</dt><dd className="text-gray-900">{rp.lastClient ?? '—'}</dd></div>
+                  <div><dt className="text-xs text-gray-500">Grade</dt><dd className="text-gray-900">{rp.grade ?? '—'}</dd></div>
+                  <div><dt className="text-xs text-gray-500">LWD</dt><dd className="text-gray-900">{rp.lwd ? rp.lwd.toLocaleDateString('en-US', { timeZone: 'UTC', dateStyle: 'medium' }) : '—'}</dd></div>
+                  <div><dt className="text-xs text-gray-500">Status</dt><dd className="text-gray-900">{statusLabel}</dd></div>
+                  {rp.sourceCvDriveFileId && (
+                    <div><dt className="text-xs text-gray-500">Roster CV</dt><dd><a href={`https://drive.google.com/file/d/${rp.sourceCvDriveFileId}/view`} target="_blank" rel="noopener noreferrer" className="text-gray-900 underline underline-offset-2">Open</a></dd></div>
+                  )}
+                </dl>
+              </div>
+            )
+          })()}
 
           <CvSection
             candidateId={id}
