@@ -21,6 +21,7 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   VENDOR_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Partner Submissions', type: 'number', min: 0, max: 100 },
   DIRECT_MIN_FIT_SCORE: { label: 'Minimum Fit Score — Direct Applications', type: 'number', min: 0, max: 100 },
   BETTER_MATCH_MIN_DELTA: { label: 'Better Match — Minimum Score Difference', type: 'number', min: 0, max: 100 },
+  BETTER_MATCH_MIN_SCORE: { label: 'Better Match — Minimum Score', type: 'number', min: 0, max: 100 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -88,6 +89,7 @@ const DISPLAY_ORDER = [
   'VENDOR_MIN_FIT_SCORE',
   'DIRECT_MIN_FIT_SCORE',
   'BETTER_MATCH_MIN_DELTA',
+  'BETTER_MATCH_MIN_SCORE',
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {

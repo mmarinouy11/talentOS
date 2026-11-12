@@ -3,27 +3,28 @@
 //   npx tsx scripts/recompute-better-match.ts           dry run (default): print the table, change no suggestion
 //   npx tsx scripts/recompute-better-match.ts --apply   keep passing suggestions with their real score, clear the rest
 //
-// A suggestion is kept only if real(suggested) >= round(current fitScore) + BETTER_MATCH_MIN_DELTA and the
+// A suggestion is kept only if real(suggested) >= round(current fitScore) + BETTER_MATCH_MIN_DELTA, real(suggested) >=
+// the floor (suggested position's vendor/direct minimum for the candidate's source, else BETTER_MATCH_MIN_SCORE), and the
 // suggested position is OPEN, not deleted and not fulfilled. The current score is CandidatePosition.fitScore,
 // i.e. what the Fit Score panel shows. Real scores missing from FitScoreCache are computed with Claude and
 // cached, also in a dry run (the cache is not a suggestion and keeps later scorings consistent).
 import { db } from '../lib/db'
-import { getOrComputeFitScore, getBetterMatchMinDelta } from '../lib/fit-scorer'
+import { getOrComputeFitScore, getBetterMatchMinDelta, getBetterMatchMinScore, betterMatchFloor, passesBetterMatch } from '../lib/fit-scorer'
 import { HIRED_CANDIDATE_POSITION_WHERE, isPositionFulfilled } from '../lib/position-fulfillment'
 
 const apply = process.argv.includes('--apply')
 
 async function main() {
-  const minDelta = await getBetterMatchMinDelta()
+  const [minDelta, minScore] = await Promise.all([getBetterMatchMinDelta(), getBetterMatchMinScore()])
   const cps = await db.candidatePosition.findMany({
     where: { suggestedPositionId: { not: null } },
     select: {
       id: true, candidateId: true, fitScore: true, suggestedPositionId: true, suggestedPositionScore: true,
-      candidate: { select: { firstName: true, lastName: true } },
+      candidate: { select: { firstName: true, lastName: true, sourcedByType: true } },
     },
     orderBy: { createdAt: 'asc' },
   })
-  console.log(`${apply ? 'APPLY' : 'DRY RUN'} — ${cps.length} stored suggestion(s), BETTER_MATCH_MIN_DELTA = ${minDelta}\n`)
+  console.log(`${apply ? 'APPLY' : 'DRY RUN'} — ${cps.length} stored suggestion(s), BETTER_MATCH_MIN_DELTA = ${minDelta}, BETTER_MATCH_MIN_SCORE = ${minScore}\n`)
 
   const rows: Record<string, string | number>[] = []
   let kept = 0, cleared = 0, failed = 0
@@ -33,7 +34,7 @@ async function main() {
     const current = cp.fitScore != null ? Math.round(cp.fitScore) : null
     const pos = await db.position.findFirst({
       where: { id: cp.suggestedPositionId!, deletedAt: null, status: 'OPEN' },
-      select: { title: true, headcount: true, _count: { select: { candidatePositions: { where: HIRED_CANDIDATE_POSITION_WHERE } } } },
+      select: { title: true, headcount: true, vendorMinFitScore: true, directMinFitScore: true, _count: { select: { candidatePositions: { where: HIRED_CANDIDATE_POSITION_WHERE } } } },
     })
     const available = !!pos && !isPositionFulfilled(pos.headcount, pos._count.candidatePositions)
 
@@ -48,12 +49,16 @@ async function main() {
       continue // leave untouched; re-run later
     }
 
-    const keep = available && current != null && real != null && real >= current + minDelta
-    const note = !available ? 'position not open/fulfilled' : current == null ? 'no current score' : ''
+    const floor = pos ? betterMatchFloor(pos, cp.candidate.sourcedByType, minScore) : minScore
+    const keep = available && current != null && real != null && passesBetterMatch(real, current, minDelta, floor)
+    const note = !available ? 'position not open/fulfilled'
+      : current == null ? 'no current score'
+      : real != null && real < floor ? `below floor ${floor}`
+      : real != null && real < current + minDelta ? `delta < ${minDelta}` : ''
     keep ? kept++ : cleared++
     rows.push({
       candidate: name, position: pos?.title ?? '(gone)', current: current ?? '-',
-      oldEstimate: cp.suggestedPositionScore ?? '-', realSuggested: real ?? '-',
+      oldEstimate: cp.suggestedPositionScore ?? '-', realSuggested: real ?? '-', floor,
       result: keep ? 'kept' : 'cleared', note,
     })
 

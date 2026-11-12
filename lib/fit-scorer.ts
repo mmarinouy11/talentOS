@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import type { Prisma } from '@prisma/client'
+import type { Prisma, SourceType } from '@prisma/client'
 import { db } from './db'
 import { callClaudeJSON, MODELS } from './anthropic'
 import { locationAllowed } from './location'
@@ -47,12 +47,15 @@ export interface FitScoreResult {
 
 // Default minimum points a suggested position's real score must beat the current one by (SystemSettings BETTER_MATCH_MIN_DELTA)
 export const BETTER_MATCH_MIN_DELTA_DEFAULT = 8
+// Default absolute floor for a suggested position's real score (SystemSettings BETTER_MATCH_MIN_SCORE)
+export const BETTER_MATCH_MIN_SCORE_DEFAULT = 70
 // Positions the cheap shortlist step may pass on to real scoring
 const SHORTLIST_SIZE = 2
 
 type ScoringCandidate = {
   id: string; firstName: string; lastName: string; seniority: string | null; yearsOfExperience: number | null
   skills: string[]; languages: string[]; summary: string | null; country: string | null; cvDriveId: string | null
+  sourcedByType?: SourceType | null
 }
 type ScoringPosition = {
   id: string; title: string; client: string; coreSkills: string[]; jdSkills: string[]; jdSeniority: string | null
@@ -154,17 +157,45 @@ export async function getOrComputeFitScore(candidateId: string, positionId: stri
   return result
 }
 
-export async function getBetterMatchMinDelta(): Promise<number> {
-  const row = await db.systemSettings.findUnique({ where: { key: 'BETTER_MATCH_MIN_DELTA' } })
+async function numberSetting(key: string, fallback: number): Promise<number> {
+  const row = await db.systemSettings.findUnique({ where: { key } })
   const n = row ? Number(row.value) : NaN
-  return Number.isFinite(n) && n >= 0 ? n : BETTER_MATCH_MIN_DELTA_DEFAULT
+  return Number.isFinite(n) && n >= 0 ? n : fallback
+}
+
+export function getBetterMatchMinDelta(): Promise<number> {
+  return numberSetting('BETTER_MATCH_MIN_DELTA', BETTER_MATCH_MIN_DELTA_DEFAULT)
+}
+
+export function getBetterMatchMinScore(): Promise<number> {
+  return numberSetting('BETTER_MATCH_MIN_SCORE', BETTER_MATCH_MIN_SCORE_DEFAULT)
+}
+
+// Absolute floor for suggesting a position: its own minimum for the candidate's source
+// (vendor/referral → vendorMinFitScore, direct → directMinFitScore), else BETTER_MATCH_MIN_SCORE
+export function betterMatchFloor(
+  position: { vendorMinFitScore: number | null; directMinFitScore: number | null },
+  sourcedByType: SourceType | null | undefined,
+  fallback: number,
+): number {
+  if (sourcedByType === 'VENDOR' || sourcedByType === 'REFERRAL') return position.vendorMinFitScore ?? fallback
+  if (sourcedByType === 'DIRECT') return position.directMinFitScore ?? fallback
+  return fallback
+}
+
+// The better-match rule, shared by scoring and scripts/recompute-better-match.ts
+export function passesBetterMatch(realSuggested: number, currentScore: number, minDelta: number, floor: number): boolean {
+  return realSuggested >= Math.round(currentScore) + minDelta && realSuggested >= floor
 }
 
 const MAX_OTHER_POSITIONS = 10
 // A suggested position must beat the current one by at least this many points
 const SUGGESTION_MIN_DELTA = 10
 
-type OtherPosition = { id: string; title: string; seniority: string | null; coreSkills: string[]; topSkills: string[] }
+type OtherPosition = {
+  id: string; title: string; seniority: string | null; coreSkills: string[]; topSkills: string[]
+  vendorMinFitScore: number | null; directMinFitScore: number | null
+}
 
 // Other OPEN positions (requisition or proactive, not fulfilled) the candidate could fit: location allows
 // their country and at least one JD/core skill overlaps their skills. Most overlap first, max 10.
@@ -181,6 +212,7 @@ async function findOtherPositions(
     where: { deletedAt: null, status: 'OPEN', type: { in: ['REQUISITION', 'PROACTIVE'] }, id: { not: currentPositionId } },
     select: {
       id: true, title: true, headcount: true, location: true, jdSeniority: true, coreSkills: true, jdSkills: true,
+      vendorMinFitScore: true, directMinFitScore: true,
       _count: { select: { candidatePositions: { where: HIRED_CANDIDATE_POSITION_WHERE } } },
     },
   })
@@ -197,6 +229,8 @@ async function findOtherPositions(
     .slice(0, MAX_OTHER_POSITIONS)
     .map(({ p }) => ({
       id: p.id,
+      vendorMinFitScore: p.vendorMinFitScore,
+      directMinFitScore: p.directMinFitScore,
       title: p.title,
       seniority: p.jdSeniority,
       coreSkills: p.coreSkills,
@@ -236,14 +270,17 @@ export async function findBetterMatch(
 ): Promise<BetterMatch | null> {
   const others = await findOtherPositions(currentPositionId, candidate)
   if (others.length === 0) return null
-  const [shortlist, minDelta] = await Promise.all([shortlistOtherPositions(candidate, others), getBetterMatchMinDelta()])
+  const [shortlist, minDelta, minScore] = await Promise.all([
+    shortlistOtherPositions(candidate, others), getBetterMatchMinDelta(), getBetterMatchMinScore(),
+  ])
 
   let best: BetterMatch | null = null
   for (const o of shortlist) {
     const r = await getOrComputeFitScore(candidate.id, o.id)
     if (!r) continue
     const score = Math.round(r.fitScore)
-    if (score >= Math.round(currentScore) + minDelta && (!best || score > best.score)) {
+    const floor = betterMatchFloor(o, candidate.sourcedByType, minScore)
+    if (passesBetterMatch(score, currentScore, minDelta, floor) && (!best || score > best.score)) {
       best = { positionId: o.id, score, reason: r.fitSummary.trim() || null }
     }
   }

@@ -33,6 +33,11 @@ export default async function SettingsPage({
       create: { key: 'BETTER_MATCH_MIN_DELTA', value: '8', description: 'Minimum points a suggested position\'s real fit score must exceed the current position\'s score by to show "Better match".' },
     }),
     db.systemSettings.upsert({
+      where: { key: 'BETTER_MATCH_MIN_SCORE' },
+      update: {},
+      create: { key: 'BETTER_MATCH_MIN_SCORE', value: '70', description: 'Minimum real fit score (0–100) a suggested position needs to show "Better match", unless that position sets its own vendor/direct minimum for the candidate\'s source.' },
+    }),
+    db.systemSettings.upsert({
       where: { key: 'DIRECT_MIN_FIT_SCORE' },
       update: {},
       create: { key: 'DIRECT_MIN_FIT_SCORE', value: '30', description: 'Minimum fit score (0–100) for direct (portal) applications. Applications below this threshold are automatically rejected.' },
