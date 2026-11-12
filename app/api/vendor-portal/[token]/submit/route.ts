@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import { START_AVAILABILITY_VALUES } from '@/lib/start-availability'
 import { db } from '@/lib/db'
 import { findCandidateMatches } from '@/lib/candidate-identity'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
@@ -44,6 +46,9 @@ export async function POST(
   const lastName = (formData.get('lastName') as string | null)?.trim() ?? ''
   const emailRaw = (formData.get('email') as string | null)?.trim().toLowerCase() ?? ''
   const countryRaw = (formData.get('country') as string | null)?.trim() ?? ''
+  // Optional; an empty or unknown value is treated as not given
+  const availabilityParsed = z.enum(START_AVAILABILITY_VALUES).safeParse(formData.get('startAvailability') || undefined)
+  const startAvailability = availabilityParsed.success ? availabilityParsed.data : null
   const compensationRaw = (formData.get('desiredCompensation') as string | null)?.trim() ?? ''
 
   // Parse availability slots
@@ -185,6 +190,7 @@ export async function POST(
       cvDriveId: cvDriveId ?? null,
       cvOriginalName: cvOriginalName ?? null,
       sourcedByType: 'VENDOR',
+      ...(startAvailability ? { startAvailability, availabilityUpdatedAt: new Date() } : {}),
       sourcedByVendorId: vendor.id,
       recruiterId: position.recruiterId,
     },

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { AvailabilityLabel } from '@/components/app/AvailabilityLabel'
 import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -138,6 +139,12 @@ export default async function CandidateDetailPage({
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recruiter (Owner)</p>
                 <p className="text-gray-900 mt-0.5">
                   {candidate.recruiter ? (candidate.recruiter.name ?? candidate.recruiter.email) : <span className="text-gray-400">Not assigned</span>}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Availability to start</p>
+                <p className="text-gray-900 mt-0.5">
+                  <AvailabilityLabel value={candidate.startAvailability} updatedAt={candidate.availabilityUpdatedAt} empty={<span className="text-gray-400">Not specified</span>} />
                 </p>
               </div>
               <div>

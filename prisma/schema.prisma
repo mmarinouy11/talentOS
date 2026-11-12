@@ -143,6 +143,7 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  bulkUploads BulkUpload[]
 
   positionsAsRecruiter  Position[]          @relation("RecruiterPositions")
   candidatePositions    CandidatePosition[] @relation("RecruiterCandidatePositions")
@@ -272,6 +273,7 @@ model Position {
   recruiter          User                @relation("RecruiterPositions", fields: [recruiterId], references: [id])
   candidatePositions CandidatePosition[]
   fitScoreCache      FitScoreCache[]
+  bulkUploads        BulkUpload[]
   positionVendors    PositionVendor[]
   sourcePosition     Position?           @relation("PositionBackups", fields: [sourcePositionId], references: [id])
   backups            Position[]          @relation("PositionBackups")
@@ -468,6 +470,74 @@ model FitScoreCache {
 
   @@unique([candidateId, positionId, inputsHash])
   @@index([candidateId, positionId])
+}
+
+enum BulkUploadStatus {
+  PROCESSING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum BulkUploadItemStatus {
+  PENDING
+  PROCESSING
+  DONE
+  NEEDS_DECISION
+  FAILED
+  SKIPPED
+}
+
+enum BulkUploadMatchType {
+  NEW
+  EXISTING
+  POSSIBLE_DUPLICATE
+}
+
+// Bulk CV upload batch (PDF/DOCX files), processed by the background worker; positionId null = talent pool only
+model BulkUpload {
+  id          String           @id @default(cuid())
+  createdById String
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  positionId  String?
+  position    Position?        @relation(fields: [positionId], references: [id])
+  status      BulkUploadStatus @default(PROCESSING)
+  totalFiles  Int
+  createdAt   DateTime         @default(now())
+  readyAt     DateTime?
+  confirmedAt DateTime?
+
+  items BulkUploadItem[]
+
+  @@index([status])
+  @@index([positionId])
+}
+
+model BulkUploadItem {
+  id                    String               @id @default(cuid())
+  bulkUploadId          String
+  bulkUpload            BulkUpload           @relation(fields: [bulkUploadId], references: [id], onDelete: Cascade)
+  fileName              String
+  fileHash              String
+  driveFileId           String
+  status                BulkUploadItemStatus @default(PENDING)
+  attempts              Int                  @default(0)
+  error                 String?
+  matchType             BulkUploadMatchType?
+  candidateId           String?
+  possibleDuplicateOfId String?
+  parsedName            String?
+  parsedEmail           String?
+  parsedSnapshot        Json?
+  alreadyInPosition     Boolean              @default(false)
+  fitScore              Int?
+  selected              Boolean              @default(false)
+  candidatePositionId   String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@index([bulkUploadId])
+  @@index([status, updatedAt])
 }
 
 model SystemSettings {

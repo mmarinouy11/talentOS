@@ -82,6 +82,8 @@ export interface TenoraiCvData {
   country: string | null
   seniority: string | null
   yearsOfExperience: number | null
+  // Availability to start label (e.g. "2 weeks"); line shown only when set
+  availability?: string | null
   summary: string | null
   skills: string[]
   matchingSkillSet: Set<string>
@@ -174,7 +176,7 @@ function renderEducationSection(education: CvEducationEntry[]): string {
 }
 
 export function renderTenoraiCv(data: TenoraiCvData): string {
-  const { anonymizedName, positionTitle, country, yearsOfExperience, summary, skills, matchingSkillSet, languages, experience, education } = data
+  const { anonymizedName, positionTitle, country, yearsOfExperience, availability, summary, skills, matchingSkillSet, languages, experience, education } = data
 
   const subtitle = [
     country,
@@ -233,6 +235,7 @@ ${toolbar}
     <div>
       <h1 style="font-family:${FONT};font-size:30px;font-weight:800;color:${CARBON};margin:0 0 8px 0;">${esc(anonymizedName)}</h1>
       <p style="font-family:${FONT};font-size:13px;color:${WARM_GRAY};font-style:italic;margin:0;">${esc(subtitle)}</p>
+      ${availability ? `<p style="font-family:${FONT};font-size:13px;color:${CHARCOAL};margin:6px 0 0 0;"><strong>Availability:</strong> ${esc(availability)}</p>` : ''}
     </div>
     <div style="flex-shrink:0;margin-top:4px;">${CARET_SVG}</div>
   </div>

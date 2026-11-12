@@ -90,7 +90,7 @@ export default async function PositionDetailPage({
       candidatePositions: {
         where: { candidate: { deletedAt: null } },
         include: {
-          candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true, minimumCompensation: true } },
+          candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true, minimumCompensation: true, startAvailability: true, availabilityUpdatedAt: true } },
           interviews: { select: { status: true, decision: true, stage: true, scheduledAt: true } },
           recruiter: { select: { name: true } },
         },
@@ -385,6 +385,8 @@ export default async function PositionDetailPage({
             email: cp.candidate.email,
             country: cp.candidate.country,
             seniority: cp.candidate.seniority,
+            startAvailability: cp.candidate.startAvailability,
+            availabilityUpdatedAt: cp.candidate.availabilityUpdatedAt?.toISOString() ?? null,
           },
         }))}
         activeCandidates={activeCandidates}

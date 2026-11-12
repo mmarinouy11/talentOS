@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { START_AVAILABILITY_VALUES, START_AVAILABILITY_LABELS } from '@/lib/start-availability'
 import { BrandHeader } from '@/components/public/BrandHeader'
 
 const LATAM_COUNTRIES = [
@@ -131,6 +132,7 @@ export function PortalPage({ mode, token }: PortalPageProps) {
   const [email, setEmail] = useState('')
   const [country, setCountry] = useState('')
   const [desiredCompensation, setDesiredCompensation] = useState('')
+  const [startAvailability, setStartAvailability] = useState('')
   const [note, setNote] = useState('')
   const [parsing, setParsing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -219,6 +221,7 @@ export function PortalPage({ mode, token }: PortalPageProps) {
       fd.append('lastName', lastName)
       fd.append('email', email)
       fd.append('country', country)
+      if (startAvailability) fd.append('startAvailability', startAvailability)
       if (mode === 'vendor') {
         fd.append('desiredCompensation', desiredCompensation)
       }
@@ -256,6 +259,7 @@ export function PortalPage({ mode, token }: PortalPageProps) {
     setEmail('')
     setCountry('')
     setDesiredCompensation('')
+    setStartAvailability('')
     setNote('')
     setSubmitError('')
     setAvailabilitySlots([])
@@ -693,6 +697,15 @@ export function PortalPage({ mode, token }: PortalPageProps) {
                 <select value={country} onChange={(e) => setCountry(e.target.value)} required style={{ ...inputStyle, cursor: 'pointer' }} onFocus={focusStyle} onBlur={blurStyle}>
                   <option value="">— Select country —</option>
                   {LATAM_COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </InputField>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <InputField label="Availability to start" hint="(optional)">
+                <select value={startAvailability} onChange={(e) => setStartAvailability(e.target.value)} style={{ ...inputStyle, cursor: 'pointer' }} onFocus={focusStyle} onBlur={blurStyle}>
+                  <option value="">— Not specified —</option>
+                  {START_AVAILABILITY_VALUES.map((v) => <option key={v} value={v}>{START_AVAILABILITY_LABELS[v]}</option>)}
                 </select>
               </InputField>
             </div>

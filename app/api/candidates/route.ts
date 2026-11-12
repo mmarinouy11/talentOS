@@ -1,3 +1,4 @@
+import { START_AVAILABILITY_VALUES, availabilityWriteData } from '@/lib/start-availability'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
@@ -28,6 +29,7 @@ const candidateSchema = z.object({
   sourcedByUserId: z.string().optional().nullable(),
   sourcedByVendorId: z.string().optional().nullable(),
   sourcedByOther: z.string().optional().nullable(),
+  startAvailability: z.enum(START_AVAILABILITY_VALUES).optional().nullable(),
   recruiterId: z.string().optional().nullable(),
   // duplicate-check context: the position being added to, and explicit confirmation for possible duplicates
   positionId: z.string().optional().nullable(),
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
   const sessionUser = session.user as { id?: string }
   const recruiterId = rest.recruiterId ?? sessionUser.id
   if (!recruiterId) return NextResponse.json({ error: 'recruiterId is required' }, { status: 400 })
-  const { cvExperience, cvEducation, ...coreRest } = rest
+  const { cvExperience, cvEducation, startAvailability, ...coreRest } = rest
   let candidate
   try {
    candidate = await db.candidate.create({
@@ -132,6 +134,7 @@ export async function POST(request: Request) {
       cvDriveId: coreRest.cvDriveId ?? null,
       cvOriginalName: coreRest.cvOriginalName ?? null,
       recruiterId,
+      ...availabilityWriteData(startAvailability, null),
       ...(Array.isArray(cvExperience) && cvExperience.length > 0 ? { cvExperience } : {}),
       ...(Array.isArray(cvEducation) && cvEducation.length > 0 ? { cvEducation } : {}),
     },

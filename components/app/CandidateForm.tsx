@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { START_AVAILABILITY_VALUES, START_AVAILABILITY_LABELS, type StartAvailabilityValue } from '@/lib/start-availability'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +38,7 @@ interface Fields {
   sourcedByUserId: string
   sourcedByVendorId: string
   sourcedByOther: string
+  startAvailability: StartAvailabilityValue | ''
 }
 
 interface CandidateFormProps {
@@ -64,6 +66,7 @@ interface CandidateFormProps {
     sourcedByUserId?: string | null
     sourcedByVendorId?: string | null
     sourcedByOther?: string | null
+    startAvailability?: StartAvailabilityValue | null
   }
 }
 
@@ -107,6 +110,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
     sourcedByUserId: defaultValues.sourcedByUserId ?? '',
     sourcedByVendorId: defaultValues.sourcedByVendorId ?? '',
     sourcedByOther: defaultValues.sourcedByOther ?? '',
+    startAvailability: defaultValues.startAvailability ?? '',
   })
 
   useEffect(() => {
@@ -211,6 +215,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
       sourcedByUserId: fields.sourcedByType === 'RECRUITER' ? fields.sourcedByUserId || null : null,
       sourcedByVendorId: fields.sourcedByType === 'VENDOR' ? fields.sourcedByVendorId || null : null,
       sourcedByOther: fields.sourcedByType === 'OTHER' ? fields.sourcedByOther || null : null,
+      startAvailability: fields.startAvailability || null,
       ...(mode === 'create' && allowPossibleDuplicate ? { allowPossibleDuplicate: true } : {}),
     }
 
@@ -414,6 +419,20 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
             <option value="">— Select recruiter —</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>{u.name ?? u.email}</option>
+            ))}
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="startAvailability">Availability to start</Label>
+          <Select
+            id="startAvailability"
+            value={fields.startAvailability}
+            onChange={(e) => setField('startAvailability', e.target.value as Fields['startAvailability'])}
+          >
+            <option value="">— Not specified —</option>
+            {START_AVAILABILITY_VALUES.map((v) => (
+              <option key={v} value={v}>{START_AVAILABILITY_LABELS[v]}</option>
             ))}
           </Select>
         </div>
