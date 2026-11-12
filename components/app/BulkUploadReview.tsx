@@ -42,6 +42,7 @@ export function BulkUploadReview({ bulkUploadId, status, hasPosition, threshold,
   const [busy, setBusy] = useState<'confirm' | 'retry' | 'cancel' | null>(null)
   const [error, setError] = useState('')
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
+  const [contacts, setContacts] = useState<Record<string, string>>({})
 
   // Keep progress live while processing
   useEffect(() => {
@@ -79,6 +80,24 @@ export function BulkUploadReview({ bulkUploadId, status, hasPosition, threshold,
     setBusyRow(rowId); setRowErrors((e) => ({ ...e, [rowId]: '' }))
     try {
       await post(`/api/bulk-uploads/${bulkUploadId}/items/${rowId}/decide`, { decision })
+      router.refresh()
+    } catch (err) {
+      setRowErrors((e) => ({ ...e, [rowId]: (err as Error).message }))
+    } finally {
+      setBusyRow(null)
+    }
+  }
+
+  // Missing contact: one input taking an email or a LinkedIn profile URL
+  async function saveContact(rowId: string) {
+    const value = (contacts[rowId] ?? '').trim()
+    const isEmail = value.includes('@')
+    if (!value) { setRowErrors((e) => ({ ...e, [rowId]: 'Enter an email or a LinkedIn profile URL' })); return }
+    if (isEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) { setRowErrors((e) => ({ ...e, [rowId]: 'Enter a valid email address' })); return }
+    if (!isEmail && !/linkedin\.com\/in\/|^\/?in\//i.test(value)) { setRowErrors((e) => ({ ...e, [rowId]: 'Enter a valid LinkedIn profile URL (linkedin.com/in/…)' })); return }
+    setBusyRow(rowId); setRowErrors((e) => ({ ...e, [rowId]: '' }))
+    try {
+      await post(`/api/bulk-uploads/${bulkUploadId}/items/${rowId}/contact`, isEmail ? { email: value } : { linkedinUrl: value })
       router.refresh()
     } catch (err) {
       setRowErrors((e) => ({ ...e, [rowId]: (err as Error).message }))
@@ -172,6 +191,20 @@ export function BulkUploadReview({ bulkUploadId, status, hasPosition, threshold,
                       : <span className="block truncate text-gray-500" title={r.fileName}>{r.fileName}</span>}
                   </td>
                   <td className="px-3 py-2.5 text-xs">
+                    {r.status === 'NEEDS_DECISION' && !r.matchType && canAct && (
+                      busyRow === r.id
+                        ? <span className="inline-flex items-center gap-1.5 text-gray-500"><span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-[#2F2C29]" />Working…</span>
+                        : <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); saveContact(r.id) }}>
+                            <input
+                              value={contacts[r.id] ?? ''}
+                              onChange={(e) => setContacts((c) => ({ ...c, [r.id]: e.target.value }))}
+                              placeholder="Email or LinkedIn URL"
+                              className="w-48 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-[#2F2C29] focus:outline-none"
+                              aria-label={`Email or LinkedIn for ${name}`}
+                            />
+                            <Button size="sm" type="submit" disabled={busyRow !== null}>Save</Button>
+                          </form>
+                    )}
                     {r.status === 'NEEDS_DECISION' && r.duplicateOf && (
                       <div className="space-y-1.5">
                         <p className="text-gray-700">

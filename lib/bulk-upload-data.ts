@@ -7,6 +7,7 @@ export interface BatchCounts {
   new: number
   existing: number
   possible: number
+  missingContact: number
   failed: number
   skipped: number
 }
@@ -19,7 +20,8 @@ export function countItems(items: CountRow[]): BatchCounts {
     processed: items.filter((i) => i.status !== 'PENDING' && i.status !== 'PROCESSING').length,
     new: items.filter((i) => i.status === 'DONE' && i.matchType === 'NEW').length,
     existing: items.filter((i) => i.status === 'DONE' && i.matchType === 'EXISTING').length,
-    possible: items.filter((i) => i.status === 'NEEDS_DECISION').length,
+    possible: items.filter((i) => i.status === 'NEEDS_DECISION' && i.matchType === 'POSSIBLE_DUPLICATE').length,
+    missingContact: items.filter((i) => i.status === 'NEEDS_DECISION' && i.matchType === null).length,
     failed: items.filter((i) => i.status === 'FAILED').length,
     skipped: items.filter((i) => i.status === 'SKIPPED').length,
   }

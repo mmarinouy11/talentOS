@@ -54,7 +54,7 @@ export default async function BulkUploadsPage() {
                   <td className="px-4 py-2.5 text-right">{b.totalFiles}</td>
                   <td className="px-4 py-2.5 text-right">{c.new}</td>
                   <td className="px-4 py-2.5 text-right">{c.existing}</td>
-                  <td className="px-4 py-2.5 text-right">{c.possible}</td>
+                  <td className="px-4 py-2.5 text-right">{c.possible + c.missingContact}</td>
                   <td className="px-4 py-2.5 text-right">{c.failed}</td>
                   <td className="px-4 py-2.5 text-gray-600">{b.createdBy.name ?? b.createdBy.email}</td>
                   <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{b.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>

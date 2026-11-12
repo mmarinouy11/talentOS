@@ -78,7 +78,7 @@ export default async function BulkUploadReviewPage({ params }: { params: Promise
           {' · '}{counts.processed}/{counts.total} processed
         </p>
         <div className="flex flex-wrap gap-2 mt-3 text-xs">
-          {([['New', counts.new], ['Existing', counts.existing], ['Possible duplicates', counts.possible], ['Failed', counts.failed], ['Skipped', counts.skipped]] as const).map(([label, n]) => (
+          {([['New', counts.new], ['Existing', counts.existing], ['Possible duplicates', counts.possible], ['Missing contact', counts.missingContact], ['Failed', counts.failed], ['Skipped', counts.skipped]] as const).map(([label, n]) => (
             <span key={label} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-gray-700"><strong className="text-[#2F2C29]">{n}</strong> {label.toLowerCase()}</span>
           ))}
         </div>

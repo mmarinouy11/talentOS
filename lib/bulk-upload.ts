@@ -1,10 +1,12 @@
 import type { Prisma } from '@prisma/client'
+import { z } from 'zod'
 import { db } from './db'
 import { downloadFileFromDrive } from './google'
 import { parseCvFromBuffer, type ParsedCv } from './cv-parser'
 import { findCandidateMatches } from './candidate-identity'
 import { hasCandidateIdentifier, realEmailOrNull } from './candidate-identifier'
 import { createCandidateRecord } from './candidate-create'
+import { normalizeLinkedinHandle } from './linkedin'
 import { getOrComputeFitScore } from './fit-scorer'
 import { classifyAnthropicError } from './anthropic'
 
@@ -130,6 +132,64 @@ async function scoreForBatch(itemId: string, candidateId: string, positionId: st
   }
 }
 
+// "Missing contact": a NEEDS_DECISION row without a possible duplicate (neither email nor LinkedIn in the CV)
+export function isMissingContact(i: { status: string; matchType: string | null }): boolean {
+  return i.status === 'NEEDS_DECISION' && i.matchType === null
+}
+
+// Resolves a parsed CV: missing contact → NEEDS_DECISION (no candidate); otherwise findCandidateMatches →
+// existing / possible duplicate / new, then scores it for position batches.
+async function resolveItem(item: ItemWithBatch, snap: Snapshot): Promise<void> {
+  const itemId = item.id
+  const parsedName = [snap.firstName, snap.lastName].filter(Boolean).join(' ')
+  const base = { parsedName, parsedEmail: snap.email, parsedSnapshot: snap as unknown as Prisma.InputJsonValue, error: null }
+
+  // "Email or LinkedIn required" still applies: the recruiter adds one on the review page
+  if (!hasCandidateIdentifier(snap.email, snap.linkedinUrl)) {
+    await db.bulkUploadItem.update({
+      where: { id: itemId },
+      data: { ...base, status: 'NEEDS_DECISION', matchType: null, possibleDuplicateOfId: null, candidateId: null },
+    })
+    return
+  }
+
+  // Identity: the DB already holds candidates created earlier in this batch, so a second file of the
+  // same person resolves to the first one. A concurrent create of the same person hits the unique
+  // email/LinkedIn constraint, and the retry below resolves it as existing.
+  for (let pass = 0; pass < 2; pass++) {
+    const match = await findCandidateMatches({ ...snap, lastName: snap.lastName ?? '' })
+    if (match.kind === 'exact') {
+      const candidateId = match.candidates[0].id
+      await db.bulkUploadItem.update({ where: { id: itemId }, data: { ...base, matchType: 'EXISTING', candidateId } })
+      await scoreForBatch(itemId, candidateId, item.bulkUpload.positionId)
+      await db.bulkUploadItem.update({ where: { id: itemId }, data: { status: 'DONE' } })
+      return
+    }
+    if (match.kind === 'possible' || match.kind === 'conflict') {
+      await db.bulkUploadItem.update({
+        where: { id: itemId },
+        data: { ...base, matchType: 'POSSIBLE_DUPLICATE', status: 'NEEDS_DECISION', possibleDuplicateOfId: match.candidates[0].id },
+      })
+      return
+    }
+    try {
+      const candidateId = await createFromSnapshot(snap, item)
+      await db.bulkUploadItem.update({ where: { id: itemId }, data: { ...base, matchType: 'NEW', candidateId } })
+      await scoreForBatch(itemId, candidateId, item.bulkUpload.positionId)
+      await db.bulkUploadItem.update({ where: { id: itemId }, data: { status: 'DONE' } })
+      return
+    } catch (err) {
+      // Same person created concurrently: match again (now exact)
+      if (pass === 0 && err instanceof BulkItemError && /deleted candidate/.test(err.message)) {
+        const again = await findCandidateMatches({ ...snap, lastName: snap.lastName ?? '' })
+        if (again.kind !== 'none') continue
+      }
+      throw err
+    }
+  }
+  throw new BulkItemError('Could not resolve this candidate')
+}
+
 // Processes one item that the worker has already claimed (status PROCESSING, attempts incremented)
 export async function processBulkItem(itemId: string): Promise<void> {
   const item = await db.bulkUploadItem.findUnique({ where: { id: itemId }, include: { bulkUpload: true } })
@@ -146,44 +206,7 @@ export async function processBulkItem(itemId: string): Promise<void> {
     const snap = toSnapshot(await parseCvFromBuffer(buffer, kind))
     if (!snap.firstName) throw new BulkItemError('Could not read a name from this CV', true)
 
-    const parsedName = [snap.firstName, snap.lastName].filter(Boolean).join(' ')
-    const base = { parsedName, parsedEmail: snap.email, parsedSnapshot: snap as unknown as Prisma.InputJsonValue, error: null }
-
-    // Identity: the DB already holds candidates created earlier in this batch, so a second file of the
-    // same person resolves to the first one. A concurrent create of the same person hits the unique
-    // email/LinkedIn constraint, and the retry below resolves it as existing.
-    for (let pass = 0; pass < 2; pass++) {
-      const match = await findCandidateMatches({ ...snap, lastName: snap.lastName ?? '' })
-      if (match.kind === 'exact') {
-        const candidateId = match.candidates[0].id
-        await db.bulkUploadItem.update({ where: { id: itemId }, data: { ...base, matchType: 'EXISTING', candidateId } })
-        await scoreForBatch(itemId, candidateId, item.bulkUpload.positionId)
-        await db.bulkUploadItem.update({ where: { id: itemId }, data: { status: 'DONE' } })
-        return
-      }
-      if (match.kind === 'possible' || match.kind === 'conflict') {
-        await db.bulkUploadItem.update({
-          where: { id: itemId },
-          data: { ...base, matchType: 'POSSIBLE_DUPLICATE', status: 'NEEDS_DECISION', possibleDuplicateOfId: match.candidates[0].id },
-        })
-        return
-      }
-      try {
-        const candidateId = await createFromSnapshot(snap, item)
-        await db.bulkUploadItem.update({ where: { id: itemId }, data: { ...base, matchType: 'NEW', candidateId } })
-        await scoreForBatch(itemId, candidateId, item.bulkUpload.positionId)
-        await db.bulkUploadItem.update({ where: { id: itemId }, data: { status: 'DONE' } })
-        return
-      } catch (err) {
-        // Same person created concurrently: match again (now exact)
-        if (pass === 0 && err instanceof BulkItemError && /deleted candidate/.test(err.message)) {
-          const again = await findCandidateMatches({ ...snap, lastName: snap.lastName ?? '' })
-          if (again.kind !== 'none') continue
-        }
-        throw err
-      }
-    }
-    throw new BulkItemError('Could not resolve this candidate')
+    await resolveItem(item, snap)
   } catch (err) {
     const permanent = err instanceof BulkItemError && err.permanent
     const failed = permanent || item.attempts >= BULK_UPLOAD_MAX_ATTEMPTS
@@ -216,11 +239,35 @@ export async function refreshBatchStatus(bulkUploadId: string): Promise<void> {
   }
 }
 
+// Missing contact: the recruiter adds an email or LinkedIn URL, then the item runs the normal flow
+export async function supplyBulkItemContact(itemId: string, contact: { email?: string | null; linkedinUrl?: string | null }): Promise<void> {
+  const item = await db.bulkUploadItem.findUnique({ where: { id: itemId }, include: { bulkUpload: true } })
+  if (!item || !isMissingContact(item)) throw new BulkItemError('This row no longer needs contact details')
+  if (item.bulkUpload.status === 'CANCELLED' || item.bulkUpload.status === 'COMPLETED') throw new BulkItemError('This batch is closed')
+  const snap = item.parsedSnapshot as unknown as Snapshot | null
+  if (!snap?.firstName) throw new BulkItemError('Parsed CV data is missing; retry the upload')
+
+  const rawEmail = realEmailOrNull(contact.email)
+  if (rawEmail && !z.string().email().safeParse(rawEmail).success) throw new BulkItemError('Enter a valid email address')
+  if (contact.linkedinUrl?.trim() && !normalizeLinkedinHandle(contact.linkedinUrl)) throw new BulkItemError('Enter a valid LinkedIn profile URL (linkedin.com/in/…)')
+  const email = rawEmail?.toLowerCase() ?? null
+  const handle = normalizeLinkedinHandle(contact.linkedinUrl)
+  if (!email && !handle) throw new BulkItemError('Enter a valid email or LinkedIn profile URL')
+  const next: Snapshot = {
+    ...snap,
+    email: email ?? snap.email,
+    // Stored as the canonical profile URL so the handle derived on create matches
+    linkedinUrl: handle ? `https://www.linkedin.com/in/${handle}` : snap.linkedinUrl,
+  }
+  await resolveItem(item, next)
+  await refreshBatchStatus(item.bulkUploadId)
+}
+
 // Possible duplicate resolution. "same" links the existing candidate (never modified); "different" creates
 // a new candidate from the stored snapshot and file.
 export async function decideBulkItem(itemId: string, decision: 'same' | 'different'): Promise<void> {
   const item = await db.bulkUploadItem.findUnique({ where: { id: itemId }, include: { bulkUpload: true } })
-  if (!item || item.status !== 'NEEDS_DECISION') throw new BulkItemError('This row no longer needs a decision')
+  if (!item || item.status !== 'NEEDS_DECISION' || item.matchType !== 'POSSIBLE_DUPLICATE') throw new BulkItemError('This row no longer needs a decision')
   if (item.bulkUpload.status === 'CANCELLED' || item.bulkUpload.status === 'COMPLETED') throw new BulkItemError('This batch is closed')
 
   let candidateId: string

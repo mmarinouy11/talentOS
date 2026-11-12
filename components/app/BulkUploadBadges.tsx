@@ -16,6 +16,7 @@ export function MatchBadge({ matchType, status }: { matchType: string | null; st
   if (status === 'FAILED') return <span className={`${base} bg-red-50 text-red-700`}>Failed</span>
   if (status === 'SKIPPED') return <span className={`${base} bg-gray-100 text-gray-500`}>Skipped</span>
   if (status === 'PENDING' || status === 'PROCESSING') return <span className={`${base} bg-[#F5F0EB] text-gray-600`}>Processing…</span>
+  if (status === 'NEEDS_DECISION' && !matchType) return <span className={`${base} bg-amber-100 text-amber-800`}>Missing contact</span>
   if (matchType === 'NEW') return <span className={`${base} bg-[#8CF000] text-[#2F2C29]`}>New</span>
   if (matchType === 'EXISTING') return <span className={`${base} bg-[#2F2C29] text-white`}>Existing</span>
   if (matchType === 'POSSIBLE_DUPLICATE') return <span className={`${base} bg-amber-100 text-amber-800`}>Possible duplicate</span>
