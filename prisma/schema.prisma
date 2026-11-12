@@ -64,6 +64,15 @@ enum CompensationRisk {
   HIGH
 }
 
+enum StartAvailability {
+  IMMEDIATE
+  ONE_WEEK
+  TWO_WEEKS
+  ONE_MONTH
+  TWO_MONTHS
+  THREE_MONTHS_PLUS
+}
+
 enum SourceType {
   RECRUITER
   VENDOR
@@ -302,6 +311,9 @@ model Candidate {
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
   deletedAt             DateTime?
+  // Availability to start, as told by the candidate; availabilityUpdatedAt set server-side when it changes
+  startAvailability     StartAvailability?
+  availabilityUpdatedAt DateTime?
 
   candidatePositions CandidatePosition[]
   fitScoreCache      FitScoreCache[]
