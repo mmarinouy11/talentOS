@@ -12,6 +12,7 @@ const navItems = [
   { href: '/positions', label: 'Positions' },
   { href: '/candidates', label: 'Candidates' },
   { href: '/redeployment', label: 'Redeployment' },
+  { href: '/opportunities', label: 'Opportunities' },
   { href: '/vendors', label: 'Partners' },
   { href: '/reports', label: 'Reports' },
   { href: '/profile', label: 'My Profile' },

@@ -417,6 +417,12 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
     update: { value: JSON.stringify(summary) },
     create: { key: LAST_SYNC_SETTING_KEY, value: JSON.stringify(summary), description: 'Result of the last Redeployment roster sync (managed automatically).' },
   })
+  // People added or changed: refresh global matches in the background (unchanged pairs are skipped)
+  if (summary.created + summary.linked + summary.updated > 0) {
+    import('./redeployment-matching')
+      .then((m) => m.runRedeploymentMatching())
+      .catch((err) => console.error('[redeployment] Matching after sync failed:', err instanceof Error ? err.message : err))
+  }
   const { errors, ...counts } = summary
   console.log('[redeployment] Sync finished', JSON.stringify({ ...counts, errors: errors.map((e) => e.rosterId) }))
   return summary
