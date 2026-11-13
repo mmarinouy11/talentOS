@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import { seedRedeploymentSettings } from '@/lib/redeployment-settings'
+import { seedGlobalOpportunitySettings } from '@/lib/global-opportunity-settings'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { SettingsForm } from '@/components/app/SettingsForm'
@@ -23,6 +24,7 @@ export default async function SettingsPage({
 
   // Ensure new settings keys exist for existing deployments that predate the seed update
   await seedRedeploymentSettings()
+  await seedGlobalOpportunitySettings()
   await Promise.all([
     db.systemSettings.upsert({
       where: { key: 'VENDOR_MIN_FIT_SCORE' },

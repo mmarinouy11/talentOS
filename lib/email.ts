@@ -109,24 +109,11 @@ async function getHeaderHtml(html: string): Promise<string> {
     : html
 }
 
-export async function sendEmailViaSystemGmail({
-  to,
-  subject,
-  html,
-}: {
-  to: string
-  subject: string
-  html: string
-}): Promise<void> {
-  if (isPlaceholderEmail(to)) {
-    console.log('[email] Skipped send to placeholder email:', to)
-    return
-  }
+// Shared by both senders: 'placeholder' / 'not-connected' when nothing was sent, 'sent' on success; Gmail errors throw
+async function deliverViaSystemGmail({ to, subject, html }: { to: string; subject: string; html: string }): Promise<'sent' | 'placeholder' | 'not-connected'> {
+  if (isPlaceholderEmail(to)) return 'placeholder'
   const account = await db.systemEmailAccount.findUnique({ where: { purpose: 'system_notifications' } })
-  if (!account?.refreshToken) {
-    console.log('[system-gmail] No system Gmail connected, skipping notification')
-    return
-  }
+  if (!account?.refreshToken) return 'not-connected'
 
   const finalHtml = await getHeaderHtml(html)
 
@@ -157,6 +144,35 @@ export async function sendEmailViaSystemGmail({
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
   await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+  return 'sent'
+}
+
+// Fire-and-forget sender (pipeline report etc.): unchanged behaviour — skips quietly when nothing can be sent
+export async function sendEmailViaSystemGmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string
+  subject: string
+  html: string
+}): Promise<void> {
+  const outcome = await deliverViaSystemGmail({ to, subject, html })
+  if (outcome === 'placeholder') console.log('[email] Skipped send to placeholder email:', to)
+  if (outcome === 'not-connected') console.log('[system-gmail] No system Gmail connected, skipping notification')
+}
+
+export type SystemEmailResult = { sent: true } | { sent: false; reason: string }
+
+// Reports whether the email actually went out (never throws), for callers that must not claim "sent" on a skip
+export async function trySendEmailViaSystemGmail(args: { to: string; subject: string; html: string }): Promise<SystemEmailResult> {
+  try {
+    const outcome = await deliverViaSystemGmail(args)
+    if (outcome === 'sent') return { sent: true }
+    return { sent: false, reason: outcome === 'not-connected' ? 'no system Gmail account connected' : 'placeholder email address' }
+  } catch (err) {
+    return { sent: false, reason: err instanceof Error ? err.message : 'unknown error sending email' }
+  }
 }
 
 export async function sendEmail({

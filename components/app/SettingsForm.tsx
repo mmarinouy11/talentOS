@@ -30,6 +30,10 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   REDEPLOYMENT_PAST_DAYS: { label: 'Redeployment — Released Up To (days ago)', type: 'number', min: 0, max: 3650 },
   REDEPLOYMENT_FUTURE_DAYS: { label: 'Redeployment — Releasing Within (days)', type: 'number', min: 0, max: 3650 },
   REDEPLOYMENT_LWD_FORMAT: { label: 'Redeployment — LWD Text Format (MDY or DMY)' },
+  GLOBAL_OPP_EXTRA_LOCATIONS: { label: 'Global Opportunities — Extra Locations (comma-separated)' },
+  GLOBAL_MATCH_TOP_N: { label: 'Global Matches — Groups Scored per Person', type: 'number', min: 1, max: 20 },
+  GLOBAL_MATCH_MIN_SCORE: { label: 'Global Matches — Minimum Score Shown', type: 'number', min: 0, max: 100 },
+  REDEPLOYMENT_DIGEST_RECIPIENTS: { label: 'Redeployment Digest — Recipients (comma-separated emails)' },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -106,10 +110,14 @@ const DISPLAY_ORDER = [
   'REDEPLOYMENT_PAST_DAYS',
   'REDEPLOYMENT_FUTURE_DAYS',
   'REDEPLOYMENT_LWD_FORMAT',
+  'GLOBAL_OPP_EXTRA_LOCATIONS',
+  'GLOBAL_MATCH_TOP_N',
+  'GLOBAL_MATCH_MIN_SCORE',
+  'REDEPLOYMENT_DIGEST_RECIPIENTS',
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {
-  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS', 'PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_WEEKLY_DAY', 'REDEPLOYMENT_LAST_SYNC'])
+  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS', 'PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_WEEKLY_DAY', 'REDEPLOYMENT_LAST_SYNC', 'REDEPLOYMENT_LAST_DIGEST_AT', 'REDEPLOYMENT_LAST_DIGEST_RESULT'])
   const ordered = [
     ...DISPLAY_ORDER.map((key) => settings.find((s) => s.key === key)).filter(Boolean) as Setting[],
     ...settings.filter((s) => !excluded.has(s.key) && !DISPLAY_ORDER.includes(s.key)),

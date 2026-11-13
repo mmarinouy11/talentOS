@@ -334,6 +334,8 @@ model CandidatePosition {
   stage                 Stage             @default(APPLIED)
   status                CandidateStatus   @default(ACTIVE)
   stageEnteredAt        DateTime          @default(now())
+  // Set once when hired while the candidate had an ACTIVE/OUT_OF_WINDOW redeployment profile (recruiter achievement weighting)
+  redeploymentHire      Boolean           @default(false)
   fitScore              Float?
   technicalFitScore     Float?
   seniorityFitScore     Float?
@@ -570,18 +572,26 @@ model GlobalOpportunityImport {
   newCount               Int
 }
 
+enum MatchTargetType {
+  GLOBAL_GROUP
+  TALENTOS_POSITION
+}
+
 enum OpportunityMatchStatus {
   NEW
   PROPOSED
   DISMISSED
 }
 
-// Redeployment person × opportunity group (groupKey), scored with the fit-score rubric
+// Redeployment person × target, scored with the fit-score rubric: a global opportunity group (groupKey) or a
+// TalentOS position (positionId)
 model OpportunityMatch {
   id                    String                 @id @default(cuid())
   redeploymentProfileId String
   redeploymentProfile   RedeploymentProfile    @relation(fields: [redeploymentProfileId], references: [id], onDelete: Cascade)
-  groupKey              String
+  targetType            MatchTargetType        @default(GLOBAL_GROUP)
+  groupKey              String?
+  positionId            String?
   score                 Int
   rationale             String                 @db.Text
   strengths             String[]
@@ -597,7 +607,9 @@ model OpportunityMatch {
   updatedAt             DateTime               @updatedAt
 
   @@unique([redeploymentProfileId, groupKey])
+  @@unique([redeploymentProfileId, positionId])
   @@index([groupKey])
+  @@index([positionId])
 }
 
 enum BulkUploadStatus {

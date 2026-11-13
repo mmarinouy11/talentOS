@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { GlobalMatchesTab } from '@/components/app/GlobalMatchesTab'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getLastSyncSummary } from '@/lib/redeployment-sync'
@@ -6,12 +8,13 @@ import { getAssignablePositionsForCandidates } from '@/lib/assignable-positions'
 import { RedeploymentTable, type RedeploymentRow } from '@/components/app/RedeploymentTable'
 import { RedeploymentSyncButton } from '@/components/app/RedeploymentSyncButton'
 
-export default async function RedeploymentPage() {
+export default async function RedeploymentPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const session = await auth()
   if (!session?.user) redirect('/login')
   const role = (session.user as { role?: string }).role
   const isAdmin = role === 'ADMIN'
   const canAct = isAdmin || role === 'RECRUITER'
+  const tab = (await searchParams).tab === 'matches' ? 'matches' : 'people'
 
   const [profiles, lastSync] = await Promise.all([
     db.redeploymentProfile.findMany({
@@ -81,7 +84,12 @@ export default async function RedeploymentPage() {
         </div>
         {isAdmin && <RedeploymentSyncButton />}
       </div>
-      <RedeploymentTable rows={rows} canAct={canAct} />
+      <nav className="flex border-b border-gray-200">
+        {([['people', 'People', '/redeployment'], ['matches', 'Global matches', '/redeployment?tab=matches']] as const).map(([key, label, href]) => (
+          <Link key={key} href={href} className={`py-2.5 mr-6 text-sm font-medium border-b-2 -mb-px ${tab === key ? 'border-[#8CF000] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{label}</Link>
+        ))}
+      </nav>
+      {tab === 'people' ? <RedeploymentTable rows={rows} canAct={canAct} /> : <GlobalMatchesTab isAdmin={isAdmin} canAct={canAct} />}
     </div>
   )
 }

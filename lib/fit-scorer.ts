@@ -163,6 +163,22 @@ export async function getOrComputeFitScore(
   return result
 }
 
+// Same prompt, rubric, model and temperature for a non-TalentOS target (e.g. a global opportunity group mapped to
+// the position shape). Returns the prompt and its inputs hash so callers can skip unchanged pairs.
+export type PositionLike = Omit<ScoringPosition, 'id'>
+
+export async function fitPromptAndHash(candidateId: string, target: PositionLike): Promise<{ prompt: string; inputsHash: string } | null> {
+  const candidate = await db.candidate.findUnique({ where: { id: candidateId } })
+  if (!candidate) return null
+  const prompt = buildFitPrompt(candidate, { ...target, id: '' })
+  return { prompt, inputsHash: fitInputsHash(prompt, candidate) }
+}
+
+export async function runFitPrompt(prompt: string): Promise<FitScoreResult> {
+  const raw = await callClaudeJSON<Record<string, unknown>>(prompt, 'SMART', SYSTEM_PROMPT, { temperature: 0 })
+  return normalizeResult(raw)
+}
+
 async function numberSetting(key: string, fallback: number): Promise<number> {
   const row = await db.systemSettings.findUnique({ where: { key } })
   const n = row ? Number(row.value) : NaN
