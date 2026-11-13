@@ -1,46 +1,21 @@
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
-import { callClaudeJSON } from '@/lib/anthropic'
+import { getOrComputeFitScore } from '@/lib/fit-scorer'
 
-const SCORE_SYSTEM = 'You are a talent fit evaluator. Score candidates concisely.'
+const MAX_IDS = 50
+const DEFAULT_LIMIT = 15
+const CONCURRENCY = 5
 
-type CandidateInput = {
-  id: string
-  skills: string[]
-  seniority: string | null
-  yearsOfExperience: number | null
+type Score = { candidateId: string; score: number; reason: string; cached: boolean }
+
+function toScore(candidateId: string, r: { fitScore: number; fitSummary: string }, cached: boolean): Score {
+  return { candidateId, score: Math.max(0, Math.min(100, Math.round(r.fitScore))), reason: r.fitSummary ?? '', cached }
 }
 
-type ScoreResult = {
-  score: number
-  reason: string
-}
-
-async function scoreOne(
-  candidate: CandidateInput,
-  jdSkills: string[],
-  coreSkills: string[]
-): Promise<{ candidateId: string; score: number; reason: string }> {
-  const prompt = `Score this candidate's fit for the role on a scale of 0-100.
-Return ONLY a JSON object: {"score": N, "reason": "one sentence"}
-Role requires: ${jdSkills.slice(0, 10).join(', ')}
-Core requirements: ${coreSkills.join(', ')}
-Candidate skills: ${candidate.skills.join(', ')}
-Seniority: ${candidate.seniority ?? 'unknown'}, Experience: ${candidate.yearsOfExperience ?? '?'} years`
-
-  try {
-    const result = await callClaudeJSON<ScoreResult>(prompt, 'FAST', SCORE_SYSTEM)
-    return {
-      candidateId: candidate.id,
-      score: Math.max(0, Math.min(100, Math.round(result.score ?? 0))),
-      reason: result.reason ?? '',
-    }
-  } catch {
-    return { candidateId: candidate.id, score: 0, reason: '' }
-  }
-}
-
+// Real fit scores for Find Candidates, cost-capped. candidateIds arrive in prefilter order. Every candidate
+// with a current cached score for this position is returned for free; real scoring (getOrComputeFitScore)
+// runs only for the first `limit` uncached ones, 5 at a time. The rest come back in `pending`.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -49,27 +24,37 @@ export async function POST(
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id: positionId } = await params
-
-  const position = await db.position.findFirst({
-    where: { id: positionId, deletedAt: null },
-    select: { jdSkills: true, coreSkills: true },
-  })
+  const position = await db.position.findFirst({ where: { id: positionId, deletedAt: null }, select: { id: true } })
   if (!position) return NextResponse.json({ error: 'Position not found' }, { status: 404 })
 
-  const body = await request.json()
-  const candidates: CandidateInput[] = body.candidates ?? []
+  const body = await request.json().catch(() => ({}))
+  const ids: string[] = Array.isArray(body.candidateIds)
+    ? [...new Set((body.candidateIds as unknown[]).filter((x): x is string => typeof x === 'string'))].slice(0, MAX_IDS)
+    : []
+  const limit = Math.max(0, Math.min(DEFAULT_LIMIT, Number(body.limit ?? DEFAULT_LIMIT) || 0))
 
-  // Run with concurrency limit of 10
-  const CONCURRENCY = 10
-  const results: { candidateId: string; score: number; reason: string }[] = []
+  const scores: Score[] = []
+  const uncached: string[] = []
+  await Promise.all(ids.map(async (id) => {
+    const r = await getOrComputeFitScore(id, positionId, { cacheOnly: true }).catch(() => null)
+    if (r) scores.push(toScore(id, r, true))
+  }))
+  const scoredIds = new Set(scores.map((s) => s.candidateId))
+  for (const id of ids) if (!scoredIds.has(id)) uncached.push(id)
 
-  for (let i = 0; i < candidates.length; i += CONCURRENCY) {
-    const batch = candidates.slice(i, i + CONCURRENCY)
-    const batchResults = await Promise.all(
-      batch.map((c) => scoreOne(c, position.jdSkills, position.coreSkills))
-    )
-    results.push(...batchResults)
+  const toCompute = uncached.slice(0, limit)
+  const failed: string[] = []
+  for (let i = 0; i < toCompute.length; i += CONCURRENCY) {
+    await Promise.all(toCompute.slice(i, i + CONCURRENCY).map(async (id) => {
+      try {
+        const r = await getOrComputeFitScore(id, positionId)
+        if (r) scores.push(toScore(id, r, false)); else failed.push(id)
+      } catch (err) {
+        console.error(`[talent-search] Scoring failed for candidate ${id}:`, err instanceof Error ? err.message : err)
+        failed.push(id)
+      }
+    }))
   }
 
-  return NextResponse.json({ scores: results })
+  return NextResponse.json({ scores, pending: uncached.slice(limit), failed })
 }

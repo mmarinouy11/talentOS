@@ -91,7 +91,7 @@ export default async function PositionDetailPage({
       candidatePositions: {
         where: { candidate: { deletedAt: null } },
         include: {
-          candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true, minimumCompensation: true, startAvailability: true, availabilityUpdatedAt: true } },
+          candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true, minimumCompensation: true, startAvailability: true, availabilityUpdatedAt: true, redeploymentProfile: { select: { status: true, lwd: true } } } },
           interviews: { select: { status: true, decision: true, stage: true, scheduledAt: true } },
           recruiter: { select: { name: true } },
         },
@@ -390,6 +390,7 @@ export default async function PositionDetailPage({
             seniority: cp.candidate.seniority,
             startAvailability: cp.candidate.startAvailability,
             availabilityUpdatedAt: cp.candidate.availabilityUpdatedAt?.toISOString() ?? null,
+            redeployLwd: cp.candidate.redeploymentProfile?.status === 'ACTIVE' ? (cp.candidate.redeploymentProfile.lwd?.toISOString() ?? '') : null,
           },
         }))}
         activeCandidates={activeCandidates}

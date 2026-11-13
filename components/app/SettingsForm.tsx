@@ -23,6 +23,13 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   BETTER_MATCH_MIN_DELTA: { label: 'Better Match — Minimum Score Difference', type: 'number', min: 0, max: 100 },
   BETTER_MATCH_MIN_SCORE: { label: 'Better Match — Minimum Score', type: 'number', min: 0, max: 100 },
   BULK_UPLOAD_PRESELECT_SCORE: { label: 'Bulk CV Upload — Preselect Score', type: 'number', min: 0, max: 100 },
+  REDEPLOYMENT_SHEET_ID: { label: 'Redeployment — Roster Sheet ID' },
+  REDEPLOYMENT_SHEET_TAB: { label: 'Redeployment — Roster Tab (name or gid)' },
+  REDEPLOYMENT_CV_FOLDER_ID: { label: 'Redeployment — CV Folder ID' },
+  REDEPLOYMENT_REHIRE_VALUES: { label: 'Redeployment — Rehire Values (comma-separated)' },
+  REDEPLOYMENT_PAST_DAYS: { label: 'Redeployment — Released Up To (days ago)', type: 'number', min: 0, max: 3650 },
+  REDEPLOYMENT_FUTURE_DAYS: { label: 'Redeployment — Releasing Within (days)', type: 'number', min: 0, max: 3650 },
+  REDEPLOYMENT_LWD_FORMAT: { label: 'Redeployment — LWD Text Format (MDY or DMY)' },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -92,10 +99,17 @@ const DISPLAY_ORDER = [
   'BETTER_MATCH_MIN_DELTA',
   'BETTER_MATCH_MIN_SCORE',
   'BULK_UPLOAD_PRESELECT_SCORE',
+  'REDEPLOYMENT_SHEET_ID',
+  'REDEPLOYMENT_SHEET_TAB',
+  'REDEPLOYMENT_CV_FOLDER_ID',
+  'REDEPLOYMENT_REHIRE_VALUES',
+  'REDEPLOYMENT_PAST_DAYS',
+  'REDEPLOYMENT_FUTURE_DAYS',
+  'REDEPLOYMENT_LWD_FORMAT',
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {
-  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS', 'PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_WEEKLY_DAY'])
+  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS', 'PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_WEEKLY_DAY', 'REDEPLOYMENT_LAST_SYNC'])
   const ordered = [
     ...DISPLAY_ORDER.map((key) => settings.find((s) => s.key === key)).filter(Boolean) as Setting[],
     ...settings.filter((s) => !excluded.has(s.key) && !DISPLAY_ORDER.includes(s.key)),

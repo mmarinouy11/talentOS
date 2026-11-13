@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { RedeployBadge, LwdChip } from '@/components/app/RedeployBadge'
 import { AvailabilityLabel } from '@/components/app/AvailabilityLabel'
 import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
@@ -29,6 +30,7 @@ export default async function CandidateInPositionPage({
     include: {
       candidate: {
         include: {
+          redeploymentProfile: { select: { status: true, lwd: true } },
           candidatePositions: {
             where: { id: { not: cpId } },
             include: {
@@ -119,6 +121,7 @@ export default async function CandidateInPositionPage({
             {candidate.firstName} {candidate.lastName}
           </h1>
           {candidate.seniority && <SeniorityBadge seniority={candidate.seniority} />}
+          {candidate.redeploymentProfile?.status === 'ACTIVE' && <><RedeployBadge /><LwdChip lwd={candidate.redeploymentProfile.lwd} /></>}
           <CandidateInPositionHeader candidatePositionId={cp.id} stage={cp.stage} />
         </div>
         <p className="text-sm text-gray-500 mt-0.5">

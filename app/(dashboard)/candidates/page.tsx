@@ -28,6 +28,7 @@ export default async function CandidatesPage() {
       sourcedByOther: true,
       sourcedByUser: { select: { name: true, email: true } },
       sourcedByVendor: { select: { id: true, name: true } },
+      redeploymentProfile: { select: { status: true, lwd: true } },
       candidatePositions: {
         select: { stage: true },
       },
@@ -67,6 +68,7 @@ export default async function CandidatesPage() {
       sourcedByOther: c.sourcedByOther,
       sourcedByUser: c.sourcedByUser,
       sourcedByVendor: c.sourcedByVendor,
+      redeployLwd: c.redeploymentProfile?.status === 'ACTIVE' ? (c.redeploymentProfile.lwd?.toISOString() ?? '') : null,
       candidateStatus,
     }
   })

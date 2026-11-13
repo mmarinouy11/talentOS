@@ -125,7 +125,11 @@ function normalizeResult(raw: Record<string, unknown>): FitScoreResult {
  * (adding to a position, re-score, better-match suggestions, future Redeployment matching) must go through here.
  * Same inputs → the cached result, so the numbers are identical everywhere and no new AI call is made.
  */
-export async function getOrComputeFitScore(candidateId: string, positionId: string): Promise<FitScoreResult | null> {
+export async function getOrComputeFitScore(
+  candidateId: string,
+  positionId: string,
+  opts: { cacheOnly?: boolean } = {},
+): Promise<FitScoreResult | null> {
   const [candidate, position] = await Promise.all([
     db.candidate.findUnique({ where: { id: candidateId } }),
     db.position.findUnique({ where: { id: positionId } }),
@@ -139,6 +143,8 @@ export async function getOrComputeFitScore(candidateId: string, positionId: stri
     where: { candidateId_positionId_inputsHash: { candidateId, positionId, inputsHash } },
   })
   if (cached) return normalizeResult(cached.result as Record<string, unknown>)
+  // cacheOnly: report whether a current score exists without spending an AI call
+  if (opts.cacheOnly) return null
 
   const raw = await callClaudeJSON<Record<string, unknown>>(prompt, 'SMART', SYSTEM_PROMPT, { temperature: 0 })
   const result = normalizeResult(raw)

@@ -41,7 +41,7 @@ interface RecruiterKPI {
     closuresList: (CandRef & { hireDate: string; startDate: string | null })[]
   }
   activity: {
-    manual: number; direct: number; partner: number
+    manual: number; direct: number; partner: number; redeployment: number
     interviewsScheduled: number; screeningHrsPerDay: number
     advances: number; rejects: number; advanceRate: number | null
     avgFitScore: number | null; activePositions: number
@@ -405,11 +405,12 @@ function ActivitySection({ metrics, month }: { metrics: RecruiterKPI[]; month: s
     manual: acc.manual + r.activity.manual,
     direct: acc.direct + r.activity.direct,
     partner: acc.partner + r.activity.partner,
+    redeployment: acc.redeployment + (r.activity.redeployment ?? 0),
     activePositions: acc.activePositions + r.activity.activePositions,
     interviewsScheduled: acc.interviewsScheduled + r.activity.interviewsScheduled,
     advances: acc.advances + r.activity.advances,
     rejects: acc.rejects + r.activity.rejects,
-  }), { manual: 0, direct: 0, partner: 0, activePositions: 0, interviewsScheduled: 0, advances: 0, rejects: 0 })
+  }), { manual: 0, direct: 0, partner: 0, redeployment: 0, activePositions: 0, interviewsScheduled: 0, advances: 0, rejects: 0 })
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -427,6 +428,7 @@ function ActivitySection({ metrics, month }: { metrics: RecruiterKPI[]; month: s
                 <th className={`${th} text-right`}>Manual</th>
                 <th className={`${th} text-right`}>Direct</th>
                 <th className={`${th} text-right`}>Partner</th>
+                <th className={`${th} text-right`}>Redeployment</th>
                 <th className={`${th} text-right`}>Int. Scheduled</th>
                 <th className={`${th} text-right`} title="Estimated based on 30 min per screening call conducted.">Daily Screen. Effort</th>
                 <th className={`${th} text-right`} title="Average days from candidate added to screening completed.">Days to Screen.</th>
@@ -449,6 +451,7 @@ function ActivitySection({ metrics, month }: { metrics: RecruiterKPI[]; month: s
                       <td className="px-3 py-3 text-right tabular-nums font-semibold">{a.manual}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{a.direct}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{a.partner}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{a.redeployment ?? 0}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{a.interviewsScheduled}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{a.screeningHrsPerDay > 0 ? `${a.screeningHrsPerDay} hrs/day` : <Dash />}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{a.daysToScreeningDone != null ? `${a.daysToScreeningDone}d` : <Dash />}</td>
@@ -460,7 +463,7 @@ function ActivitySection({ metrics, month }: { metrics: RecruiterKPI[]; month: s
                     </tr>
                     {isOpen && (
                       <tr>
-                        <td colSpan={13} className="px-4 py-4 bg-gray-50">
+                        <td colSpan={14} className="px-4 py-4 bg-gray-50">
                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Daily sourcing</p>
                           <MiniBarChart data={a.dailySourcing} month={month} />
                         </td>
@@ -477,6 +480,7 @@ function ActivitySection({ metrics, month }: { metrics: RecruiterKPI[]; month: s
                 <td className="px-3 py-3 text-right tabular-nums">{totals.manual}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{totals.direct}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{totals.partner}</td>
+                <td className="px-3 py-3 text-right tabular-nums">{totals.redeployment}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{totals.interviewsScheduled}</td>
                 <td /><td />
                 <td className="px-3 py-3 text-right tabular-nums">{totals.advances}</td>

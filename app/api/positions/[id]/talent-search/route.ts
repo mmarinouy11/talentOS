@@ -14,7 +14,7 @@ export async function POST(
 
   const position = await db.position.findFirst({
     where: { id: positionId, deletedAt: null },
-    select: { id: true, jdSkills: true, coreSkills: true, location: true, jdSeniority: true },
+    select: { id: true, title: true, jdSkills: true, coreSkills: true, location: true, jdSeniority: true },
   })
   if (!position) return NextResponse.json({ error: 'Position not found' }, { status: 404 })
 
@@ -42,7 +42,8 @@ export async function POST(
     where: {
       deletedAt: null,
       id: { notIn: [...excluded] },
-      skills: { isEmpty: false },
+      // Redeployment people are included even when their CV gave no skills (roster skills are used instead)
+      OR: [{ skills: { isEmpty: false } }, { redeploymentProfile: { status: 'ACTIVE' } }],
     },
     select: {
       id: true,
@@ -52,8 +53,13 @@ export async function POST(
       skills: true,
       seniority: true,
       yearsOfExperience: true,
+      cvExperience: true,
+      redeploymentProfile: { select: { status: true, lwd: true, primarySkill: true, subSkill: true, lastJobTitle: true } },
     },
   })
+
+  const STOP = new Set(['and', 'or', 'the', 'of', 'for', 'with', 'sr', 'jr', 'senior', 'junior', 'mid', 'lead', 'ii', 'iii'])
+  const titleWords = [...new Set(position.title.toLowerCase().split(/[^a-z0-9+#.]+/).filter((w) => w.length > 1 && !STOP.has(w)))]
 
   type Match = {
     id: string
@@ -64,7 +70,11 @@ export async function POST(
     seniority: string | null
     yearsOfExperience: number | null
     matchingSkills: string[]
+    // Prefilter rank only (no AI); used for ordering, never returned or displayed
     matchCount: number
+    titleHits: number
+    // ACTIVE redeployment profile only; no score boost
+    redeploy: { lwd: string | null } | null
   }
 
   const matches: Match[] = []
@@ -77,7 +87,8 @@ export async function POST(
     }
 
     // Skills overlap
-    const candidateSkillsLower = c.skills.map((s) => s.toLowerCase())
+    const rp = c.redeploymentProfile?.status === 'ACTIVE' ? c.redeploymentProfile : null
+    const candidateSkillsLower = [...c.skills, ...(rp ? [rp.primarySkill, rp.subSkill].filter((s): s is string => !!s) : [])].map((s) => s.toLowerCase())
     const matchingSkills: string[] = []
     for (const jdSkill of jdSkillsLower) {
       if (candidateSkillsLower.some((cs) => cs.includes(jdSkill) || jdSkill.includes(cs))) {
@@ -86,6 +97,13 @@ export async function POST(
       }
     }
     if (matchingSkills.length === 0) continue
+
+    // Title overlap: position title words found in the candidate's latest role (CV) or last roster role
+    const latestRole = [
+      Array.isArray(c.cvExperience) ? (c.cvExperience[0] as { title?: unknown } | undefined)?.title : null,
+      rp?.lastJobTitle,
+    ].filter((t): t is string => typeof t === 'string').join(' ').toLowerCase()
+    const titleHits = titleWords.filter((w) => latestRole.includes(w)).length
 
     matches.push({
       id: c.id,
@@ -97,13 +115,17 @@ export async function POST(
       yearsOfExperience: c.yearsOfExperience,
       matchingSkills,
       matchCount: matchingSkills.length,
+      titleHits,
+      redeploy: rp ? { lwd: rp.lwd?.toISOString() ?? null } : null,
     })
   }
 
-  matches.sort((a, b) => b.matchCount - a.matchCount)
+  matches.sort((a, b) => b.matchCount - a.matchCount || b.titleHits - a.titleHits)
 
   return NextResponse.json({
-    candidates: matches.slice(0, 50),
+    // Ordered by the prefilter; its numbers stay server-side
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    candidates: matches.slice(0, 50).map(({ matchCount: _m, titleHits: _t, ...rest }) => rest),
     total: matches.length,
     position: {
       jdSkills: position.jdSkills,

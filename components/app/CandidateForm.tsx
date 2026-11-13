@@ -34,7 +34,7 @@ interface Fields {
   minimumCompensation: string
   notes: string
   recruiterId: string
-  sourcedByType: 'RECRUITER' | 'VENDOR' | 'OTHER' | ''
+  sourcedByType: 'RECRUITER' | 'VENDOR' | 'OTHER' | 'REDEPLOYMENT' | ''
   sourcedByUserId: string
   sourcedByVendorId: string
   sourcedByOther: string
@@ -62,7 +62,7 @@ interface CandidateFormProps {
     cvDriveId?: string | null
     cvOriginalName?: string | null
     recruiterId?: string | null
-    sourcedByType?: 'RECRUITER' | 'VENDOR' | 'OTHER' | null
+    sourcedByType?: 'RECRUITER' | 'VENDOR' | 'OTHER' | 'REDEPLOYMENT' | null
     sourcedByUserId?: string | null
     sourcedByVendorId?: string | null
     sourcedByOther?: string | null
@@ -453,6 +453,7 @@ export function CandidateForm({ mode, currentUserId, defaultValues = {} }: Candi
             <option value="RECRUITER">Internal Recruiter</option>
             <option value="VENDOR">Partner</option>
             <option value="OTHER">Other</option>
+            <option value="REDEPLOYMENT">Redeployment</option>
           </Select>
         </div>
 

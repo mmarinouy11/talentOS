@@ -11,6 +11,7 @@ const navItems = [
   { href: '/', label: 'Home' },
   { href: '/positions', label: 'Positions' },
   { href: '/candidates', label: 'Candidates' },
+  { href: '/redeployment', label: 'Redeployment' },
   { href: '/vendors', label: 'Partners' },
   { href: '/reports', label: 'Reports' },
   { href: '/profile', label: 'My Profile' },

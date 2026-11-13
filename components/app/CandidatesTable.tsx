@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { RedeployBadge, LwdChip } from './RedeployBadge'
 import Link from 'next/link'
 import type { Seniority, SourceType } from '@prisma/client'
 import { SeniorityBadge } from './SeniorityBadge'
@@ -57,6 +58,8 @@ export interface CandidateRow {
   sourcedByOther: string | null
   sourcedByUser: { name: string | null; email: string } | null
   sourcedByVendor: { id: string; name: string } | null
+  // Set (possibly '') when the candidate has an ACTIVE redeployment profile
+  redeployLwd?: string | null
   candidateStatus?: 'active' | 'hired' | 'rejected'
 }
 
@@ -75,12 +78,21 @@ function sourceLabel(row: CandidateRow): string {
   if (row.sourcedByType === 'RECRUITER') return row.sourcedByUser?.name ?? row.sourcedByUser?.email ?? ''
   if (row.sourcedByType === 'VENDOR') return row.sourcedByVendor?.name ?? ''
   if (row.sourcedByType === 'DIRECT') return 'Direct Application'
+  if (row.sourcedByType === 'REDEPLOYMENT') return 'Redeployment'
   return row.sourcedByOther ?? ''
 }
 
 type SortKey = keyof SortRow
 
 function SourceCell({ row }: { row: CandidateRow }) {
+  // Active redeployment profile: Redeploy badge whatever the original source
+  if (row.redeployLwd != null || row.sourcedByType === 'REDEPLOYMENT') return (
+    <span className="inline-flex items-center gap-1 text-xs">
+      {row.sourcedByType && row.sourcedByType !== 'REDEPLOYMENT' && <span className="text-gray-500">{sourceLabel(row) || '—'}</span>}
+      <RedeployBadge />
+      {row.redeployLwd ? <LwdChip lwd={row.redeployLwd} /> : null}
+    </span>
+  )
   if (!row.sourcedByType) return <span className="text-gray-400">—</span>
   if (row.sourcedByType === 'RECRUITER') return (
     <span className="text-gray-700 text-xs">
