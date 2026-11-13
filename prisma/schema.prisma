@@ -508,6 +508,7 @@ model RedeploymentProfile {
   preferredName         String?
   cvFileName            String?
   sourceCvDriveFileId   String?
+  opportunityMatches    OpportunityMatch[]
   status                RedeploymentStatus @default(ACTIVE)
   firstSeenAt           DateTime           @default(now())
   lastSyncedAt          DateTime
@@ -515,6 +516,88 @@ model RedeploymentProfile {
   updatedAt             DateTime           @updatedAt
 
   @@index([status])
+}
+
+// Company-wide open positions (imported .xlsx). Only rows kept by the import filters are stored.
+model GlobalOpportunity {
+  id                    String    @id @default(cuid())
+  requisitionId         String    @unique
+  groupKey              String
+  location              String
+  workMode              String?
+  designation           String
+  grade                 String?
+  experience            String?
+  groupAccountName      String?
+  accountName           String?
+  projectName           String?
+  opportunityName       String?
+  stageName             String?
+  confidenceLevel       String?
+  requirementType       String?
+  employmentType        String?
+  primarySkill          String?
+  subSkills             String[]
+  mandatorySkills       String[]
+  jobSummary            String?   @db.Text
+  jobDescription        String?   @db.Text
+  openings              Int
+  plannedOnboardingDate DateTime?
+  sourceCreatedOn       DateTime?
+  active                Boolean   @default(true)
+  firstSeenAt           DateTime  @default(now())
+  lastSeenAt            DateTime
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([groupKey])
+  @@index([active])
+}
+
+model GlobalOpportunityImport {
+  id                     String   @id @default(cuid())
+  fileName               String
+  importedById           String
+  importedAt             DateTime @default(now())
+  totalRows              Int
+  kept                   Int
+  discardedOffshore      Int
+  discardedLatam         Int
+  discardedUsWfo         Int
+  discardedOtherLocation Int
+  discardedOther         Int
+  deactivated            Int
+  newCount               Int
+}
+
+enum OpportunityMatchStatus {
+  NEW
+  PROPOSED
+  DISMISSED
+}
+
+// Redeployment person × opportunity group (groupKey), scored with the fit-score rubric
+model OpportunityMatch {
+  id                    String                 @id @default(cuid())
+  redeploymentProfileId String
+  redeploymentProfile   RedeploymentProfile    @relation(fields: [redeploymentProfileId], references: [id], onDelete: Cascade)
+  groupKey              String
+  score                 Int
+  rationale             String                 @db.Text
+  strengths             String[]
+  gaps                  String[]
+  inputsHash            String
+  status                OpportunityMatchStatus @default(NEW)
+  notes                 String?
+  proposedAt            DateTime?
+  proposedById          String?
+  dismissedAt           DateTime?
+  scoredAt              DateTime
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@unique([redeploymentProfileId, groupKey])
+  @@index([groupKey])
 }
 
 enum BulkUploadStatus {
