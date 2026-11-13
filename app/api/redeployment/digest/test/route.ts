@@ -8,10 +8,11 @@ export async function POST() {
   if (who instanceof NextResponse) return who
   if (!who.email) return NextResponse.json({ error: 'Your user has no email' }, { status: 400 })
   try {
-    await sendTestRedeploymentDigest(who.email)
+    const r = await sendTestRedeploymentDigest(who.email)
+    if (!r.sent) return NextResponse.json({ error: `Not sent: ${r.reason}` }, { status: 502 })
     return NextResponse.json({ sentTo: who.email })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Could not send the digest'
+    const message = `Not sent: ${err instanceof Error ? err.message : 'could not build the digest'}`
     console.error('[redeployment-digest] Test send failed:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }

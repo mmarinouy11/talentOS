@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { getActiveOpportunityGroups } from '@/lib/redeployment-matching'
 import { getGlobalOpportunitySettings } from '@/lib/global-opportunity-settings'
+import { getLastDigestResult } from '@/lib/redeployment-digest'
 import { GlobalMatchesView, type MatchPerson } from './GlobalMatchesView'
 
 // Server part of the "Global matches" tab: ACTIVE people with their matches on still-active opportunity groups
@@ -38,5 +39,23 @@ export async function GlobalMatchesTab({ isAdmin, canAct }: { isAdmin: boolean; 
     .filter((p) => p.matches.length > 0)
     .sort((a, b) => b.matches[0].score - a.matches[0].score)
 
-  return <GlobalMatchesView people={people} defaultMinScore={settings.minScore} isAdmin={isAdmin} canAct={canAct} groupCount={groups.length} />
+  const lastDigest = isAdmin ? await getLastDigestResult() : null
+  const tone = lastDigest?.outcome === 'sent' ? 'border-gray-200 bg-white text-gray-700'
+    : lastDigest?.outcome === 'error' ? 'border-red-200 bg-red-50 text-red-700'
+      : 'border-amber-200 bg-amber-50 text-amber-800'
+  const label = { sent: 'Sent', partial: 'Partly sent', skipped: 'Not sent', error: 'Error' } as const
+
+  return (
+    <div className="space-y-4">
+      {isAdmin && (
+        <div className={`rounded-lg border px-4 py-2.5 text-sm ${lastDigest ? tone : 'border-gray-200 bg-white text-gray-500'}`}>
+          <span className="font-medium">Last Monday digest:</span>{' '}
+          {lastDigest
+            ? <>{label[lastDigest.outcome]} · {new Date(lastDigest.at).toLocaleString('en-US', { timeZone: 'America/Montevideo', dateStyle: 'medium', timeStyle: 'short' })} · {lastDigest.detail}</>
+            : 'not run yet'}
+        </div>
+      )}
+      <GlobalMatchesView people={people} defaultMinScore={settings.minScore} isAdmin={isAdmin} canAct={canAct} groupCount={groups.length} />
+    </div>
+  )
 }

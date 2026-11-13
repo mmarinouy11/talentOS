@@ -1,5 +1,5 @@
 import { db } from './db'
-import { sendEmailViaSystemGmail } from './email'
+import { trySendEmailViaSystemGmail } from './email'
 import { getGlobalOpportunitySettings } from './global-opportunity-settings'
 import { getActiveOpportunityGroups } from './redeployment-matching'
 import { lwdChip } from './redeployment-display'
@@ -91,26 +91,72 @@ export async function buildRedeploymentDigest(now = new Date()): Promise<{ subje
   return { subject: `Redeployment digest — ${people.length} ${people.length === 1 ? 'person' : 'people'} with matches`, html, people: people.length }
 }
 
-// Monday send: only to REDEPLOYMENT_DIGEST_RECIPIENTS (nothing when empty); "New" tags compare with the last send
-export async function sendRedeploymentDigest(): Promise<{ sent: number }> {
-  const { digestRecipients } = await getGlobalOpportunitySettings()
-  if (digestRecipients.length === 0) {
-    console.log('[redeployment-digest] No recipients configured, not sent')
-    return { sent: 0 }
-  }
-  const now = new Date()
-  const { subject, html } = await buildRedeploymentDigest(now)
-  for (const to of digestRecipients) await sendEmailViaSystemGmail({ to, subject, html })
-  await db.systemSettings.upsert({
-    where: { key: LAST_DIGEST_KEY },
-    update: { value: now.toISOString() },
-    create: { key: LAST_DIGEST_KEY, value: now.toISOString(), description: 'Last Monday Redeployment digest (managed automatically).' },
-  })
-  return { sent: digestRecipients.length }
+export const LAST_DIGEST_RESULT_KEY = 'REDEPLOYMENT_LAST_DIGEST_RESULT'
+
+export interface DigestResult {
+  at: string
+  outcome: 'sent' | 'partial' | 'skipped' | 'error'
+  detail: string
+  sentTo: string[]
+  failed: { to: string; reason: string }[]
 }
 
-// Test send to one address; does not move the "New since last digest" marker
-export async function sendTestRedeploymentDigest(to: string): Promise<void> {
+async function saveResult(r: DigestResult) {
+  await db.systemSettings.upsert({
+    where: { key: LAST_DIGEST_RESULT_KEY },
+    update: { value: JSON.stringify(r) },
+    create: { key: LAST_DIGEST_RESULT_KEY, value: JSON.stringify(r), description: 'Result of the last Monday Redeployment digest (managed automatically).' },
+  })
+}
+
+export async function getLastDigestResult(): Promise<DigestResult | null> {
+  const row = await db.systemSettings.findUnique({ where: { key: LAST_DIGEST_RESULT_KEY } })
+  if (!row) return null
+  try { return JSON.parse(row.value) as DigestResult } catch { return null }
+}
+
+// Monday send: only to REDEPLOYMENT_DIGEST_RECIPIENTS (nothing when empty). Each address reports whether it really
+// went out; the result (sent / partial / skipped / error) is stored for the Global matches tab and logged.
+// The "New since last digest" marker only moves when at least one email was actually sent.
+export async function sendRedeploymentDigest(): Promise<DigestResult> {
+  const now = new Date()
+  const base = { at: now.toISOString(), sentTo: [] as string[], failed: [] as { to: string; reason: string }[] }
+  let result: DigestResult
+  try {
+    const { digestRecipients } = await getGlobalOpportunitySettings()
+    if (digestRecipients.length === 0) {
+      result = { ...base, outcome: 'skipped', detail: 'No recipients configured (REDEPLOYMENT_DIGEST_RECIPIENTS is empty)' }
+    } else {
+      const { subject, html } = await buildRedeploymentDigest(now)
+      for (const to of digestRecipients) {
+        const r = await trySendEmailViaSystemGmail({ to, subject, html })
+        if (r.sent) base.sentTo.push(to); else base.failed.push({ to, reason: r.reason })
+      }
+      const reasons = [...new Set(base.failed.map((f) => f.reason))].join('; ')
+      result = base.failed.length === 0
+        ? { ...base, outcome: 'sent', detail: `Sent to ${base.sentTo.length} recipient${base.sentTo.length === 1 ? '' : 's'}` }
+        : base.sentTo.length > 0
+          ? { ...base, outcome: 'partial', detail: `Sent to ${base.sentTo.length}, not sent to ${base.failed.length}: ${reasons}` }
+          : { ...base, outcome: 'skipped', detail: `Not sent: ${reasons}` }
+      if (base.sentTo.length > 0) {
+        await db.systemSettings.upsert({
+          where: { key: LAST_DIGEST_KEY },
+          update: { value: now.toISOString() },
+          create: { key: LAST_DIGEST_KEY, value: now.toISOString(), description: 'Last Monday Redeployment digest (managed automatically).' },
+        })
+      }
+    }
+  } catch (err) {
+    result = { ...base, outcome: 'error', detail: err instanceof Error ? err.message : 'Unknown error building the digest' }
+  }
+  if (result.outcome === 'sent') console.log(`[redeployment-digest] ${result.detail}`)
+  else console.warn(`[redeployment-digest] WARNING: digest ${result.outcome} — ${result.detail}`)
+  await saveResult(result).catch((err) => console.error('[redeployment-digest] Could not store the result:', err))
+  return result
+}
+
+// Test send to one address; does not move the "New since last digest" marker or the stored Monday result
+export async function sendTestRedeploymentDigest(to: string): Promise<{ sent: true } | { sent: false; reason: string }> {
   const { subject, html } = await buildRedeploymentDigest()
-  await sendEmailViaSystemGmail({ to, subject: `[Test] ${subject}`, html })
+  return trySendEmailViaSystemGmail({ to, subject: `[Test] ${subject}`, html })
 }
