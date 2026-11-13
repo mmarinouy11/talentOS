@@ -7,6 +7,7 @@ import { findCandidateMatches, type DuplicateResult } from './candidate-identity
 import { hasCandidateIdentifier, realEmailOrNull } from './candidate-identifier'
 import { createCandidateRecord } from './candidate-create'
 import { parseCvFromBuffer, type ParsedCv } from './cv-parser'
+import { redeploymentFirstName } from './redeployment-names'
 
 const TZ = 'America/Montevideo'
 const DAY_MS = 86_400_000
@@ -267,7 +268,8 @@ export async function createCandidateFromProfile(
 
   // Roster fields win; the CV only fills what the roster leaves empty
   const c = await createCandidateRecord({
-    firstName: profile.preferredName || profile.firstName || parsed.firstName || '',
+    // Preferred name minus the Last Name (it often holds the full name); the profile keeps the raw roster values
+    firstName: redeploymentFirstName(profile) || parsed.firstName || '',
     lastName: profile.lastName || parsed.lastName || '',
     email,
     phone: profile.phone || parsed.phone || null,
