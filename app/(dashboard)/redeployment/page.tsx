@@ -85,7 +85,7 @@ export default async function RedeploymentPage({ searchParams }: { searchParams:
         {isAdmin && <RedeploymentSyncButton />}
       </div>
       <nav className="flex border-b border-gray-200">
-        {([['people', 'People', '/redeployment'], ['matches', 'Global matches', '/redeployment?tab=matches']] as const).map(([key, label, href]) => (
+        {([['people', 'People', '/redeployment'], ['matches', 'Matches', '/redeployment?tab=matches']] as const).map(([key, label, href]) => (
           <Link key={key} href={href} className={`py-2.5 mr-6 text-sm font-medium border-b-2 -mb-px ${tab === key ? 'border-[#8CF000] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>{label}</Link>
         ))}
       </nav>

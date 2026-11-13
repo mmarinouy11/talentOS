@@ -120,7 +120,8 @@ export async function POST(
     })
   }
 
-  matches.sort((a, b) => b.matchCount - a.matchCount || b.titleHits - a.titleHits)
+  // Redeployment pool first (they pass the prefilter above), so they land in the first scoring batch; no score boost
+  matches.sort((a, b) => Number(!!b.redeploy) - Number(!!a.redeploy) || b.matchCount - a.matchCount || b.titleHits - a.titleHits)
 
   return NextResponse.json({
     // Ordered by the prefilter; its numbers stay server-side

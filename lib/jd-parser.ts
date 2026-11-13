@@ -89,6 +89,8 @@ ${position.description.slice(0, 4000)}`
         ...(screeningQuestions.length > 0 ? { screeningQuestions } : {}),
       },
     })
+    // New JD intelligence changes who fits: refresh redeployment matches (debounced, background)
+    import('./redeployment-matching').then((m) => m.scheduleRedeploymentMatching(`position ${positionId} JD parsed`)).catch(() => {})
 
     return parsed
   } catch (err) {

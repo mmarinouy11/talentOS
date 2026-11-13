@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { markRedeploymentHire } from '@/lib/redeployment-hire'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -45,6 +46,9 @@ export async function PATCH(
       ...(newStage === 'HIRED' && startDate ? { startDate: new Date(startDate) } : {}),
     },
   })
+
+  // Becoming hired now: flag redeployment hires (recruiter achievement weighting)
+  if (newStage === 'HIRED' && cp.stage !== 'HIRED' && cp.status !== 'HIRED') await markRedeploymentHire(id)
 
   await db.stageHistory.create({
     data: {

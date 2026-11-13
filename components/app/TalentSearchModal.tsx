@@ -159,6 +159,61 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
     }
   }
 
+  // Redeployment pool rows: lime left border (badge + LWD chip come from c.redeploy). Same scores, no boost.
+  const renderRow = (c: TalentCandidate, pool: boolean) => (
+                  <tr
+                    key={c.id}
+                    onClick={() => toggleSelect(c.id)}
+                    className={`cursor-pointer hover:bg-[#F5F0EB] transition-colors ${selected.has(c.id) ? 'bg-[#F5F0EB]' : ''}`}
+                  >
+                    <td className={`py-3 pl-4 pr-2 ${pool ? 'border-l-4 border-l-[#8CF000]' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(c.id)}
+                        onChange={() => toggleSelect(c.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 rounded border-gray-300 accent-black"
+                      />
+                    </td>
+                    <td className="py-3 px-3">
+                      <p className="font-medium text-gray-900 flex items-center gap-1.5 flex-wrap">
+                        {c.firstName} {c.lastName}
+                        {c.redeploy && <><RedeployBadge /><LwdChip lwd={c.redeploy.lwd} /></>}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {c.seniority ? SENIORITY_LABEL[c.seniority] : null}
+                        {c.seniority && c.country ? ' · ' : ''}
+                        {c.country ?? ''}
+                        {c.yearsOfExperience ? ` · ${c.yearsOfExperience}y exp` : ''}
+                      </p>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="flex flex-wrap gap-1">
+                        {c.matchingSkills.slice(0, 4).map((s) => (
+                          <span key={s} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{s}</span>
+                        ))}
+                        {c.matchingSkills.length > 4 && (
+                          <span className="text-xs text-gray-400">+{c.matchingSkills.length - 4} more</span>
+                        )}
+                      </div>
+                      {c.reason && !c.scoring && (
+                        <p className="text-xs text-gray-400 mt-1 leading-snug line-clamp-1">{c.reason}</p>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      {c.scoring ? (
+                        <span className="inline-block h-4 w-4 rounded-full border-2 border-gray-200 border-t-[#8CF000] animate-spin" />
+                      ) : c.score !== undefined ? (
+                        <span className={`text-sm font-semibold ${c.score >= 70 ? 'text-[#2F2C29]' : c.score >= 50 ? 'text-amber-600' : 'text-gray-400'}`}>
+                          {c.score}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300" title="Not scored yet">—</span>
+                      )}
+                    </td>
+                  </tr>
+  )
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
@@ -226,59 +281,25 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {candidates.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => toggleSelect(c.id)}
-                    className={`cursor-pointer hover:bg-[#F5F0EB] transition-colors ${selected.has(c.id) ? 'bg-[#F5F0EB]' : ''}`}
-                  >
-                    <td className="py-3 pl-4 pr-2">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(c.id)}
-                        onChange={() => toggleSelect(c.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 rounded border-gray-300 accent-black"
-                      />
-                    </td>
-                    <td className="py-3 px-3">
-                      <p className="font-medium text-gray-900 flex items-center gap-1.5 flex-wrap">
-                        {c.firstName} {c.lastName}
-                        {c.redeploy && <><RedeployBadge /><LwdChip lwd={c.redeploy.lwd} /></>}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {c.seniority ? SENIORITY_LABEL[c.seniority] : null}
-                        {c.seniority && c.country ? ' · ' : ''}
-                        {c.country ?? ''}
-                        {c.yearsOfExperience ? ` · ${c.yearsOfExperience}y exp` : ''}
-                      </p>
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="flex flex-wrap gap-1">
-                        {c.matchingSkills.slice(0, 4).map((s) => (
-                          <span key={s} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{s}</span>
-                        ))}
-                        {c.matchingSkills.length > 4 && (
-                          <span className="text-xs text-gray-400">+{c.matchingSkills.length - 4} more</span>
-                        )}
-                      </div>
-                      {c.reason && !c.scoring && (
-                        <p className="text-xs text-gray-400 mt-1 leading-snug line-clamp-1">{c.reason}</p>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      {c.scoring ? (
-                        <span className="inline-block h-4 w-4 rounded-full border-2 border-gray-200 border-t-[#8CF000] animate-spin" />
-                      ) : c.score !== undefined ? (
-                        <span className={`text-sm font-semibold ${c.score >= 70 ? 'text-[#2F2C29]' : c.score >= 50 ? 'text-amber-600' : 'text-gray-400'}`}>
-                          {c.score}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300" title="Not scored yet">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const pool = candidates.filter((c) => c.redeploy)
+                  const others = candidates.filter((c) => !c.redeploy)
+                  const header = (label: string, hint: string) => (
+                    <tr className="bg-[#F5F0EB]">
+                      <td colSpan={4} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#2F2C29]">
+                        {label} <span className="ml-1 font-normal normal-case tracking-normal text-gray-500">{hint}</span>
+                      </td>
+                    </tr>
+                  )
+                  return (
+                    <>
+                      {pool.length > 0 && header('Redeployment pool', `${pool.length} · scored first, same scoring as everyone`)}
+                      {pool.map((c) => renderRow(c, true))}
+                      {pool.length > 0 && others.length > 0 && header('Other candidates', `${others.length}`)}
+                      {others.map((c) => renderRow(c, false))}
+                    </>
+                  )
+                })()}
               </tbody>
             </table>
           )}

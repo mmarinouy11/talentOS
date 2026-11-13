@@ -6,5 +6,7 @@ export async function register() {
     startBulkUploadWorker()
     const { startRedeploymentCron } = await import('./lib/redeployment-cron')
     startRedeploymentCron()
+    const { runRedeploymentHireBackfill } = await import('./lib/redeployment-hire')
+    void runRedeploymentHireBackfill()
   }
 }

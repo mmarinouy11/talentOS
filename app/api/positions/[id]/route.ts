@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { scheduleRedeploymentMatching } from '@/lib/redeployment-matching'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -120,6 +121,11 @@ export async function PATCH(
   })
 
   if (parsed.data.description) parseJDInBackground(position.id)
+  // Reopened, or skills / seniority / JD changed: redeployment matches may change (JD edits also re-run after parsing)
+  const reopened = parsed.data.status === 'OPEN' && existing.status !== 'OPEN'
+  if (reopened || parsed.data.coreSkills !== undefined || parsed.data.description !== undefined || parsed.data.status !== undefined) {
+    scheduleRedeploymentMatching(`position ${position.id} updated`)
+  }
 
   return NextResponse.json(position)
 }

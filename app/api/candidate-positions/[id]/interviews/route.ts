@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { markRedeploymentHire } from '@/lib/redeployment-hire'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -97,6 +98,7 @@ export async function POST(
       where: { id },
       data: { stage: interviewStage as Stage, stageEnteredAt: new Date() },
     })
+    if (interviewStage === 'HIRED') await markRedeploymentHire(id)
     if (userId) {
       await db.stageHistory.create({
         data: {

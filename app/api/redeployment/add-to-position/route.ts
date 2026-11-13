@@ -48,5 +48,13 @@ export async function POST(request: Request) {
 
   const cp = await addCandidateToPosition({ candidateId, positionId, recruiterId: user.id, movedById: user.id })
   scoreCandidateForPosition(cp.id).catch(console.error)
+  // The person's TalentOS-position match (if any) becomes PROPOSED
+  const profile = await db.redeploymentProfile.findUnique({ where: { candidateId }, select: { id: true } })
+  if (profile) {
+    await db.opportunityMatch.updateMany({
+      where: { redeploymentProfileId: profile.id, positionId, targetType: 'TALENTOS_POSITION', status: { not: 'PROPOSED' } },
+      data: { status: 'PROPOSED', proposedAt: new Date(), proposedById: user.id, dismissedAt: null },
+    })
+  }
   return NextResponse.json(cp, { status: 201 })
 }
