@@ -511,6 +511,12 @@ model RedeploymentProfile {
   cvFileName            String?
   sourceCvDriveFileId   String?
   opportunityMatches    OpportunityMatch[]
+  // Excluded from matching (reversible); excludedLwd = LWD when excluded, a different LWD in the roster reactivates
+  excludedFromMatching  Boolean            @default(false)
+  excludedReason        String?
+  excludedAt            DateTime?
+  excludedById          String?
+  excludedLwd           DateTime?
   status                RedeploymentStatus @default(ACTIVE)
   firstSeenAt           DateTime           @default(now())
   lastSyncedAt          DateTime
@@ -610,6 +616,40 @@ model OpportunityMatch {
   @@unique([redeploymentProfileId, positionId])
   @@index([groupKey])
   @@index([positionId])
+}
+
+// A matching target skipped for everyone (global opportunity group or TalentOS position); matches hidden, not deleted
+model MatchTargetExclusion {
+  id           String          @id @default(cuid())
+  targetType   MatchTargetType
+  groupKey     String?
+  positionId   String?
+  reason       String?
+  excludedById String
+  excludedAt   DateTime        @default(now())
+
+  @@unique([targetType, groupKey])
+  @@unique([targetType, positionId])
+}
+
+// A redeployment person proposed for a global opportunity by email (sent from the user's Gmail, or manually)
+model OpportunityProposal {
+  id                    String   @id @default(cuid())
+  matchId               String
+  redeploymentProfileId String
+  groupKey              String
+  toEmails              String[]
+  ccEmails              String[]
+  subject               String
+  body                  String   @db.Text
+  attachmentName        String?
+  sentById              String
+  sentAt                DateTime @default(now())
+  gmailMessageId        String?
+  method                String
+
+  @@index([matchId])
+  @@index([redeploymentProfileId])
 }
 
 enum BulkUploadStatus {

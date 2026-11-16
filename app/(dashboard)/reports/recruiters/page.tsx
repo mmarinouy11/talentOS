@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
+import { RedeployBadge } from '@/components/app/RedeployBadge'
 import Link from 'next/link'
 import { ProactiveBadge } from '@/components/app/ProactiveBadge'
 import { useRouter } from 'next/navigation'
@@ -28,7 +29,8 @@ interface RecruiterKPI {
   qualified: { count: number; requisition: number; proactive: number; perActivePosition: number | null; pace: number | null; target: number }
   timeToSubmission: { first: SlaAgg; shortlist: SlaAgg }
   techPassRate: { rate: number | null; advances: number; total: number }
-  closures: { count: number; target: number; stretch: number; isLowDemand: boolean; isNA: boolean }
+  // count is weighted: hires + redeployHires × redeployWeight
+  closures: { count: number; hires: number; redeployHires: number; redeployWeight: number; target: number; stretch: number; isLowDemand: boolean; isNA: boolean }
   achievement: {
     score: number | null
     naKpis: string[]
@@ -38,7 +40,7 @@ interface RecruiterKPI {
     positions: { id: string; title: string; status: string; headcount: number; kickoff: string; firstSLA: SlaResult; shortlistSLA: SlaResult; activityOnly: boolean }[]
     qualifiedCandidates: (CandRef & { date: string; proactive: boolean })[]
     techEvaluations: (CandRef & { result: 'Passed' | 'Failed'; date: string; source: 'decision' | 'stage move' })[]
-    closuresList: (CandRef & { hireDate: string; startDate: string | null })[]
+    closuresList: (CandRef & { hireDate: string; startDate: string | null; redeploymentHire?: boolean })[]
   }
   activity: {
     manual: number; direct: number; partner: number; redeployment: number
@@ -322,7 +324,7 @@ function DrillDown({ r }: { r: RecruiterKPI }) {
         <DTable widths={['30%', '40%', '15%', '15%']} headers={['Candidate', 'Position', 'Hired', 'Start date']}>
           {closures.map((c) => (
             <tr key={c.cpId} className={dTr}>
-              <td className={dTd}><TruncLink href={candHref(c)} text={c.name} /></td>
+              <td className={dTd}><div className="flex items-center gap-1.5 min-w-0"><TruncLink href={candHref(c)} text={c.name} />{c.redeploymentHire && <RedeployBadge />}</div></td>
               <td className={`${dTd} text-gray-500`}><span className="block truncate" title={c.positionTitle}>{c.positionTitle}</span></td>
               <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{fmtDate(c.hireDate)}</td>
               <td className={`${dTd} text-gray-500 whitespace-nowrap`}>{c.startDate ? fmtDate(c.startDate) : '—'}</td>
@@ -374,6 +376,14 @@ function ScorecardRow({ r, isCurrentMonth, open, onToggle }: { r: RecruiterKPI; 
           {c.isNA ? <span className="text-gray-400">N/A</span> : (
             <div>
               <StatusIcon s={ratioStatus(c.count, c.target)} /> {c.count} / {c.target}
+              {c.redeployHires > 0 && (
+                <div
+                  className="text-xs text-gray-500"
+                  title={`Redeployment hires count ${c.redeployWeight}× in this report (setting REDEPLOYMENT_HIRE_WEIGHT): a hire counts as redeployment when the candidate was in the Redeployment pool (active or out of window) at the time of hire. Hire counts elsewhere are unchanged.`}
+                >
+                  ({c.hires} hire{c.hires === 1 ? '' : 's'} · {c.redeployHires} redeploy ×{c.redeployWeight})
+                </div>
+              )}
               {!c.isLowDemand && <span className="text-gray-400 text-xs"> · stretch {c.stretch}</span>}
               {c.isLowDemand && <div className="text-xs text-gray-400">(low demand)</div>}
             </div>

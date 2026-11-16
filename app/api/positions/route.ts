@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { scheduleRedeploymentMatching } from '@/lib/redeployment-matching'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -76,5 +77,6 @@ export async function POST(request: Request) {
 
   parseJDInBackground(position.id)
 
+  scheduleRedeploymentMatching('position created')
   return NextResponse.json(position, { status: 201 })
 }

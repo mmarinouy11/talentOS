@@ -1,7 +1,7 @@
 import { db } from './db'
 import { trySendEmailViaSystemGmail } from './email'
 import { getGlobalOpportunitySettings } from './global-opportunity-settings'
-import { getActiveOpportunityGroups } from './redeployment-matching'
+import { getVisibleMatches } from './redeployment-match-view'
 import { lwdChip } from './redeployment-display'
 
 const LAST_DIGEST_KEY = 'REDEPLOYMENT_LAST_DIGEST_AT'
@@ -25,53 +25,54 @@ export async function buildRedeploymentDigest(now = new Date()): Promise<{ subje
   const lastDigestAt = lastRow ? new Date(lastRow.value) : null
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
 
-  const active = await db.redeploymentProfile.findMany({
-    where: { status: 'ACTIVE' },
-    select: {
-      id: true, lwd: true, firstSeenAt: true, lastJobTitle: true, grade: true, preferredName: true, firstName: true, lastName: true,
-      candidate: { select: { firstName: true, lastName: true } },
-      opportunityMatches: {
-        where: { status: { in: ['NEW', 'PROPOSED'] }, score: { gte: settings.minScore } },
-        orderBy: { score: 'desc' },
-      },
-    },
-  })
+  const active = await db.redeploymentProfile.findMany({ where: { status: 'ACTIVE' }, select: { lwd: true, firstSeenAt: true } })
   const releasingSoon = active.filter((p) => p.lwd && p.lwd.getTime() >= today && p.lwd.getTime() <= today + 30 * DAY_MS).length
   const releasedRecently = active.filter((p) => p.lwd && p.lwd.getTime() < today && p.lwd.getTime() >= today - 30 * DAY_MS).length
   const newThisWeek = active.filter((p) => p.firstSeenAt.getTime() >= now.getTime() - 7 * DAY_MS).length
 
-  const groups = new Map((await getActiveOpportunityGroups()).map((g) => [g.groupKey, g]))
-  const people = active
-    .map((p) => ({ p, matches: p.opportunityMatches.filter((m) => groups.has(m.groupKey)).slice(0, 3) }))
-    .filter((x) => x.matches.length > 0)
-    .sort((a, b) => b.matches[0].score - a.matches[0].score)
+  // Same visibility as the Matches tab; NEW/PROPOSED at or above the minimum score, top 3 per section
+  const keep = (m: { status: string; score: number }) => (m.status === 'NEW' || m.status === 'PROPOSED') && m.score >= settings.minScore
+  const people = (await getVisibleMatches()).people
+    .map((p) => ({ p, positions: p.positionMatches.filter(keep).slice(0, 3), groups: p.groupMatches.filter(keep).slice(0, 3) }))
+    .filter((x) => x.positions.length + x.groups.length > 0)
+    .sort((a, b) => Math.max(...[...b.positions, ...b.groups].map((m) => m.score)) - Math.max(...[...a.positions, ...a.groups].map((m) => m.score)))
 
   const base = process.env.NEXTAUTH_URL ?? ''
   const link = `${base}/redeployment?tab=matches`
   const stat = (label: string, n: number) =>
     `<td style="padding:10px 14px;background:${CREAM};border-radius:6px;font-family:${FONT};"><div style="font-size:20px;font-weight:700;color:${CHARCOAL};">${n}</div><div style="font-size:11px;color:#5E5751;">${label}</div></td>`
 
-  const personBlocks = people.map(({ p, matches }) => {
-    const name = p.candidate ? `${p.candidate.firstName} ${p.candidate.lastName}` : [p.preferredName || p.firstName, p.lastName].filter(Boolean).join(' ')
-    const chip = lwdChip(p.lwd, now)
-    const rows = matches.map((m) => {
-      const g = groups.get(m.groupKey)!
-      const isNew = !lastDigestAt || m.createdAt > lastDigestAt
-      return `<tr>
-        <td style="padding:6px 8px;font-family:${FONT};font-size:13px;font-weight:700;color:${CHARCOAL};vertical-align:top;">${m.score}</td>
-        <td style="padding:6px 8px;font-family:${FONT};font-size:13px;color:${CHARCOAL};vertical-align:top;">
-          ${esc(g.designation)}${isNew ? ` <span style="background:${LIME};color:${CHARCOAL};font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;">New</span>` : ''}${m.status === 'PROPOSED' ? ` <span style="background:${CREAM};color:${CHARCOAL};font-size:10px;padding:1px 6px;border-radius:3px;">Proposed</span>` : ''}
-          <div style="font-size:12px;color:#5E5751;">${esc(g.accountName ?? g.groupAccountName ?? '—')} · ${esc(g.location)} · ${esc(g.workMode ?? 'Unknown')} · ${g.openings} opening${g.openings === 1 ? '' : 's'}</div>
-          <div style="font-size:11px;color:#8A847D;">Req ${esc(g.requisitionIds.join(', '))} · Onboarding ${fmtDate(g.plannedOnboardingDate)}</div>
+  const tags = (m: { createdAt: Date; status: string }) =>
+    `${!lastDigestAt || m.createdAt > lastDigestAt ? ` <span style="background:${LIME};color:${CHARCOAL};font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;">New</span>` : ''}${m.status === 'PROPOSED' ? ` <span style="background:${CREAM};color:${CHARCOAL};font-size:10px;padding:1px 6px;border-radius:3px;">Proposed</span>` : ''}`
+  const row = (score: number, title: string, sub: string, sub2?: string) => `<tr>
+        <td style="padding:6px 8px;font-family:${FONT};font-size:13px;font-weight:700;color:${CHARCOAL};vertical-align:top;width:32px;">${score}</td>
+        <td style="padding:6px 8px;font-family:${FONT};font-size:13px;color:${CHARCOAL};vertical-align:top;">${title}
+          <div style="font-size:12px;color:#5E5751;">${sub}</div>${sub2 ? `<div style="font-size:11px;color:#8A847D;">${sub2}</div>` : ''}
         </td>
       </tr>`
-    }).join('')
+  const section = (heading: string, rows: string) => rows
+    ? `<div style="font-family:${FONT};font-size:11px;font-weight:700;color:#5E5751;text-transform:uppercase;letter-spacing:1px;margin:8px 0 2px 0;">${heading}</div><table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">${rows}</table>`
+    : ''
+
+  const personBlocks = people.map(({ p, positions, groups }) => {
+    const chip = lwdChip(p.lwd, now)
+    const positionRows = positions.map((m) => row(
+      m.score,
+      `<a href="${esc(`${base}/positions/${m.position.id}`)}" style="color:${CHARCOAL};">${esc(m.position.title)}</a>${m.position.type === 'PROACTIVE' ? ' <span style="font-size:10px;color:#5E5751;">(Proactive)</span>' : ''}${tags(m)}`,
+      esc(m.position.client),
+    )).join('')
+    const groupRows = groups.map((m) => row(
+      m.score,
+      `${esc(m.group.designation)}${tags(m)}`,
+      `${esc(m.group.accountName ?? m.group.groupAccountName ?? '—')} · ${esc(m.group.location)} · ${esc(m.group.workMode ?? 'Unknown')} · ${m.group.openings} opening${m.group.openings === 1 ? '' : 's'}`,
+      `Req ${esc(m.group.requisitionIds.join(', '))} · Onboarding ${fmtDate(m.group.plannedOnboardingDate)}`,
+    )).join('')
     return `<div style="margin:0 0 18px 0;border:1px solid #E5E0D8;border-radius:8px;padding:12px 14px;">
-      <div style="font-family:${FONT};font-size:14px;font-weight:700;color:${CHARCOAL};">${esc(name)}
+      <div style="font-family:${FONT};font-size:14px;font-weight:700;color:${CHARCOAL};">${esc(p.name)}
         ${chip ? `<span style="font-weight:400;font-size:11px;background:${chip.tone === 'soon' ? '#FEF3C7' : '#F3F4F6'};color:${chip.tone === 'soon' ? '#92400E' : '#4B5563'};padding:1px 6px;border-radius:9px;margin-left:6px;">${esc(chip.label)}</span>` : ''}
       </div>
-      <div style="font-family:${FONT};font-size:12px;color:#5E5751;margin-bottom:6px;">${esc(p.lastJobTitle ?? '—')}${p.grade ? ` · Grade ${esc(p.grade)}` : ''}</div>
-      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">${rows}</table>
+      <div style="font-family:${FONT};font-size:12px;color:#5E5751;margin-bottom:4px;">${esc(p.lastJobTitle ?? '—')}${p.grade ? ` · Grade ${esc(p.grade)}` : ''}</div>
+      ${section('TalentOS positions', positionRows)}${section('Global opportunities', groupRows)}
     </div>`
   }).join('')
 
@@ -84,9 +85,9 @@ export async function buildRedeploymentDigest(now = new Date()): Promise<{ subje
     <table cellpadding="0" cellspacing="6" style="border-collapse:separate;margin:0 -6px 18px -6px;"><tr>
       ${stat('Active people', active.length)}${stat('Releasing in 30 days', releasingSoon)}${stat('Released last 30 days', releasedRecently)}${stat('New this week', newThisWeek)}
     </tr></table>
-    <h2 style="font-size:15px;margin:0 0 10px 0;color:${CHARCOAL};">Top global matches (score ≥ ${settings.minScore})</h2>
+    <h2 style="font-size:15px;margin:0 0 10px 0;color:${CHARCOAL};">Top matches (score ≥ ${settings.minScore})</h2>
     ${personBlocks || `<p style="font-size:13px;color:#5E5751;">No matches at or above ${settings.minScore} this week.</p>`}
-    <p style="margin:20px 0 0 0;"><a href="${esc(link)}" style="display:inline-block;background:${CHARCOAL};color:${LIME};font-weight:700;font-size:13px;padding:9px 16px;border-radius:4px;text-decoration:none;">Open Global matches</a></p>
+    <p style="margin:20px 0 0 0;"><a href="${esc(link)}" style="display:inline-block;background:${CHARCOAL};color:${LIME};font-weight:700;font-size:13px;padding:9px 16px;border-radius:4px;text-decoration:none;">Open Matches</a></p>
   </div></body></html>`
   return { subject: `Redeployment digest — ${people.length} ${people.length === 1 ? 'person' : 'people'} with matches`, html, people: people.length }
 }
@@ -116,7 +117,7 @@ export async function getLastDigestResult(): Promise<DigestResult | null> {
 }
 
 // Monday send: only to REDEPLOYMENT_DIGEST_RECIPIENTS (nothing when empty). Each address reports whether it really
-// went out; the result (sent / partial / skipped / error) is stored for the Global matches tab and logged.
+// went out; the result (sent / partial / skipped / error) is stored for the Matches tab and logged.
 // The "New since last digest" marker only moves when at least one email was actually sent.
 export async function sendRedeploymentDigest(): Promise<DigestResult> {
   const now = new Date()

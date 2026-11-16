@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { scheduleRedeploymentMatching } from '@/lib/redeployment-matching'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -30,6 +31,7 @@ export async function POST(
   const parsed = schema.safeParse(await request.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ error: 'Headcount must be a whole number of at least 1' }, { status: 400 })
 
+  scheduleRedeploymentMatching(`position ${id} converted`)
   const updated = await db.position.update({
     where: { id },
     data: { type: 'REQUISITION', convertedAt: new Date(), status: 'OPEN', headcount: parsed.data.headcount },

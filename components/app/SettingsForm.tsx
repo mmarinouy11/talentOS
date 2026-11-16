@@ -34,6 +34,7 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   GLOBAL_MATCH_TOP_N: { label: 'Global Matches — Groups Scored per Person', type: 'number', min: 1, max: 20 },
   GLOBAL_MATCH_MIN_SCORE: { label: 'Global Matches — Minimum Score Shown', type: 'number', min: 0, max: 100 },
   REDEPLOYMENT_DIGEST_RECIPIENTS: { label: 'Redeployment Digest — Recipients (comma-separated emails)' },
+  REDEPLOYMENT_HIRE_WEIGHT: { label: 'Recruiter Performance — Redeployment Hire Weight', type: 'number', min: 0, max: 10 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -114,10 +115,11 @@ const DISPLAY_ORDER = [
   'GLOBAL_MATCH_TOP_N',
   'GLOBAL_MATCH_MIN_SCORE',
   'REDEPLOYMENT_DIGEST_RECIPIENTS',
+  'REDEPLOYMENT_HIRE_WEIGHT',
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {
-  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS', 'PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_WEEKLY_DAY', 'REDEPLOYMENT_LAST_SYNC', 'REDEPLOYMENT_LAST_DIGEST_AT', 'REDEPLOYMENT_LAST_DIGEST_RESULT'])
+  const excluded = new Set(['EMAIL_HEADER_IMAGE_URL', 'SENDER_EMAIL', 'PIPELINE_REPORT_ENABLED', 'PIPELINE_REPORT_EMAILS', 'PIPELINE_REPORT_SEND_TIME', 'PIPELINE_REPORT_PERIOD_DAYS', 'PIPELINE_REPORT_CADENCE', 'PIPELINE_REPORT_WEEKLY_DAY', 'REDEPLOYMENT_LAST_SYNC', 'REDEPLOYMENT_LAST_DIGEST_AT', 'REDEPLOYMENT_LAST_DIGEST_RESULT', 'REDEPLOYMENT_HIRE_BACKFILL'])
   const ordered = [
     ...DISPLAY_ORDER.map((key) => settings.find((s) => s.key === key)).filter(Boolean) as Setting[],
     ...settings.filter((s) => !excluded.has(s.key) && !DISPLAY_ORDER.includes(s.key)),

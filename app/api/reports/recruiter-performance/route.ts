@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { getRedeploymentHireWeight } from '@/lib/redeployment-hire'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { addBusinessDays, businessDaysBetween, elapsedBusinessDays } from '@/lib/business-days'
@@ -255,13 +256,14 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    const redeployWeight = await getRedeploymentHireWeight()
     // Closures: distinct candidate-positions moved to HIRED in month (earliest move = hire date)
     const closuresRaw = await db.$queryRaw<{
       recruiterId: string; positionId: string; cpId: string
       hireDate: Date; firstName: string; lastName: string
-      positionTitle: string; startDate: Date | null
+      positionTitle: string; startDate: Date | null; redeploymentHire: boolean
     }[]>`
-      SELECT cp."recruiterId", cp."positionId", cp.id as "cpId",
+      SELECT cp."recruiterId", cp."positionId", cp.id as "cpId", cp."redeploymentHire",
              MIN(sh."movedAt") as "hireDate",
              c."firstName", c."lastName", p."title" as "positionTitle",
              cp."startDate"
@@ -273,7 +275,7 @@ export async function GET(req: NextRequest) {
         AND sh."movedAt" >= ${monthStart} AND sh."movedAt" <= ${monthEnd}
         AND cp."recruiterId" IS NOT NULL
         AND p."type" = 'REQUISITION'
-      GROUP BY cp.id, cp."recruiterId", cp."positionId", cp."startDate",
+      GROUP BY cp.id, cp."recruiterId", cp."positionId", cp."startDate", cp."redeploymentHire",
                c."firstName", c."lastName", p."title"
     `
 
@@ -405,7 +407,10 @@ export async function GET(req: NextRequest) {
 
       // KPI 4: Closures
       const myClosures = closuresRaw.filter((c) => c.recruiterId === rid)
-      const closureCount = myClosures.length
+      // Weighted closures (this report only): normal hire = 1, redeployment hire = REDEPLOYMENT_HIRE_WEIGHT
+      const redeployHires = myClosures.filter((c) => c.redeploymentHire).length
+      const normalHires = myClosures.length - redeployHires
+      const closureCount = normalHires + redeployHires * redeployWeight
       const closureTarget = openHeadcount < 2 ? openHeadcount : 2
       const closureIsNA = openHeadcount === 0
       const closureIsLowDemand = !closureIsNA && openHeadcount < 2
@@ -504,7 +509,7 @@ export async function GET(req: NextRequest) {
           shortlist: shortAgg,
         },
         techPassRate: { rate: techPassRate, advances: techAdvances, total: techTotal },
-        closures: { count: closureCount, target: closureTarget, stretch: 3, isLowDemand: closureIsLowDemand, isNA: closureIsNA },
+        closures: { count: closureCount, hires: normalHires, redeployHires, redeployWeight, target: closureTarget, stretch: 3, isLowDemand: closureIsLowDemand, isNA: closureIsNA },
         achievement: {
           score: achievementScore,
           naKpis: breakdown.filter((b) => b.attainment == null).map((b) => b.label),
@@ -531,6 +536,7 @@ export async function GET(req: NextRequest) {
             cpId: c.cpId, positionId: c.positionId, positionTitle: c.positionTitle,
             hireDate: new Date(c.hireDate).toISOString(),
             startDate: c.startDate ? new Date(c.startDate).toISOString() : null,
+            redeploymentHire: c.redeploymentHire,
           })),
         },
         activity: {

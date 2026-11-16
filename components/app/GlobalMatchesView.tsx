@@ -15,12 +15,16 @@ export interface MatchPerson {
   lastJobTitle: string | null
   grade: string | null
   lwd: string | null
-  matches: {
-    id: string; score: number; status: Status; rationale: string; strengths: string[]; gaps: string[]; notes: string | null
-    designation: string; account: string | null; location: string; workMode: string | null; openings: number
-    requisitionIds: string[]; plannedOnboarding: string | null
-  }[]
+  matches: Match[]
 }
+
+type MatchBase = { id: string; score: number; status: Status; rationale: string; strengths: string[]; gaps: string[]; notes: string | null }
+export type Match =
+  | (MatchBase & { kind: 'position'; positionId: string; title: string; client: string; proactive: boolean })
+  | (MatchBase & {
+      kind: 'group'; designation: string; account: string | null; location: string; workMode: string | null; openings: number
+      requisitionIds: string[]; plannedOnboarding: string | null
+    })
 
 const selectCls = 'rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-[#2F2C29] focus:outline-none'
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' }) : '—')
@@ -43,13 +47,13 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
 
-  const locations = [...new Set(people.flatMap((p) => p.matches.map((m) => m.location)))].sort()
+  const locations = [...new Set(people.flatMap((p) => p.matches.flatMap((m) => (m.kind === 'group' ? [m.location] : []))))].sort()
   const visible = people
     .map((p) => ({
       ...p,
       matches: p.matches.filter((m) =>
         (status === 'ALL' || (status === 'OPEN' ? m.status !== 'DISMISSED' : m.status === status))
-        && m.score >= minScore && (!location || m.location === location)),
+        && m.score >= minScore && (!location || (m.kind === 'group' && m.location === location))),
     }))
     .filter((p) => p.matches.length > 0)
 
@@ -73,6 +77,23 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
       const res = await fetch(url, { method: 'POST' })
       const d = await res.json().catch(() => ({}))
       setMsg(res.ok ? done(d) : (d.error ?? 'Something went wrong'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // TalentOS positions: add through the Redeployment route (validated server-side; the match becomes PROPOSED)
+  async function addToPosition(person: MatchPerson, m: Extract<Match, { kind: 'position' }>) {
+    if (!person.candidateId) return
+    setBusy(m.id); setMsg('')
+    try {
+      const res = await fetch('/api/redeployment/add-to-position', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidateId: person.candidateId, positionId: m.positionId }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setMsg(typeof d.error === 'string' ? d.error : 'Could not add to the position'); return }
+      setMsg(`${person.name} added to ${m.title} — scoring in progress.`)
+      router.refresh()
     } finally {
       setBusy(null)
     }
@@ -116,48 +137,73 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
             <span className="text-sm text-gray-500">{[p.lastJobTitle, p.grade && `Grade ${p.grade}`].filter(Boolean).join(' · ')}</span>
             <LwdChip lwd={p.lwd} />
           </div>
-          <ul className="divide-y divide-gray-100">
-            {p.matches.map((m) => (
-              <li key={m.id} className="px-4 py-3 hover:bg-[#F5F0EB] transition-colors">
-                <div className="flex flex-wrap items-start gap-3">
-                  <span className="text-lg font-semibold text-[#2F2C29] w-10">{m.score}</span>
-                  <div className="flex-1 min-w-[240px]">
-                    <p className="text-sm font-medium text-gray-900">
-                      {m.designation} <span className={`ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[m.status]}`}>{m.status === 'NEW' ? 'New' : m.status === 'PROPOSED' ? 'Proposed' : 'Dismissed'}</span>
-                    </p>
-                    <p className="text-xs text-gray-600">{m.account ?? '—'} · {m.location} · {m.workMode ?? 'Unknown'} · {m.openings} opening{m.openings === 1 ? '' : 's'} · Onboarding {fmt(m.plannedOnboarding)}</p>
-                    <p className="text-xs text-gray-400">Req {m.requisitionIds.join(', ')}</p>
-                    {m.notes && <p className="text-xs text-gray-600 mt-1">Note: {m.notes}</p>}
-                    <button type="button" className="mt-1 text-xs font-medium text-gray-600 underline underline-offset-2" onClick={() => toggle(m.id)}>{expanded.has(m.id) ? '▾ Hide details' : '▸ Rationale, strengths, gaps'}</button>
-                    {expanded.has(m.id) && (
-                      <div className="mt-2 space-y-2 text-sm text-gray-700">
-                        <p>{m.rationale}</p>
-                        {m.strengths.length > 0 && <ul className="space-y-0.5">{m.strengths.map((s, i) => <li key={i}><span className="text-[#2F2C29] font-semibold">+</span> {s}</li>)}</ul>}
-                        {m.gaps.length > 0 && <ul className="space-y-0.5">{m.gaps.map((g, i) => <li key={i}><span className="text-amber-600 font-semibold">−</span> {g}</li>)}</ul>}
-                      </div>
-                    )}
-                  </div>
-                  {canAct && (
-                    <div className="flex flex-col items-end gap-1.5">
-                      {noteFor === m.id ? (
-                        <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); act(m.id, 'propose', note) }}>
-                          <input className={`${selectCls} w-48 text-xs`} placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} autoFocus />
-                          <Button size="sm" type="submit" disabled={busy !== null}>Save</Button>
-                          <Button size="sm" type="button" variant="outline" onClick={() => setNoteFor(null)}>Cancel</Button>
-                        </form>
-                      ) : (
-                        <div className="flex gap-1.5">
-                          {m.status !== 'PROPOSED' && m.status !== 'DISMISSED' && <Button size="sm" disabled={busy !== null} onClick={() => { setNoteFor(m.id); setNote(m.notes ?? '') }}>Mark as proposed</Button>}
-                          {m.status !== 'DISMISSED' && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => act(m.id, 'dismiss')}>Dismiss</Button>}
-                          {m.status !== 'NEW' && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => act(m.id, 'reopen')}>Reopen</Button>}
+          {([['position', 'TalentOS positions'], ['group', 'Global opportunities']] as const).map(([kind, heading]) => {
+            const list = p.matches.filter((m) => m.kind === kind)
+            if (list.length === 0) return null
+            return (
+              <div key={kind}>
+                <p className="px-4 pt-2.5 pb-1 text-xs font-medium uppercase tracking-wide text-gray-500">{heading}</p>
+                <ul className="divide-y divide-gray-100">
+                  {list.map((m) => (
+                    <li key={m.id} className="px-4 py-3 hover:bg-[#F5F0EB] transition-colors">
+                      <div className="flex flex-wrap items-start gap-3">
+                        <span className="text-lg font-semibold text-[#2F2C29] w-10">{m.score}</span>
+                        <div className="flex-1 min-w-[240px]">
+                          {m.kind === 'position' ? (
+                            <>
+                              <p className="text-sm font-medium text-gray-900">
+                                <Link href={`/positions/${m.positionId}`} className="hover:underline">{m.title}</Link>
+                                {m.proactive && <span className="ml-1 inline-flex rounded-full bg-[#F5F0EB] px-2 py-0.5 text-xs font-medium text-[#2F2C29]">Proactive</span>}
+                                <span className={`ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[m.status]}`}>{m.status === 'NEW' ? 'New' : m.status === 'PROPOSED' ? 'Proposed' : 'Dismissed'}</span>
+                              </p>
+                              <p className="text-xs text-gray-600">{m.client}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium text-gray-900">
+                                {m.designation} <span className={`ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[m.status]}`}>{m.status === 'NEW' ? 'New' : m.status === 'PROPOSED' ? 'Proposed' : 'Dismissed'}</span>
+                              </p>
+                              <p className="text-xs text-gray-600">{m.account ?? '—'} · {m.location} · {m.workMode ?? 'Unknown'} · {m.openings} opening{m.openings === 1 ? '' : 's'} · Onboarding {fmt(m.plannedOnboarding)}</p>
+                              <p className="text-xs text-gray-400">Req {m.requisitionIds.join(', ')}</p>
+                            </>
+                          )}
+                          {m.notes && <p className="text-xs text-gray-600 mt-1">Note: {m.notes}</p>}
+                          <button type="button" className="mt-1 text-xs font-medium text-gray-600 underline underline-offset-2" onClick={() => toggle(m.id)}>{expanded.has(m.id) ? '▾ Hide details' : '▸ Rationale, strengths, gaps'}</button>
+                          {expanded.has(m.id) && (
+                            <div className="mt-2 space-y-2 text-sm text-gray-700">
+                              <p>{m.rationale}</p>
+                              {m.strengths.length > 0 && <ul className="space-y-0.5">{m.strengths.map((x, i) => <li key={i}><span className="text-[#2F2C29] font-semibold">+</span> {x}</li>)}</ul>}
+                              {m.gaps.length > 0 && <ul className="space-y-0.5">{m.gaps.map((x, i) => <li key={i}><span className="text-amber-600 font-semibold">−</span> {x}</li>)}</ul>}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+                        {canAct && (
+                          <div className="flex flex-col items-end gap-1.5">
+                            {noteFor === m.id ? (
+                              <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); act(m.id, 'propose', note) }}>
+                                <input className={`${selectCls} w-48 text-xs`} placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} autoFocus />
+                                <Button size="sm" type="submit" disabled={busy !== null}>Save</Button>
+                                <Button size="sm" type="button" variant="outline" onClick={() => setNoteFor(null)}>Cancel</Button>
+                              </form>
+                            ) : (
+                              <div className="flex gap-1.5">
+                                {m.kind === 'position' && m.status !== 'DISMISSED' && (
+                                  <Button size="sm" disabled={busy !== null || !p.candidateId} onClick={() => addToPosition(p, m)}>{busy === m.id ? 'Adding…' : 'Add to position'}</Button>
+                                )}
+                                {m.kind === 'group' && m.status !== 'PROPOSED' && m.status !== 'DISMISSED' && <Button size="sm" disabled={busy !== null} onClick={() => { setNoteFor(m.id); setNote(m.notes ?? '') }}>Mark as proposed</Button>}
+                                {m.status !== 'DISMISSED' && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => act(m.id, 'dismiss')}>Dismiss</Button>}
+                                {m.status !== 'NEW' && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => act(m.id, 'reopen')}>Reopen</Button>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
         </div>
       ))}
     </div>
