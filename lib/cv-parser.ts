@@ -1,5 +1,8 @@
 import { extractPdfText, renderPdfToImages } from '@/lib/pdf-extract'
-import { callClaudeJSON, getAnthropic, MODELS } from '@/lib/anthropic'
+import { callClaudeJSON, getAnthropic, MODELS, ClaudeOutputTruncatedError } from '@/lib/anthropic'
+
+// Long work histories need room: 4096 truncated the JSON on CVs with many roles
+const CV_PARSE_MAX_TOKENS = 8192
 
 export const CV_PARSE_SYSTEM_PROMPT = `You are a CV parser. Extract structured information from the CV text provided.
 Return ONLY valid JSON with these exact fields:
@@ -63,7 +66,7 @@ function isGlyphGarbage(text: string): boolean {
 async function parsePdfAsDocument(buffer: Buffer): Promise<ParsedCv> {
   const response = await getAnthropic().messages.create({
     model: MODELS.SMART,
-    max_tokens: 4096,
+    max_tokens: CV_PARSE_MAX_TOKENS,
     system: CV_PARSE_SYSTEM_PROMPT,
     messages: [{
       role: 'user',
@@ -73,6 +76,7 @@ async function parsePdfAsDocument(buffer: Buffer): Promise<ParsedCv> {
       ],
     }],
   })
+  if (response.stop_reason === 'max_tokens') throw new ClaudeOutputTruncatedError(CV_PARSE_MAX_TOKENS)
   const block = response.content[0]
   if (block.type !== 'text') throw new Error('Unexpected document response type')
   const clean = block.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
@@ -87,7 +91,8 @@ export async function parseCvFromBuffer(buffer: Buffer, kind: 'pdf' | 'docx' = '
     return callClaudeJSON<ParsedCv>(
       `Parse this CV and return the structured JSON:\n\n${text.slice(0, 8000)}`,
       'FAST',
-      CV_PARSE_SYSTEM_PROMPT
+      CV_PARSE_SYSTEM_PROMPT,
+      { maxTokens: CV_PARSE_MAX_TOKENS, failOnTruncation: true },
     )
   }
 
@@ -112,14 +117,15 @@ export async function parseCvFromBuffer(buffer: Buffer, kind: 'pdf' | 'docx' = '
 
     const response = await anthropic.messages.create({
       model: MODELS.SMART,
-      max_tokens: 4096,
+      max_tokens: CV_PARSE_MAX_TOKENS,
       system: CV_PARSE_SYSTEM_PROMPT,
       messages: [{
         role: 'user',
         content: [...imageBlocks, { type: 'text', text: 'Parse this CV from the images and return the structured JSON.' }],
       }],
     })
-    const block = response.content[0]
+    if (response.stop_reason === 'max_tokens') throw new ClaudeOutputTruncatedError(CV_PARSE_MAX_TOKENS)
+  const block = response.content[0]
     if (block.type !== 'text') throw new Error('Unexpected vision response type')
     const clean = block.text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
     return JSON.parse(clean) as ParsedCv
@@ -128,6 +134,7 @@ export async function parseCvFromBuffer(buffer: Buffer, kind: 'pdf' | 'docx' = '
   return callClaudeJSON<ParsedCv>(
     `Parse this CV and return the structured JSON:\n\n${text.slice(0, 8000)}`,
     'FAST',
-    CV_PARSE_SYSTEM_PROMPT
+    CV_PARSE_SYSTEM_PROMPT,
+    { maxTokens: CV_PARSE_MAX_TOKENS, failOnTruncation: true },
   )
 }

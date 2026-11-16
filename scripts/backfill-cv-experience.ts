@@ -1,92 +1,83 @@
-/**
- * Backfill Candidate.cvExperience / cvEducation / skills from the original
- * CV file already stored in Google Drive (cvDriveId), for candidates whose
- * cvExperience is still empty — added via bulk-import or before this field
- * existed.
- *
- * Run from project root:
- *   npx tsx scripts/backfill-cv-experience.ts
- *   npx tsx scripts/backfill-cv-experience.ts --apply
- *   npx tsx scripts/backfill-cv-experience.ts --apply --limit=10
- *
- * Without --apply, prints counts only (dry run). --limit caps how many
- * candidates are processed — use it for a first test run before the full batch.
- *
- * Requires ANTHROPIC_API_KEY, GOOGLE_SERVICE_ACCOUNT_KEY, and DATABASE_URL
- * in .env.local (loaded automatically via dotenv).
- */
-
-import path from 'path'
-import { config } from 'dotenv'
-config({ path: path.resolve(process.cwd(), '.env.local') })
-
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
+// Candidates in an active pipeline with no stored work history (cvExperience) — diagnose and repair.
+//
+//   npx tsx scripts/backfill-cv-experience.ts              dry run (default): list them grouped by source and CV type
+//                                                          (PDF / scanned PDF / DOCX / unsupported / unreadable / none); no AI calls
+//   npx tsx scripts/backfill-cv-experience.ts --apply      parse each stored CV with parseCvFromBuffer and fill ONLY empty fields
+//                                                          (cvExperience, cvEducation, summary, skills); concurrency 2
+//   --limit=N                                              process only the first N (for a first test run)
+//
+// Failures are logged with the candidate ID and the reason and the run continues; a summary prints at the end.
+// Needs DATABASE_URL, GOOGLE_SERVICE_ACCOUNT_KEY and (for --apply) ANTHROPIC_API_KEY.
+import { db } from '../lib/db'
 import { downloadFileFromDrive } from '../lib/google'
-import { parseCvFromBuffer } from '../lib/cv-parser'
+import { detectCvKind, isScannedPdf, fillCvExperienceFromDrive, cvParseErrorReason } from '../lib/cv-experience'
 
-const db = new PrismaClient({ adapter: new PrismaPg(process.env.DATABASE_URL!) })
 const apply = process.argv.includes('--apply')
 const limitArg = process.argv.find((a) => a.startsWith('--limit='))
-const limit = limitArg ? parseInt(limitArg.split('=')[1], 10) : undefined
+const limit = limitArg ? Number(limitArg.split('=')[1]) : Infinity
+
+type Row = { id: string; name: string; source: string; cvDriveId: string | null; cvType?: string }
+
+async function pool<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>) {
+  const queue = [...items]
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await fn(item)
+  }))
+}
 
 async function main() {
   const candidates = await db.candidate.findMany({
-    where: { deletedAt: null, cvDriveId: { not: null } },
-    select: { id: true, cvDriveId: true, cvExperience: true, cvEducation: true, skills: true },
+    where: { deletedAt: null, candidatePositions: { some: { status: 'ACTIVE' } } },
+    select: { id: true, firstName: true, lastName: true, sourcedByType: true, cvDriveId: true, cvExperience: true },
+    orderBy: { createdAt: 'asc' },
   })
+  const rows: Row[] = candidates
+    .filter((c) => !Array.isArray(c.cvExperience) || c.cvExperience.length === 0)
+    .slice(0, Number.isFinite(limit) ? limit : undefined)
+    .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`.trim(), source: c.sourcedByType ?? 'UNSPECIFIED', cvDriveId: c.cvDriveId }))
 
-  const needsBackfill = candidates.filter(
-    (c) => !Array.isArray(c.cvExperience) || (c.cvExperience as unknown[]).length === 0
-  )
-  const toProcess = limit ? needsBackfill.slice(0, limit) : needsBackfill
-
-  console.log(`\n=== Backfill CV Experience ===`)
-  console.log(`Candidates with a CV on file : ${candidates.length}`)
-  console.log(`Missing cvExperience          : ${needsBackfill.length}`)
-  console.log(`Will process this run         : ${toProcess.length}`)
+  console.log(`${apply ? 'APPLY' : 'DRY RUN'} — ${rows.length} candidate(s) in an active pipeline without stored work history${Number.isFinite(limit) ? ` (limit ${limit})` : ''}\n`)
 
   if (!apply) {
-    console.log('\nDry run — pass --apply to execute.')
+    // CV type by content (download only, no AI)
+    await pool(rows, 4, async (r) => {
+      if (!r.cvDriveId) { r.cvType = 'none'; return }
+      try {
+        const buf = await downloadFileFromDrive(r.cvDriveId)
+        const kind = detectCvKind(buf)
+        r.cvType = kind === 'pdf' ? ((await isScannedPdf(buf)) ? 'scanned PDF' : 'PDF') : kind === 'docx' ? 'DOCX' : 'unsupported'
+      } catch (err) {
+        r.cvType = `unreadable (${cvParseErrorReason(err)})`
+      }
+    })
+    const groups = new Map<string, number>()
+    for (const r of rows) groups.set(`${r.source}|${r.cvType}`, (groups.get(`${r.source}|${r.cvType}`) ?? 0) + 1)
+    console.table([...groups.entries()].sort().map(([k, n]) => { const [source, cvType] = k.split('|'); return { source, 'CV type': cvType, candidates: n } }))
+    console.table(rows.map((r) => ({ id: r.id, name: r.name, source: r.source, 'CV type': r.cvType })))
+    console.log(`\nTotal: ${rows.length}. Run with --apply to parse the ones with a CV.`)
     return
   }
 
-  let success = 0
-  const failures: { id: string; reason: string }[] = []
-
-  for (const c of toProcess) {
-    try {
-      const buffer = await downloadFileFromDrive(c.cvDriveId!)
-      const parsed = await parseCvFromBuffer(buffer)
-
-      const existingSkillsLower = new Set(c.skills.map((s) => s.toLowerCase()))
-      const newSkills = (parsed.skills ?? []).filter((s) => !existingSkillsLower.has(s.toLowerCase()))
-      const mergedSkills = newSkills.length > 0 ? [...c.skills, ...newSkills] : undefined
-
-      const data: Record<string, unknown> = {}
-      if (Array.isArray(parsed.experience) && parsed.experience.length > 0) data.cvExperience = parsed.experience
-      if (Array.isArray(parsed.education) && parsed.education.length > 0) data.cvEducation = parsed.education
-      if (mergedSkills) data.skills = mergedSkills
-
-      if (Object.keys(data).length > 0) {
-        await db.candidate.update({ where: { id: c.id }, data })
-      }
-      success++
-      console.log(`OK   ${c.id} — experience:${(parsed.experience ?? []).length} education:${(parsed.education ?? []).length} new skills:${newSkills.length}`)
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err)
-      failures.push({ id: c.id, reason })
-      console.error(`FAIL ${c.id} — ${reason}`)
+  const summary = { parsed: 0, noExperienceInCv: 0, noCv: 0, failed: new Map<string, number>() }
+  let done = 0
+  await pool(rows, 2, async (r) => {
+    const res = await fillCvExperienceFromDrive(r.id)
+    done++
+    if (res.status === 'filled' || res.status === 'already') summary.parsed++
+    else if (res.status === 'no-cv') summary.noCv++
+    else if (res.status === 'no-experience-in-cv') summary.noExperienceInCv++
+    else {
+      summary.failed.set(res.reason, (summary.failed.get(res.reason) ?? 0) + 1)
+      console.error(`  FAILED ${r.id} (${r.name}): ${res.reason}`)
     }
-  }
+    if (done % 10 === 0) console.log(`  … ${done}/${rows.length}`)
+  })
 
-  console.log(`\nDone. Success: ${success}, Failed: ${failures.length}`)
-  if (failures.length > 0) {
-    console.log('Failures (review manually):')
-    failures.forEach((f) => console.log(`  ${f.id}: ${f.reason}`))
-  }
+  const failedTotal = [...summary.failed.values()].reduce((a, b) => a + b, 0)
+  console.log(`\nSummary: parsed ${summary.parsed} · no experience found in CV ${summary.noExperienceInCv} · no CV ${summary.noCv} · failed ${failedTotal}`)
+  if (failedTotal > 0) console.table([...summary.failed.entries()].map(([reason, n]) => ({ reason, candidates: n })))
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1) })
+  .catch((err) => { console.error(err); process.exitCode = 1 })
   .finally(() => db.$disconnect())

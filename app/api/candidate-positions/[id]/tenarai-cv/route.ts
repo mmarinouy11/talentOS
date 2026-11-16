@@ -2,12 +2,11 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 import { renderTenoraiCv, type CvExperienceEntry, type CvEducationEntry } from '@/lib/templates/tenarai-cv'
-import { downloadFileFromDrive } from '@/lib/google'
-import { parseCvFromBuffer } from '@/lib/cv-parser'
 import { availabilityLabel } from '@/lib/start-availability'
+import { fillCvExperienceFromDrive } from '@/lib/cv-experience'
 
-const PARSE_TIMEOUT_MS = 45_000
-const PDF_MAGIC = '%PDF'
+// Parsing a scanned CV can take up to ~120 s (lib/cv-experience CV_PARSE_TIMEOUT_MS)
+export const maxDuration = 180
 
 function normalizeSkill(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -48,15 +47,46 @@ function sanitizeEducation(v: unknown): CvEducationEntry[] {
     .filter((e) => e.degree || e.institution)
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    p.then((v) => { clearTimeout(t); resolve(v) }, (e) => { clearTimeout(t); reject(e) })
-  })
-}
-
 function escHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+// "Preparing CV…" shell: fetches the real CV (?render=1) and swaps it in, so slow parses show progress
+function loadingPage(renderUrl: string) {
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Preparing CV… | Tenarai LATAM</title></head>
+<body style="margin:0;background:#FFFFFF;font-family:Arial, Helvetica, sans-serif;color:#2F2C29;">
+<div style="max-width:560px;margin:120px auto;text-align:center;">
+<div style="width:28px;height:28px;margin:0 auto 16px auto;border:3px solid #E5E0D8;border-top-color:#8CF000;border-radius:50%;animation:s 0.9s linear infinite;"></div>
+<p style="font-size:15px;margin:0;">Preparing CV…</p>
+<p style="font-size:12px;color:#5E5751;margin:8px 0 0 0;">Reading the candidate's CV can take up to two minutes.</p>
+</div>
+<style>@keyframes s{to{transform:rotate(360deg)}}</style>
+<script>
+fetch(${JSON.stringify(renderUrl)}, { credentials: 'same-origin' })
+  .then(function (r) { return r.text() })
+  .then(function (html) { document.open(); document.write(html); document.close() })
+  .catch(function () { document.body.innerHTML = '<p style="font-family:Arial;margin:80px auto;max-width:560px;">Could not load the CV. <a href="">Retry</a></p>' })
+</script>
+</body></html>`
+  return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
+}
+
+// Experience could not be built: no silent fallback. Retry, or explicitly generate without experience.
+function experienceErrorPage(reason: string, retryUrl: string, withoutUrl: string) {
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CV not generated | Tenarai LATAM</title></head>
+<body style="margin:0;background:#FFFFFF;font-family:Arial, Helvetica, sans-serif;color:#2F2C29;">
+<div style="max-width:600px;margin:80px auto;padding:32px;border:1px solid #E5E0D8;border-radius:8px;">
+<h1 style="font-size:20px;margin:0 0 12px 0;color:#000000;">Couldn't build the experience section</h1>
+<p style="font-size:14px;line-height:1.6;margin:0 0 20px 0;">Reason: ${escHtml(reason)}</p>
+<a href="${escHtml(retryUrl)}" style="display:inline-block;background:#2F2C29;color:#8CF000;font-weight:700;font-size:13px;padding:9px 16px;border-radius:4px;text-decoration:none;margin-right:10px;">Retry</a>
+<a href="${escHtml(withoutUrl)}" style="display:inline-block;border:1px solid #2F2C29;color:#2F2C29;font-size:13px;padding:8px 16px;border-radius:4px;text-decoration:none;">Generate without experience</a>
+<p style="font-size:12px;color:#5E5751;margin:16px 0 0 0;">"Generate without experience" shows "Detailed experience available upon request." in that section.</p>
+</div></body></html>`
+  return new NextResponse(html, { status: 422, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
 }
 
 function errorPage(status: number, title: string, message: string) {
@@ -80,6 +110,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!session?.user) return errorPage(401, 'Not signed in', 'Sign in to view this CV.')
 
   const { id } = await params
+  const withoutExperience = req.nextUrl.searchParams.get('withoutExperience') === '1'
+  const base = `/api/candidate-positions/${id}/tenarai-cv`
+  const qs = (render: boolean, without: boolean) => {
+    const p = new URLSearchParams()
+    if (render) p.set('render', '1')
+    if (without) p.set('withoutExperience', '1')
+    const s = p.toString()
+    return s ? `${base}?${s}` : base
+  }
+  // First request: show "Preparing CV…" while the real render (which may parse the CV) runs
+  if (req.nextUrl.searchParams.get('render') !== '1') return loadingPage(qs(true, withoutExperience))
 
   try {
     const cp = await db.candidatePosition.findFirst({
@@ -114,42 +155,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let skills = strList(candidate.skills)
     let summary = str(candidate.summary) || null
 
-    if (experience.length === 0 && candidate.cvDriveId) {
-      try {
-        const buffer = await downloadFileFromDrive(candidate.cvDriveId)
-        // .docx and other formats can't be parsed; the CV renders with what's on the candidate record
-        if (buffer.subarray(0, 4).toString('latin1') !== PDF_MAGIC) {
-          throw new Error(`Drive file ${candidate.cvDriveId} is not a PDF`)
-        }
-        const parsed = await withTimeout(parseCvFromBuffer(buffer), PARSE_TIMEOUT_MS, 'CV parse')
-
-        const parsedSkills = strList(parsed?.skills)
-        const existingLower = new Set(skills.map((s) => s.toLowerCase()))
-        const newSkills = parsedSkills.filter((s) => !existingLower.has(s.toLowerCase()))
-        const mergedSkills = newSkills.length > 0 ? [...skills, ...newSkills] : skills
-        const parsedExperience = sanitizeExperience(parsed?.experience)
-        const parsedEducation = sanitizeEducation(parsed?.education)
-        const parsedSummary = str(parsed?.summary)
-
-        const data: Record<string, unknown> = {}
-        if (parsedExperience.length > 0) data.cvExperience = parsedExperience
-        if (parsedEducation.length > 0) data.cvEducation = parsedEducation
-        if (newSkills.length > 0) data.skills = mergedSkills
-        if (!summary && parsedSummary) data.summary = parsedSummary
-
-        if (Object.keys(data).length > 0) {
-          db.candidate.update({ where: { id: candidate.id }, data }).catch((err) => {
-            console.error(`[tenarai-cv] Failed to persist parsed CV for candidate ${candidate.id}:`, err)
-          })
-        }
-
-        experience = parsedExperience
-        if (parsedEducation.length > 0) education = parsedEducation
-        skills = mergedSkills
-        if (!summary && parsedSummary) summary = parsedSummary
-      } catch (err) {
-        // Missing/trashed file, non-PDF, Claude failure or timeout: fall back to the stored data
-        console.error(`[tenarai-cv] On-demand parse failed for candidate ${candidate.id} (cvDriveId ${candidate.cvDriveId}):`, err)
+    // No stored work history: parse the stored CV now (fills only empty fields), then re-read.
+    // If experience still can't be built, stop with the reason unless the user chose to go without it.
+    if (experience.length === 0 && !withoutExperience) {
+      const result = candidate.cvDriveId ? await fillCvExperienceFromDrive(candidate.id) : { status: 'no-cv' as const }
+      if (result.status === 'filled') {
+        const fresh = await db.candidate.findUnique({ where: { id: candidate.id }, select: { cvExperience: true, cvEducation: true, skills: true, summary: true } })
+        experience = sanitizeExperience(fresh?.cvExperience)
+        education = sanitizeEducation(fresh?.cvEducation)
+        skills = strList(fresh?.skills)
+        summary = str(fresh?.summary) || null
+      }
+      if (experience.length === 0) {
+        const reason = result.status === 'failed' ? result.reason
+          : result.status === 'no-cv' ? 'there is no CV file on this candidate'
+            : 'no work experience was found in the CV'
+        console.error(`[tenarai-cv] No experience for candidatePosition ${id} (candidate ${candidate.id}): ${reason}`)
+        return experienceErrorPage(reason, qs(false, false), qs(false, true))
       }
     }
 

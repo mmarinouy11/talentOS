@@ -94,6 +94,14 @@ Import from `lib/anthropic.ts`:
 - Person exclusion: `RedeploymentProfile.excludedFromMatching` (+ reason/at/by/excludedLwd) via `POST/DELETE /api/redeployment/[id]/exclusion` (/redeployment table and the Matches tab): no matching (no AI), hidden from Matches/digest and from Find Candidates' Redeployment pool (still a regular candidate); sync reactivates automatically when the roster LWD differs from excludedLwd ("Reactivated automatically: new LWD" kept in excludedReason)
 - Target exclusion: `MatchTargetExclusion` (GLOBAL_GROUP by groupKey / TALENTOS_POSITION by positionId) via `POST /api/match-exclusions`, `DELETE /api/match-exclusions/[id]` ("Exclude for everyone" on the Matches tab and /opportunities): matching skips it, existing matches hidden (not deleted), digest included; Find Candidates and the position itself unaffected. "Exclusions" view in the Matches tab lists people / global opportunities / positions with Reactivate. Per-pair Dismiss unchanged
 
+## Tenarai CV experience
+
+- `GET /api/candidate-positions/[id]/tenarai-cv` first returns a "Preparing CV…" page that fetches `?render=1` and swaps the result in (maxDuration 180). No silent fallback: when the candidate has no stored `cvExperience`, `fillCvExperienceFromDrive()` (`lib/cv-experience.ts`) parses the stored CV (PDF or DOCX by content, 120 s timeout, fills ONLY empty fields: cvExperience, cvEducation, summary, skills); if experience still can't be built → error page "Couldn't build the experience section: <reason>" with Retry and "Generate without experience" (`?withoutExperience=1`, the only path to "Detailed experience available upon request.")
+- CV parser output limit 8192 tokens; a cut-off answer throws `ClaudeOutputTruncatedError` (lib/anthropic `failOnTruncation`), surfaced as the reason
+- Work history is stored at creation everywhere: portals (vendor, referral, direct apply) run `fillCvExperienceFromDrive` in the background; in-position "Create New" sends the /api/cv/upload experience/education
+- Skill groups (`categorizeSkill`): Languages = programming/scripting only (PowerShell, Bash, SQL…); cloud platforms (AWS/Azure/GCP) + Docker/Kubernetes → Cloud & DevOps; Scrum/Agile/Kanban/ITIL… → Methodologies; whole-word fallback, keys < 3 chars only match exactly
+- `scripts/backfill-cv-experience.ts`: dry run lists active-pipeline candidates without cvExperience grouped by source and CV type (PDF / scanned PDF / DOCX / none…); `--apply` fills them (concurrency 2, failures logged by candidate ID, summary by reason); `--limit=N`
+
 ## Interview Pipeline
 
 - Enums: `PipelineStage` (APPLIED|SCREENING|TECHNICAL_INTERVIEW|MANAGER_INTERVIEW|CLIENT_INTERVIEW|OFFER|HIRED|REJECTED), `InterviewStatus` (PENDING|AWAITING_SCHEDULE|SCHEDULED|COMPLETED|CANCELLED), `InterviewDecision` (ADVANCE|REJECT|HOLD), `SchedulingMode` (MANUAL_SLOTS|CALENDAR_LINK)

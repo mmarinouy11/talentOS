@@ -13,51 +13,78 @@ const CARET_SVG = `<svg width="20" height="22" viewBox="0 0 82 84" fill="${CARBO
 // Logo wordmark (caret + "Tenarai", black, for footer per brand guidelines)
 const LOGO_SVG = `<div style="display:flex;align-items:center;gap:6px;"><svg width="14" height="15" viewBox="0 0 82 84" fill="${CARBON}" xmlns="http://www.w3.org/2000/svg"><path d="M0,1.4028496v40.920418h40.920418v40.920418h40.920418V1.4028496H0Z"/></svg><span style="font-family:${FONT};font-weight:700;font-size:12px;color:${CARBON};">Tenarai</span></div>`
 
-export type SkillCategory = 'Languages' | 'Frameworks' | 'Cloud & DevOps' | 'AI & Data' | 'Soft Skills' | 'Other'
+export type SkillCategory = 'Languages' | 'Frameworks' | 'Cloud & DevOps' | 'AI & Data' | 'Methodologies' | 'Soft Skills' | 'Other'
 
+// "Languages" = programming and scripting languages only (spoken languages have their own CV section).
+// Cloud platforms go under Cloud & DevOps; Scrum/Agile/Kanban etc. under Methodologies (not Soft Skills).
 const SKILL_CATEGORY_MAP: Record<string, SkillCategory> = {
-  // Languages
-  python: 'Languages', go: 'Languages', java: 'Languages', javascript: 'Languages',
-  typescript: 'Languages', sql: 'Languages', 'c#': 'Languages', ruby: 'Languages',
-  php: 'Languages', rust: 'Languages', swift: 'Languages', kotlin: 'Languages',
-  scala: 'Languages', 'c++': 'Languages', bash: 'Languages', shell: 'Languages',
+  // Languages (programming / scripting)
+  python: 'Languages', go: 'Languages', golang: 'Languages', java: 'Languages', javascript: 'Languages',
+  typescript: 'Languages', sql: 'Languages', 'c#': 'Languages', ruby: 'Languages', c: 'Languages',
+  php: 'Languages', rust: 'Languages', swift: 'Languages', kotlin: 'Languages', perl: 'Languages',
+  scala: 'Languages', 'c++': 'Languages', bash: 'Languages', shell: 'Languages', 'shell scripting': 'Languages',
+  powershell: 'Languages', 'pl/sql': 'Languages', 't-sql': 'Languages', vba: 'Languages', r: 'Languages',
+  dart: 'Languages', 'objective-c': 'Languages', groovy: 'Languages', lua: 'Languages', elixir: 'Languages',
   // Frameworks & Libraries
-  kubernetes: 'Frameworks', docker: 'Frameworks', 'node.js': 'Frameworks',
-  django: 'Frameworks', flask: 'Frameworks', spring: 'Frameworks', 'express.js': 'Frameworks',
-  react: 'Frameworks', 'next.js': 'Frameworks', fastapi: 'Frameworks', rails: 'Frameworks',
-  laravel: 'Frameworks', angular: 'Frameworks', vue: 'Frameworks', graphql: 'Frameworks',
+  'node.js': 'Frameworks', nodejs: 'Frameworks', django: 'Frameworks', flask: 'Frameworks', spring: 'Frameworks',
+  'express.js': 'Frameworks', express: 'Frameworks', react: 'Frameworks', 'react native': 'Frameworks',
+  'next.js': 'Frameworks', fastapi: 'Frameworks', rails: 'Frameworks', 'ruby on rails': 'Frameworks',
+  laravel: 'Frameworks', angular: 'Frameworks', vue: 'Frameworks', 'vue.js': 'Frameworks', graphql: 'Frameworks',
   'spring boot': 'Frameworks', 'spring data': 'Frameworks', 'spring security': 'Frameworks',
   'spring test': 'Frameworks', junit: 'Frameworks', 'junit 5': 'Frameworks', mockito: 'Frameworks',
-  hibernate: 'Frameworks',
-  // Cloud & DevOps
-  aws: 'Cloud & DevOps', azure: 'Cloud & DevOps', gcp: 'Cloud & DevOps',
-  'ci/cd': 'Cloud & DevOps', git: 'Cloud & DevOps', terraform: 'Cloud & DevOps',
-  ansible: 'Cloud & DevOps', jenkins: 'Cloud & DevOps', 'github actions': 'Cloud & DevOps',
-  'docker compose': 'Cloud & DevOps', helm: 'Cloud & DevOps', linux: 'Cloud & DevOps',
+  hibernate: 'Frameworks', '.net': 'Frameworks', 'asp.net': 'Frameworks', '.net core': 'Frameworks',
+  flutter: 'Frameworks', jquery: 'Frameworks', selenium: 'Frameworks', cypress: 'Frameworks', jest: 'Frameworks',
+  // Cloud & DevOps (platforms, infrastructure, tooling)
+  aws: 'Cloud & DevOps', 'amazon web services': 'Cloud & DevOps', azure: 'Cloud & DevOps', 'microsoft azure': 'Cloud & DevOps',
+  gcp: 'Cloud & DevOps', 'google cloud': 'Cloud & DevOps', 'google cloud platform': 'Cloud & DevOps', 'oracle cloud': 'Cloud & DevOps',
+  kubernetes: 'Cloud & DevOps', docker: 'Cloud & DevOps', openshift: 'Cloud & DevOps',
+  'ci/cd': 'Cloud & DevOps', git: 'Cloud & DevOps', github: 'Cloud & DevOps', gitlab: 'Cloud & DevOps', terraform: 'Cloud & DevOps',
+  ansible: 'Cloud & DevOps', jenkins: 'Cloud & DevOps', 'github actions': 'Cloud & DevOps', 'azure devops': 'Cloud & DevOps',
+  'docker compose': 'Cloud & DevOps', helm: 'Cloud & DevOps', linux: 'Cloud & DevOps', 'windows server': 'Cloud & DevOps',
   'kubernetes operators': 'Cloud & DevOps', prometheus: 'Cloud & DevOps', grafana: 'Cloud & DevOps',
   datadog: 'Cloud & DevOps', nginx: 'Cloud & DevOps', 'observability tools': 'Cloud & DevOps',
-  microservices: 'Cloud & DevOps', maven: 'Cloud & DevOps',
+  microservices: 'Cloud & DevOps', maven: 'Cloud & DevOps', devops: 'Cloud & DevOps', vmware: 'Cloud & DevOps',
+  'active directory': 'Cloud & DevOps', 'office 365': 'Cloud & DevOps', 'microsoft 365': 'Cloud & DevOps',
   // AI & Data
   'llm automation': 'AI & Data', 'ai-assisted scripting': 'AI & Data',
-  postgresql: 'AI & Data', mongodb: 'AI & Data', mysql: 'AI & Data',
-  redis: 'AI & Data', elasticsearch: 'AI & Data', kafka: 'AI & Data',
-  spark: 'AI & Data', 'machine learning': 'AI & Data', tensorflow: 'AI & Data',
-  pytorch: 'AI & Data', pandas: 'AI & Data', 'data engineering': 'AI & Data',
+  postgresql: 'AI & Data', mongodb: 'AI & Data', mysql: 'AI & Data', 'sql server': 'AI & Data', oracle: 'AI & Data',
+  redis: 'AI & Data', elasticsearch: 'AI & Data', kafka: 'AI & Data', snowflake: 'AI & Data', databricks: 'AI & Data',
+  spark: 'AI & Data', 'machine learning': 'AI & Data', tensorflow: 'AI & Data', 'power bi': 'AI & Data', tableau: 'AI & Data',
+  pytorch: 'AI & Data', pandas: 'AI & Data', 'data engineering': 'AI & Data', etl: 'AI & Data',
+  // Methodologies
+  scrum: 'Methodologies', agile: 'Methodologies', kanban: 'Methodologies', itil: 'Methodologies', safe: 'Methodologies',
+  lean: 'Methodologies', waterfall: 'Methodologies', tdd: 'Methodologies', bdd: 'Methodologies', 'design thinking': 'Methodologies',
+  'six sigma': 'Methodologies', prince2: 'Methodologies', pmp: 'Methodologies',
   // Soft Skills
-  'incident response': 'Soft Skills', 'team collaboration': 'Soft Skills',
+  'incident response': 'Soft Skills', 'team collaboration': 'Soft Skills', teamwork: 'Soft Skills',
   ownership: 'Soft Skills', 'on-call operations': 'Soft Skills', 'problem solving': 'Soft Skills',
-  leadership: 'Soft Skills', communication: 'Soft Skills', agile: 'Soft Skills', scrum: 'Soft Skills',
+  leadership: 'Soft Skills', communication: 'Soft Skills', mentoring: 'Soft Skills', 'customer service': 'Soft Skills',
 }
 
-const CATEGORY_ORDER: SkillCategory[] = ['Languages', 'Frameworks', 'Cloud & DevOps', 'AI & Data', 'Soft Skills', 'Other']
+const CATEGORY_ORDER: SkillCategory[] = ['Languages', 'Frameworks', 'Cloud & DevOps', 'AI & Data', 'Methodologies', 'Soft Skills', 'Other']
+
+// Words of a skill name; keeps + # . / - inside words so c++, c#, node.js, ci/cd and t-sql stay whole
+function skillWords(s: string): string[] {
+  return s.toLowerCase().split(/[\s,()]+/).map((w) => w.replace(/^[^a-z0-9.#+]+|[^a-z0-9#+]+$/g, '')).filter(Boolean)
+}
+
+// Fallback keys, longest first (so "spring boot" wins over "spring", "azure devops" over "azure").
+// Keys shorter than 3 characters ("go", "c", "r") only match exactly — never inside other skill names.
+const FALLBACK_KEYS = Object.keys(SKILL_CATEGORY_MAP)
+  .filter((k) => k.length >= 3)
+  .map((k) => ({ key: k, words: skillWords(k) }))
+  .sort((a, b) => b.words.length - a.words.length || b.key.length - a.key.length)
 
 export function categorizeSkill(skill: string): SkillCategory {
-  const lower = (skill ?? '').toLowerCase()
+  const lower = (skill ?? '').toLowerCase().trim()
   if (!lower) return 'Other'
   if (SKILL_CATEGORY_MAP[lower]) return SKILL_CATEGORY_MAP[lower]
-  // Substring fallback: check if any map key is contained in the skill or vice-versa
-  for (const [key, cat] of Object.entries(SKILL_CATEGORY_MAP)) {
-    if (lower.includes(key) || key.includes(lower)) return cat
+  // Whole-word fallback: a known key appears as a contiguous word sequence in the skill ("Scrum Master" → scrum)
+  const words = skillWords(lower)
+  for (const { key, words: kw } of FALLBACK_KEYS) {
+    for (let i = 0; i + kw.length <= words.length; i++) {
+      if (kw.every((w, j) => words[i + j] === w)) return SKILL_CATEGORY_MAP[key]
+    }
   }
   return 'Other'
 }

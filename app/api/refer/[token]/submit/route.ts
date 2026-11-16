@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { fillCvExperienceFromDrive } from '@/lib/cv-experience'
 import { START_AVAILABILITY_VALUES } from '@/lib/start-availability'
 import { db } from '@/lib/db'
 import { findCandidateMatches } from '@/lib/candidate-identity'
@@ -187,6 +188,8 @@ export async function POST(
       recruiterId: position.recruiterId,
     },
   })
+  // Store the parsed work history now (shared parser, background) so the Tenarai CV never depends on an on-demand parse
+  void fillCvExperienceFromDrive(candidate.id).then((r) => { if (r.status === 'failed') console.error(`[portal] Work history not stored for candidate ${candidate.id}: ${r.reason}`) }).catch(() => {})
 
   const referralNotes = note
     ? `Referred by: ${referrerName}\n${note}`
