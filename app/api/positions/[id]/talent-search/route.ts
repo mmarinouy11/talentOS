@@ -54,7 +54,7 @@ export async function POST(
       seniority: true,
       yearsOfExperience: true,
       cvExperience: true,
-      redeploymentProfile: { select: { status: true, lwd: true, primarySkill: true, subSkill: true, lastJobTitle: true } },
+      redeploymentProfile: { select: { status: true, excludedFromMatching: true, lwd: true, primarySkill: true, subSkill: true, lastJobTitle: true } },
     },
   })
 
@@ -87,7 +87,8 @@ export async function POST(
     }
 
     // Skills overlap
-    const rp = c.redeploymentProfile?.status === 'ACTIVE' ? c.redeploymentProfile : null
+    // Excluded people still appear, but as regular candidates (not in the Redeployment pool section)
+    const rp = c.redeploymentProfile?.status === 'ACTIVE' && !c.redeploymentProfile.excludedFromMatching ? c.redeploymentProfile : null
     const candidateSkillsLower = [...c.skills, ...(rp ? [rp.primarySkill, rp.subSkill].filter((s): s is string => !!s) : [])].map((s) => s.toLowerCase())
     const matchingSkills: string[] = []
     for (const jdSkill of jdSkillsLower) {

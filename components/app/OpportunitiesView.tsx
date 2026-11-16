@@ -1,9 +1,12 @@
 'use client'
 
 import { Fragment, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export interface OpportunityGroupRow {
   groupKey: string
+  // Excluded from redeployment matching for everyone (MatchTargetExclusion)
+  exclusion: { id: string; reason: string | null } | null
   designation: string
   account: string | null
   location: string
@@ -36,6 +39,22 @@ export function OpportunitiesView({ rows }: { rows: OpportunityGroupRow[] }) {
     if (s && !r.skillText.includes(s) && !r.designation.toLowerCase().includes(s)) return false
     return true
   })
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  // Redeployment matching skips excluded groups for everyone; their matches are hidden, not deleted
+  async function exclude(r: OpportunityGroupRow) {
+    const reason = window.prompt(`Exclude "${r.designation}" from redeployment matching for everyone? Optional reason:`)
+    if (reason === null) return
+    setBusy(true)
+    try {
+      await fetch('/api/match-exclusions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetType: 'GLOBAL_GROUP', groupKey: r.groupKey, reason }) })
+      router.refresh()
+    } finally { setBusy(false) }
+  }
+  async function reactivate(id: string) {
+    setBusy(true)
+    try { await fetch(`/api/match-exclusions/${id}`, { method: 'DELETE' }); router.refresh() } finally { setBusy(false) }
+  }
   const toggle = (k: string) => { const n = new Set(open); if (n.has(k)) n.delete(k); else n.add(k); setOpen(n) }
 
   return (
@@ -69,10 +88,11 @@ export function OpportunitiesView({ rows }: { rows: OpportunityGroupRow[] }) {
               <th className="px-3 py-2 text-right">Reqs</th>
               <th className="px-3 py-2">Onboarding</th>
               <th className="px-3 py-2">Stage / Confidence</th>
+              <th className="px-3 py-2">Matching</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.length === 0 && <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">No open opportunities</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={12} className="px-3 py-8 text-center text-gray-400">No open opportunities</td></tr>}
             {filtered.map((r) => (
               <Fragment key={r.groupKey}>
                 <tr className="hover:bg-[#F5F0EB] transition-colors align-top">
@@ -91,9 +111,19 @@ export function OpportunitiesView({ rows }: { rows: OpportunityGroupRow[] }) {
                   </td>
                   <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">{fmt(r.plannedOnboarding)}</td>
                   <td className="px-3 py-2.5 text-gray-700">{[r.stage, r.confidence].filter(Boolean).join(' / ') || '—'}</td>
+                  <td className="px-3 py-2.5 text-xs whitespace-nowrap">
+                    {r.exclusion ? (
+                      <span className="text-gray-600">
+                        <span className="inline-flex rounded-full bg-gray-200 px-2 py-0.5 font-medium text-[#2F2C29]" title={r.exclusion.reason ?? undefined}>Excluded</span>
+                        <button type="button" className="ml-1.5 underline underline-offset-2 hover:text-gray-900" disabled={busy} onClick={() => reactivate(r.exclusion!.id)}>Reactivate</button>
+                      </span>
+                    ) : (
+                      <button type="button" className="text-gray-500 underline underline-offset-2 hover:text-gray-900" disabled={busy} onClick={() => exclude(r)}>Exclude for everyone</button>
+                    )}
+                  </td>
                 </tr>
                 {open.has(r.groupKey) && (
-                  <tr><td colSpan={11} className="bg-gray-50 px-3 py-2 text-xs text-gray-600">Requisition IDs: {r.requisitionIds.join(', ')}</td></tr>
+                  <tr><td colSpan={12} className="bg-gray-50 px-3 py-2 text-xs text-gray-600">Requisition IDs: {r.requisitionIds.join(', ')}</td></tr>
                 )}
               </Fragment>
             ))}

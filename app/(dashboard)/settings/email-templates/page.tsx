@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { REDEPLOYMENT_PROPOSAL_KEY, REDEPLOYMENT_PROPOSAL_PLACEHOLDERS, REDEPLOYMENT_PROPOSAL_DEFAULT_SUBJECT, REDEPLOYMENT_PROPOSAL_DEFAULT_BODY } from '@/lib/redeployment-proposal-template'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { SettingsNav } from '@/components/app/SettingsNav'
@@ -60,6 +61,14 @@ export const SYSTEM_EMAIL_TEMPLATES = [
     placeholders: ['recruiterName', 'candidateName', 'positionTitle', 'vendorName', 'link'] as const,
     defaultSubject: 'New candidate from {{vendorName}}: {{candidateName}} - {{positionTitle}}',
     defaultHtml: `<p>Hi {{recruiterName}},</p>\n<p><strong>{{vendorName}}</strong> has submitted a new candidate, <strong>{{candidateName}}</strong>, for <strong>{{positionTitle}}</strong>.</p>\n<p><a href="{{link}}" style="display:inline-block;background-color:#000000;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:500;">View Candidate</a></p>\n<p>Best,<br/>Tenarai LATAM</p>`,
+  },
+  {
+    key: REDEPLOYMENT_PROPOSAL_KEY,
+    name: 'Redeployment Proposal (global opportunity)',
+    description: 'Prefills the "Propose by email" composer on the Redeployment Matches tab (plain text; sent from the user\'s own Gmail with the roster CV attached). Never include the fit score or personal contact details.',
+    placeholders: REDEPLOYMENT_PROPOSAL_PLACEHOLDERS,
+    defaultSubject: REDEPLOYMENT_PROPOSAL_DEFAULT_SUBJECT,
+    defaultHtml: REDEPLOYMENT_PROPOSAL_DEFAULT_BODY,
   },
 ]
 

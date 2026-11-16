@@ -64,6 +64,8 @@ export default async function RedeploymentPage({ searchParams }: { searchParams:
       rosterCvId: p.sourceCvDriveFileId,
       duplicateOf: !p.candidateId && dup ? { id: dup.id, name: `${dup.firstName} ${dup.lastName}`.trim(), email: dup.email } : null,
       assignable: candidate ? assignable.get(candidate.id) ?? [] : [],
+      excluded: p.excludedFromMatching,
+      excludedReason: p.excludedReason,
       noEmail: !p.candidateId && !p.possibleDuplicateOfId && !p.personalEmail && !p.workEmail,
     }
   })

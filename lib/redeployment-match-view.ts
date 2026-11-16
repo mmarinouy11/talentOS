@@ -1,6 +1,6 @@
 import type { OpportunityMatch } from '@prisma/client'
 import { db } from './db'
-import { getActiveOpportunityGroups, type OpportunityGroup } from './redeployment-matching'
+import { getActiveOpportunityGroups, getExcludedTargets, type OpportunityGroup } from './redeployment-matching'
 import { getAssignablePositionsForCandidates, type AssignablePosition } from './assignable-positions'
 
 export type PositionMatchView = OpportunityMatch & { position: AssignablePosition }
@@ -24,7 +24,7 @@ export async function getVisibleMatches(): Promise<{ people: PersonMatches[]; gr
   const [groups, profiles] = await Promise.all([
     getActiveOpportunityGroups(),
     db.redeploymentProfile.findMany({
-      where: { status: 'ACTIVE', candidateId: { not: null } },
+      where: { status: 'ACTIVE', excludedFromMatching: false, candidateId: { not: null } },
       select: {
         id: true, lwd: true, lastJobTitle: true, grade: true, firstSeenAt: true, preferredName: true, firstName: true, lastName: true,
         candidate: { select: { id: true, firstName: true, lastName: true } },
@@ -32,7 +32,8 @@ export async function getVisibleMatches(): Promise<{ people: PersonMatches[]; gr
       },
     }),
   ])
-  const byKey = new Map(groups.map((g) => [g.groupKey, g]))
+  const excluded = await getExcludedTargets()
+  const byKey = new Map(groups.filter((g) => !excluded.groupKeys.has(g.groupKey)).map((g) => [g.groupKey, g]))
   const candidateIds = profiles.map((p) => p.candidate?.id).filter((x): x is string => !!x)
   const assignable = await getAssignablePositionsForCandidates(candidateIds)
 
@@ -42,7 +43,7 @@ export async function getVisibleMatches(): Promise<{ people: PersonMatches[]; gr
     const groupMatches: GroupMatchView[] = []
     for (const m of p.opportunityMatches) {
       if (m.targetType === 'TALENTOS_POSITION') {
-        const pos = m.positionId ? open.get(m.positionId) : undefined
+        const pos = m.positionId && !excluded.positionIds.has(m.positionId) ? open.get(m.positionId) : undefined
         if (pos) positionMatches.push({ ...m, position: pos })
       } else {
         const g = m.groupKey ? byKey.get(m.groupKey) : undefined

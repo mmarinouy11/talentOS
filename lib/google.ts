@@ -102,3 +102,10 @@ export async function listDriveFolderFiles(folderId: string): Promise<DriveFolde
   } while (pageToken)
   return files
 }
+
+// Name and type of a Drive file (Shared Drives supported)
+export async function getDriveFileMeta(fileId: string): Promise<{ name: string; mimeType: string }> {
+  const drive = getDriveClient()
+  const res = await drive.files.get({ fileId, fields: 'name, mimeType', supportsAllDrives: true })
+  return { name: res.data.name ?? 'cv', mimeType: res.data.mimeType ?? 'application/octet-stream' }
+}

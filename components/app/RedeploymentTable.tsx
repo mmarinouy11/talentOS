@@ -27,6 +27,9 @@ export interface RedeploymentRow {
   // Open, not fulfilled, requisition or proactive, and not already linked to this candidate (lib/assignable-positions)
   assignable: { id: string; title: string; client: string; type: 'REQUISITION' | 'PROACTIVE' }[]
   noEmail: boolean
+  excluded: boolean
+  // Exclusion reason, or the automatic reactivation note when not excluded
+  excludedReason: string | null
 }
 
 type Timing = 'all' | 'soon' | 'released'
@@ -67,6 +70,28 @@ export function RedeploymentTable({ rows, canAct }: { rows: RedeploymentRow[]; c
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Something went wrong')
     return data
+  }
+
+  // Exclude (optional reason) / reactivate matching for this person
+  async function toggleExclusion(row: RedeploymentRow) {
+    let reason: string | null = null
+    if (!row.excluded) {
+      reason = window.prompt(`Exclude ${row.name} from matching? Optional reason:`)
+      if (reason === null) return
+    }
+    setBusyRow(row.id); setRowMsg((m) => ({ ...m, [row.id]: { text: '', error: false } }))
+    try {
+      const res = await fetch(`/api/redeployment/${row.id}/exclusion`, {
+        method: row.excluded ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' },
+        body: row.excluded ? undefined : JSON.stringify({ reason }),
+      })
+      if (!res.ok) throw new Error('Could not update the exclusion')
+      router.refresh()
+    } catch (err) {
+      setRowMsg((m) => ({ ...m, [row.id]: { text: (err as Error).message, error: true } }))
+    } finally {
+      setBusyRow(null)
+    }
   }
 
   async function decide(id: string, decision: 'same' | 'different') {
@@ -146,6 +171,17 @@ export function RedeploymentTable({ rows, canAct }: { rows: RedeploymentRow[]; c
                     ? <Link href={`/candidates/${r.candidateId}`} className="font-medium text-gray-900 hover:underline">{r.name}</Link>
                     : <span className="font-medium text-gray-900">{r.name}</span>}
                   {r.status !== 'ACTIVE' && <span className="block text-xs text-gray-400">{r.status === 'REMOVED' ? 'Removed from roster' : 'Out of window'}</span>}
+                  {r.excluded && (
+                    <span className="mt-1 block text-xs text-gray-600">
+                      <span className="inline-flex rounded-full bg-gray-200 px-2 py-0.5 font-medium text-[#2F2C29]">Excluded</span>
+                      {r.excludedReason && <span className="ml-1">{r.excludedReason}</span>}
+                    </span>
+                  )}
+                  {!r.excluded && r.excludedReason?.startsWith('Reactivated automatically') && <span className="mt-1 block text-xs text-gray-500">{r.excludedReason}</span>}
+                  {canAct && r.status === 'ACTIVE' && (
+                    <button type="button" className="mt-1 block text-xs text-gray-500 underline underline-offset-2 hover:text-gray-900" disabled={busyRow !== null}
+                      onClick={() => toggleExclusion(r)}>{r.excluded ? 'Reactivate' : 'Exclude from matching'}</button>
+                  )}
                 </td>
                 <td className="px-3 py-2.5 text-gray-700">{r.lastJobTitle ?? '—'}</td>
                 <td className="px-3 py-2.5 text-gray-700">{r.lastClient ?? '—'}</td>

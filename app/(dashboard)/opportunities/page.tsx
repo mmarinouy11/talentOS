@@ -11,15 +11,18 @@ export default async function OpportunitiesPage() {
   const role = (session.user as { role?: string }).role
   if (role !== 'ADMIN' && role !== 'RECRUITER') redirect('/')
 
-  const [groups, lastImport] = await Promise.all([
+  const [groups, exclusions, lastImport] = await Promise.all([
     getActiveOpportunityGroups(),
+    db.matchTargetExclusion.findMany({ where: { targetType: 'GLOBAL_GROUP' }, select: { id: true, groupKey: true, reason: true } }),
     db.globalOpportunityImport.findFirst({ orderBy: { importedAt: 'desc' } }),
   ])
   const importer = lastImport ? await db.user.findUnique({ where: { id: lastImport.importedById }, select: { name: true, email: true } }) : null
 
+  const exclusionByKey = new Map(exclusions.map((e) => [e.groupKey!, { id: e.id, reason: e.reason }]))
   const rows: OpportunityGroupRow[] = groups
     .map((g) => ({
       groupKey: g.groupKey,
+      exclusion: exclusionByKey.get(g.groupKey) ?? null,
       designation: g.designation,
       account: g.accountName ?? g.groupAccountName,
       location: g.location,
