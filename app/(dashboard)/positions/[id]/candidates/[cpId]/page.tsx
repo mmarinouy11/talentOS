@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { pickCandidatePositionInterview } from '@/lib/interview-display'
 import { RedeployBadge, LwdChip } from '@/components/app/RedeployBadge'
 import { AvailabilityLabel } from '@/components/app/AvailabilityLabel'
 import { db } from '@/lib/db'
@@ -37,7 +38,7 @@ export default async function CandidateInPositionPage({
               position: { select: { id: true, title: true } },
               interviews: {
                 orderBy: { createdAt: 'desc' },
-                select: { stage: true, status: true, decision: true, scheduledAt: true },
+                select: { stage: true, status: true, decision: true, scheduledAt: true, createdAt: true },
               },
             },
             orderBy: { updatedAt: 'desc' },
@@ -85,23 +86,10 @@ export default async function CandidateInPositionPage({
     MANAGER_INTERVIEW: 'Manager Interview', CLIENT_INTERVIEW: 'Client Interview',
     OFFER: 'Offer', HIRED: 'Hired', REJECTED: 'Rejected',
   }
-  const INTERVIEW_STAGE_ORDER: Record<string, number> = {
-    OFFER: 6, CLIENT_INTERVIEW: 5, MANAGER_INTERVIEW: 4, TECHNICAL_INTERVIEW: 3, SCREENING: 2, APPLIED: 1,
-  }
-  function pickLatestInterview(
-    interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null }[],
-    cpStage: string
-  ) {
-    if (!interviews.length) return null
-    if (['APPLIED', 'REJECTED', 'WITHDRAWN', 'HIRED'].includes(cpStage)) {
-      const rejected = interviews.find((i) => i.decision === 'REJECT')
-      if (rejected) return rejected
-      return interviews.reduce((best, cur) =>
-        (INTERVIEW_STAGE_ORDER[cur.stage] ?? 0) >= (INTERVIEW_STAGE_ORDER[best.stage] ?? 0) ? cur : best
-      )
-    }
-    return interviews.find((i) => i.stage === cpStage) ?? null
-  }
+  const pickLatestInterview = (
+    interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null; createdAt: Date }[],
+    cpStage: string,
+  ) => pickCandidatePositionInterview(interviews, cpStage)
 
   const otherPositions = candidate.candidatePositions ?? []
 

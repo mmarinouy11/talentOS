@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { interviewRoundLabel, INTERVIEW_BASE_LABELS } from '@/lib/interview-display'
 import { markRedeploymentHire } from '@/lib/redeployment-hire'
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
@@ -6,16 +7,7 @@ import { z } from 'zod'
 import { STAGE_SEQUENCE } from '@/lib/pipeline'
 import type { Stage } from '@prisma/client'
 
-const STAGE_LABELS: Record<string, string> = {
-  APPLIED: 'Applied',
-  SCREENING: 'Screening',
-  TECHNICAL_INTERVIEW: 'Technical Interview',
-  MANAGER_INTERVIEW: 'Manager Interview',
-  CLIENT_INTERVIEW: 'Client Interview',
-  OFFER: 'Offer',
-  HIRED: 'Hired',
-  REJECTED: 'Rejected',
-}
+const STAGE_LABELS = INTERVIEW_BASE_LABELS
 
 const createSchema = z.object({
   stage: z.enum(['APPLIED', 'SCREENING', 'TECHNICAL_INTERVIEW', 'MANAGER_INTERVIEW', 'CLIENT_INTERVIEW', 'OFFER', 'HIRED', 'REJECTED']),
@@ -62,12 +54,13 @@ export async function POST(
 
 
   const [existingForStage, existingTotal] = await Promise.all([
-    db.interview.count({ where: { candidatePositionId: id, stage: parsed.data.stage } }),
-    db.interview.count({ where: { candidatePositionId: id } }),
+    // Cancelled interviews don't count: rescheduling a cancelled "Screening" creates "Screening" again
+    db.interview.count({ where: { candidatePositionId: id, stage: parsed.data.stage, status: { not: 'CANCELLED' } } }),
+    db.interview.count({ where: { candidatePositionId: id, status: { not: 'CANCELLED' } } }),
   ])
 
   const baseLabel = STAGE_LABELS[parsed.data.stage] ?? parsed.data.stage
-  const roundLabel = existingForStage === 0 ? baseLabel : `${baseLabel} - Round ${existingForStage + 1}`
+  const roundLabel = interviewRoundLabel(baseLabel, existingForStage)
   const roundNumber = existingTotal + 1
 
   const interview = await db.interview.create({

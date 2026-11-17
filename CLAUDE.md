@@ -120,6 +120,8 @@ Import from `lib/anthropic.ts`:
 - Interview model: `feedbackPdfUrl` (Drive file ID), `aiRecommendedDecision` (InterviewDecision?), `feedbackParseMethod` ("text"|"vision"), `durationMinutes` — AI-suggested decision shown as hint near Decision dropdown, never auto-fills recruiter's choice
 - Manual feedback text: PATCH /api/interviews/[id] calls Claude Haiku when feedbackText changes, auto-populates same fields
 - Status auto-derivation: scheduledAt→SCHEDULED, feedbackText→COMPLETED, action:'cancel'→CANCELLED; no direct status field in edit form
+- Round numbering ignores CANCELLED interviews (`interviewRoundLabel()` in `lib/interview-display.ts`): re-creating a cancelled "Screening" gives "Screening" again, roundNumber counts non-cancelled only. Repair: `scripts/fix-interview-rounds.ts` (dry run / --apply; only auto labels relabelled, custom labels keep text, cancelled untouched)
+- "The" interview of a candidate-position (position candidates table, other-positions list on the candidate-in-position page): `pickCandidatePositionInterview()` → next upcoming non-cancelled → most recent non-cancelled → "Cancelled" only when all are
 - Scheduling slots: 15-min increments, recruiter timezone selector (saved to User.timezone), configurable durationMinutes per interview and as SystemSettings defaults (DEFAULT_DURATION_SCREENING_MANAGER, DEFAULT_DURATION_OTHER)
 - Candidate timezone: slot times formatted in candidate's country timezone in scheduling emails; `lib/timezone.ts` has COUNTRY_TIMEZONE_MAP and formatSlotForCandidate()
 - Settings: SENDER_EMAIL key in SystemSettings; editable via `/settings` (LABELS entry added)
