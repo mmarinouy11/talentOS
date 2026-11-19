@@ -16,6 +16,7 @@ interface TalentCandidate {
   yearsOfExperience: number | null
   matchingSkills: string[]
   redeploy?: { lwd: string | null } | null
+  autoScore?: boolean
   score?: number
   reason?: string
   scoring?: boolean
@@ -36,6 +37,9 @@ interface TalentSearchModalProps {
 
 const SCORE_BATCH = 15
 
+interface AutoScoring { strongCount: number; strongScore: number; autoMax: number }
+const DEFAULT_AUTO: AutoScoring = { strongCount: 5, strongScore: 70, autoMax: 45 }
+
 const SENIORITY_LABEL: Record<Seniority, string> = {
   JUNIOR: 'Junior',
   MID: 'Mid',
@@ -55,42 +59,90 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Real fit scores: cached ones come back free; at most 15 new ones are computed per request
-  const scoreBatch = useCallback(async (ids: string[]) => {
+  type ScoreResponse = { scores: { candidateId: string; score: number; reason: string; cached: boolean }[]; pending: string[]; failed: string[] }
+
+  // Real fit scores: cached ones come back free; at most `limit` (≤15) new ones are computed per request
+  const requestScores = useCallback(async (ids: string[], limit: number): Promise<ScoreResponse> => {
+    const res = await fetch(`/api/positions/${positionId}/talent-search/score`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateIds: ids, limit }),
+    })
+    if (!res.ok) throw new Error('Scoring failed')
+    return res.json() as Promise<ScoreResponse>
+  }, [positionId])
+
+  const applyScores = useCallback((data: ScoreResponse) => {
+    const scoreMap = new Map(data.scores.map((x) => [x.candidateId, x]))
+    setCandidates((prev) => prev.map((c) => {
+      const x = scoreMap.get(c.id)
+      return x ? { ...c, score: x.score, reason: x.reason, scoring: false } : c
+    }))
+    return scoreMap
+  }, [])
+
+  // Still unscored, in server (prefilter) order: auto-eligible first
+  const unscoredIds = (list: TalentCandidate[], done: Set<string>) => list.filter((c) => !done.has(c.id)).map((c) => c.id)
+
+  const runAutoScoring = useCallback(async (list: TalentCandidate[], cfg: AutoScoring) => {
     setScoring(true)
-    setCandidates((prev) => prev.map((c) => (ids.includes(c.id) && c.score === undefined ? { ...c, scoring: true } : c)))
+    const done = new Set<string>()
+    const failed = new Set<string>()
     try {
-      const res = await fetch(`/api/positions/${positionId}/talent-search/score`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidateIds: ids, limit: SCORE_BATCH }),
-      })
-      if (!res.ok) throw new Error('Scoring failed')
-      const data = await res.json() as { scores: { candidateId: string; score: number; reason: string }[]; pending: string[]; failed: string[] }
-      const scoreMap = new Map(data.scores.map((x) => [x.candidateId, x]))
-      setPending(data.pending ?? [])
-      setCandidates((prev) => {
-        // Scored first (best real score first); unscored keep the prefilter order below
-        const order = new Map(prev.map((c, i) => [c.id, i]))
-        return prev
-          .map((c) => {
-            const x = scoreMap.get(c.id)
-            return x ? { ...c, score: x.score, reason: x.reason, scoring: false } : { ...c, scoring: false }
-          })
-          .sort((a, b) => {
-            if (a.score !== undefined && b.score !== undefined) return b.score - a.score
-            if (a.score !== undefined) return -1
-            if (b.score !== undefined) return 1
-            return order.get(a.id)! - order.get(b.id)!
-          })
-      })
+      const eligible = list.filter((c) => c.autoScore)
+      const rest = list.filter((c) => !c.autoScore)
+      // Non-eligible: cached scores only (free)
+      if (rest.length > 0) {
+        const r = await requestScores(rest.map((c) => c.id), 0)
+        applyScores(r).forEach((_, id) => done.add(id))
+      }
+      // Eligible: 15 at a time; continue while a batch of new scores is strong, up to autoMax computed
+      let computed = 0
+      let first = true
+      while (true) {
+        const ids = eligible.map((c) => c.id).filter((id) => !done.has(id) && !failed.has(id))
+        if (ids.length === 0) break
+        const limit = Math.min(SCORE_BATCH, Math.max(0, cfg.autoMax - computed))
+        if (!first && limit === 0) break
+        const toMark = new Set(ids.slice(0, limit))
+        setCandidates((prev) => prev.map((c) => (toMark.has(c.id) ? { ...c, scoring: true } : c)))
+        const r = await requestScores(ids, limit)
+        const map = applyScores(r)
+        map.forEach((_, id) => done.add(id))
+        r.failed.forEach((id) => failed.add(id))
+        setCandidates((prev) => prev.map((c) => (c.scoring ? { ...c, scoring: false } : c)))
+        const fresh = r.scores.filter((x) => !x.cached)
+        computed += fresh.length
+        first = false
+        const strong = fresh.filter((x) => x.score >= cfg.strongScore).length
+        if (fresh.length === 0 || strong < cfg.strongCount || computed >= cfg.autoMax) break
+      }
     } catch {
       setCandidates((prev) => prev.map((c) => ({ ...c, scoring: false })))
-      setPending((prev) => (prev.length > 0 ? prev : ids))
     } finally {
+      setPending(unscoredIds(list, done))
       setScoring(false)
     }
-  }, [positionId])
+  }, [requestScores, applyScores])
+
+  // "Score 15 more": next unscored in prefilter order (eligible first, then the rest)
+  const scoreMore = useCallback(async () => {
+    if (pending.length === 0) return
+    setScoring(true)
+    const toMark = new Set(pending.slice(0, SCORE_BATCH))
+    setCandidates((prev) => prev.map((c) => (toMark.has(c.id) ? { ...c, scoring: true } : c)))
+    try {
+      const r = await requestScores(pending, SCORE_BATCH)
+      const map = applyScores(r)
+      const failed = new Set(r.failed)
+      setPending(pending.filter((id) => !map.has(id) && !failed.has(id)))
+    } catch {
+      // keep pending as is
+    } finally {
+      setCandidates((prev) => prev.map((c) => (c.scoring ? { ...c, scoring: false } : c)))
+      setScoring(false)
+    }
+  }, [pending, requestScores, applyScores])
 
   const runSearch = useCallback(async () => {
     setLoading(true)
@@ -99,22 +151,19 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
       const res = await fetch(`/api/positions/${positionId}/talent-search`, { method: 'POST' })
       if (!res.ok) throw new Error('Search failed')
       const data = await res.json()
-      const initial: TalentCandidate[] = (data.candidates ?? []).map((c: TalentCandidate) => ({
-        ...c,
-        scoring: true,
-      }))
+      const initial: TalentCandidate[] = data.candidates ?? []
       setCandidates(initial)
       setTotal(data.total ?? initial.length)
       setLoading(false)
 
       if (initial.length === 0) return
-      await scoreBatch(initial.map((c) => c.id))
+      await runAutoScoring(initial, { ...DEFAULT_AUTO, ...(data.autoScoring ?? {}) })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
       setScoring(false)
     }
-  }, [positionId, scoreBatch])
+  }, [positionId, runAutoScoring])
 
   useEffect(() => { runSearch() }, [runSearch])
 
@@ -159,14 +208,14 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
     }
   }
 
-  // Redeployment pool rows: lime left border (badge + LWD chip come from c.redeploy). Same scores, no boost.
-  const renderRow = (c: TalentCandidate, pool: boolean) => (
+  // Redeployment rows: lime left border + badge + LWD chip. Highlighted only, never prioritized.
+  const renderRow = (c: TalentCandidate) => (
                   <tr
                     key={c.id}
                     onClick={() => toggleSelect(c.id)}
                     className={`cursor-pointer hover:bg-[#F5F0EB] transition-colors ${selected.has(c.id) ? 'bg-[#F5F0EB]' : ''}`}
                   >
-                    <td className={`py-3 pl-4 pr-2 ${pool ? 'border-l-4 border-l-[#8CF000]' : ''}`}>
+                    <td className={`py-3 pl-4 pr-2 ${c.redeploy ? 'border-l-4 border-l-[#8CF000]' : ''}`}>
                       <input
                         type="checkbox"
                         checked={selected.has(c.id)}
@@ -229,8 +278,8 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
             <span className="text-sm text-gray-500">Searching database…</span>
           ) : (
             <span className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900">{candidates.length}</span> candidates found
-              {total > candidates.length && <span className="text-gray-400"> (showing top {candidates.length} of {total})</span>}
+              Scored <span className="font-medium text-gray-900">{candidates.filter((c) => c.score !== undefined).length}</span> of <span className="font-medium text-gray-900">{candidates.length}</span> matching candidates
+              {total > candidates.length && <span className="text-gray-400"> (top {candidates.length} of {total})</span>}
             </span>
           )}
           {scoring && !loading && (
@@ -240,7 +289,7 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
             </span>
           )}
           {!scoring && !loading && pending.length > 0 && (
-            <Button size="sm" variant="outline" onClick={() => scoreBatch(pending)}>
+            <Button size="sm" variant="outline" onClick={scoreMore}>
               Score {Math.min(SCORE_BATCH, pending.length)} more
             </Button>
           )}
@@ -282,21 +331,21 @@ export function TalentSearchModal({ positionId, positionTitle, onClose, onAdded 
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(() => {
-                  const pool = candidates.filter((c) => c.redeploy)
-                  const others = candidates.filter((c) => !c.redeploy)
-                  const header = (label: string, hint: string) => (
-                    <tr className="bg-[#F5F0EB]">
-                      <td colSpan={4} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#2F2C29]">
-                        {label} <span className="ml-1 font-normal normal-case tracking-normal text-gray-500">{hint}</span>
-                      </td>
-                    </tr>
-                  )
+                  // One list by real score (desc); identical score → redeploy first. Unscored below, in prefilter order.
+                  const scored = candidates.filter((c) => c.score !== undefined)
+                    .sort((a, b) => b.score! - a.score! || Number(!!b.redeploy) - Number(!!a.redeploy))
+                  const unscored = candidates.filter((c) => c.score === undefined)
                   return (
                     <>
-                      {pool.length > 0 && header('Redeployment pool', `${pool.length} · scored first, same scoring as everyone`)}
-                      {pool.map((c) => renderRow(c, true))}
-                      {pool.length > 0 && others.length > 0 && header('Other candidates', `${others.length}`)}
-                      {others.map((c) => renderRow(c, false))}
+                      {scored.map(renderRow)}
+                      {unscored.length > 0 && (
+                        <tr className="bg-[#F5F0EB]">
+                          <td colSpan={4} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#2F2C29]">
+                            Not scored yet <span className="ml-1 font-normal normal-case tracking-normal text-gray-500">(ranked by skill match)</span>
+                          </td>
+                        </tr>
+                      )}
+                      {unscored.map(renderRow)}
                     </>
                   )
                 })()}

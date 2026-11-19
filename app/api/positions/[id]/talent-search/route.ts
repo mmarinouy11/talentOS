@@ -2,6 +2,8 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { locationAllowed } from '@/lib/location'
+import { prefilterCandidate } from '@/lib/talent-prefilter'
+import { getFindCandidatesSettings } from '@/lib/find-candidates-settings'
 
 export async function POST(
   _request: Request,
@@ -18,7 +20,6 @@ export async function POST(
   })
   if (!position) return NextResponse.json({ error: 'Position not found' }, { status: 404 })
 
-  const jdSkillsLower = position.jdSkills.map((s) => s.toLowerCase())
   const hasLocationFilter = position.location && position.location.length > 0
 
   // IDs already in this position
@@ -42,7 +43,8 @@ export async function POST(
     where: {
       deletedAt: null,
       id: { notIn: [...excluded] },
-      // Redeployment people are included even when their CV gave no skills (roster skills are used instead)
+      // Redeployment people are included even when their CV gave no skills (roster skills are used instead);
+      // the title match can still make others relevant
       OR: [{ skills: { isEmpty: false } }, { redeploymentProfile: { status: 'ACTIVE' } }],
     },
     select: {
@@ -58,9 +60,6 @@ export async function POST(
     },
   })
 
-  const STOP = new Set(['and', 'or', 'the', 'of', 'for', 'with', 'sr', 'jr', 'senior', 'junior', 'mid', 'lead', 'ii', 'iii'])
-  const titleWords = [...new Set(position.title.toLowerCase().split(/[^a-z0-9+#.]+/).filter((w) => w.length > 1 && !STOP.has(w)))]
-
   type Match = {
     id: string
     firstName: string
@@ -70,13 +69,15 @@ export async function POST(
     seniority: string | null
     yearsOfExperience: number | null
     matchingSkills: string[]
-    // Prefilter rank only (no AI); used for ordering, never returned or displayed
-    matchCount: number
-    titleHits: number
-    // ACTIVE redeployment profile only; no score boost
+    // ACTIVE redeployment profile only: highlighted, never prioritized
     redeploy: { lwd: string | null } | null
+    // Prefilter (no AI): who gets real-scored first. rank stays server-side; autoScore is only "may be auto-scored"
+    autoScore: boolean
+    rank: number
   }
 
+  const coreSkills = position.coreSkills ?? []
+  const otherSkills = (position.jdSkills ?? []).filter((s) => !coreSkills.includes(s))
   const matches: Match[] = []
   for (const c of candidates) {
     // Location filter
@@ -86,25 +87,21 @@ export async function POST(
       continue
     }
 
-    // Skills overlap
-    // Excluded people still appear, but as regular candidates (not in the Redeployment pool section)
     const rp = c.redeploymentProfile?.status === 'ACTIVE' && !c.redeploymentProfile.excludedFromMatching ? c.redeploymentProfile : null
-    const candidateSkillsLower = [...c.skills, ...(rp ? [rp.primarySkill, rp.subSkill].filter((s): s is string => !!s) : [])].map((s) => s.toLowerCase())
-    const matchingSkills: string[] = []
-    for (const jdSkill of jdSkillsLower) {
-      if (candidateSkillsLower.some((cs) => cs.includes(jdSkill) || jdSkill.includes(cs))) {
-        const original = position.jdSkills[jdSkillsLower.indexOf(jdSkill)]
-        matchingSkills.push(original)
-      }
-    }
-    if (matchingSkills.length === 0) continue
-
-    // Title overlap: position title words found in the candidate's latest role (CV) or last roster role
     const latestRole = [
       Array.isArray(c.cvExperience) ? (c.cvExperience[0] as { title?: unknown } | undefined)?.title : null,
       rp?.lastJobTitle,
-    ].filter((t): t is string => typeof t === 'string').join(' ').toLowerCase()
-    const titleHits = titleWords.filter((w) => latestRole.includes(w)).length
+    ].filter((t): t is string => typeof t === 'string').join(' ')
+    const pf = prefilterCandidate({
+      positionTitle: position.title,
+      coreSkills,
+      otherSkills,
+      positionSeniority: position.jdSeniority,
+      candidateSkills: [...c.skills, ...(rp ? [rp.primarySkill, rp.subSkill].filter((s): s is string => !!s) : [])],
+      candidateLatestRole: latestRole || null,
+      candidateSeniority: c.seniority,
+    })
+    if (!pf.relevant) continue
 
     matches.push({
       id: c.id,
@@ -114,20 +111,22 @@ export async function POST(
       skills: c.skills,
       seniority: c.seniority,
       yearsOfExperience: c.yearsOfExperience,
-      matchingSkills,
-      matchCount: matchingSkills.length,
-      titleHits,
+      matchingSkills: pf.matchingSkills,
       redeploy: rp ? { lwd: rp.lwd?.toISOString() ?? null } : null,
+      autoScore: pf.eligible,
+      rank: pf.rank,
     })
   }
 
-  // Redeployment pool first (they pass the prefilter above), so they land in the first scoring batch; no score boost
-  matches.sort((a, b) => Number(!!b.redeploy) - Number(!!a.redeploy) || b.matchCount - a.matchCount || b.titleHits - a.titleHits)
+  // Eligible first, then by prefilter rank. Redeploy people get no bonus here.
+  matches.sort((a, b) => Number(b.autoScore) - Number(a.autoScore) || b.rank - a.rank)
+  const settings = await getFindCandidatesSettings()
 
   return NextResponse.json({
     // Ordered by the prefilter; its numbers stay server-side
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    candidates: matches.slice(0, 50).map(({ matchCount: _m, titleHits: _t, ...rest }) => rest),
+    candidates: matches.slice(0, 50).map(({ rank: _r, ...rest }) => rest),
+    autoScoring: settings,
     total: matches.length,
     position: {
       jdSkills: position.jdSkills,
