@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { seedRedeploymentSettings } from '@/lib/redeployment-settings'
 import { seedGlobalOpportunitySettings } from '@/lib/global-opportunity-settings'
 import { getRedeploymentHireWeight } from '@/lib/redeployment-hire'
+import { getFindCandidatesSettings } from '@/lib/find-candidates-settings'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { SettingsForm } from '@/components/app/SettingsForm'
@@ -27,6 +28,7 @@ export default async function SettingsPage({
   await seedRedeploymentSettings()
   await seedGlobalOpportunitySettings()
   await getRedeploymentHireWeight() // seeds REDEPLOYMENT_HIRE_WEIGHT
+  await getFindCandidatesSettings() // seeds FIND_CANDIDATES_*
   await Promise.all([
     db.systemSettings.upsert({
       where: { key: 'VENDOR_MIN_FIT_SCORE' },

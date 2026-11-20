@@ -35,6 +35,9 @@ const LABELS: Record<string, { label: string; type?: string; min?: number; max?:
   GLOBAL_MATCH_MIN_SCORE: { label: 'Global Matches — Minimum Score Shown', type: 'number', min: 0, max: 100 },
   REDEPLOYMENT_DIGEST_RECIPIENTS: { label: 'Redeployment Digest — Recipients (comma-separated emails)' },
   REDEPLOYMENT_HIRE_WEIGHT: { label: 'Recruiter Performance — Redeployment Hire Weight', type: 'number', min: 0, max: 10 },
+  FIND_CANDIDATES_STRONG_COUNT: { label: 'Find Candidates — Strong Scores Needed to Auto-score More', type: 'number', min: 0, max: 15 },
+  FIND_CANDIDATES_STRONG_SCORE: { label: 'Find Candidates — Strong Score Threshold', type: 'number', min: 0, max: 100 },
+  FIND_CANDIDATES_AUTO_MAX: { label: 'Find Candidates — Max Auto-scored per Search', type: 'number', min: 0, max: 200 },
 }
 
 function SettingRow({ setting }: { setting: Setting }) {
@@ -116,6 +119,9 @@ const DISPLAY_ORDER = [
   'GLOBAL_MATCH_MIN_SCORE',
   'REDEPLOYMENT_DIGEST_RECIPIENTS',
   'REDEPLOYMENT_HIRE_WEIGHT',
+  'FIND_CANDIDATES_STRONG_COUNT',
+  'FIND_CANDIDATES_STRONG_SCORE',
+  'FIND_CANDIDATES_AUTO_MAX',
 ]
 
 export function SettingsForm({ settings }: { settings: Setting[] }) {

@@ -30,6 +30,8 @@ interface ParsedCV {
   skills?: string[]
   languages?: string[]
   summary?: string | null
+  experience?: unknown[]
+  education?: unknown[]
 }
 
 interface Props {
@@ -150,6 +152,9 @@ export function CreateCandidateInPositionForm({ positionId, currentUserId, onCre
       startAvailability: startAvailability || null,
       skills: cvParsed?.skills ?? [],
       languages: cvParsed?.languages ?? [],
+      // Work history from the CV upload parse, so the Tenarai CV has it without re-parsing
+      ...(Array.isArray(cvParsed?.experience) && cvParsed.experience.length > 0 ? { cvExperience: cvParsed.experience } : {}),
+      ...(Array.isArray(cvParsed?.education) && cvParsed.education.length > 0 ? { cvEducation: cvParsed.education } : {}),
       ...(cvDriveId ? { cvDriveId, cvOriginalName } : {}),
       ...(cvParsed?.phone ? { phone: cvParsed.phone } : {}),
       ...(cvParsed?.seniority ? { seniority: cvParsed.seniority } : {}),

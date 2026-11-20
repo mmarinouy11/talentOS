@@ -381,9 +381,16 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
         const status = eligible ? 'ACTIVE' : 'OUT_OF_WINDOW'
         // Roster CV reference for linked candidates; their own CV is never replaced
         const cv = fields.cvFileName ? findCvFile(await cvFiles(), fields.cvFileName, rosterId) : null
+        // Excluded from matching but the roster now shows a different LWD: reactivate automatically
+        const newLwd = fields.lwd instanceof Date ? fields.lwd.getTime() : null
+        const lwdChanged = existing.excludedFromMatching && newLwd !== (existing.excludedLwd?.getTime() ?? null)
+        const reactivation = lwdChanged
+          ? { excludedFromMatching: false, excludedReason: 'Reactivated automatically: new LWD', excludedAt: null, excludedById: null, excludedLwd: null }
+          : {}
+        if (lwdChanged) console.log(`[redeployment] Roster ${rosterId}: reactivated automatically (new LWD)`)
         const updated = await db.redeploymentProfile.update({
           where: { id: existing.id },
-          data: { ...fields, status, lastSyncedAt: now, sourceCvDriveFileId: cv?.id ?? existing.sourceCvDriveFileId },
+          data: { ...fields, ...reactivation, status, lastSyncedAt: now, sourceCvDriveFileId: cv?.id ?? existing.sourceCvDriveFileId },
         })
         summary.updated++
         if (status === 'OUT_OF_WINDOW' && existing.status !== 'OUT_OF_WINDOW') summary.outOfWindow++

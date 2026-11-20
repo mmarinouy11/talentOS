@@ -101,6 +101,97 @@ export async function sendEmailViaGmail(
   return from
 }
 
+export class GmailNotConnectedError extends Error {
+  constructor() { super('Gmail not connected for this user'); this.name = 'GmailNotConnectedError' }
+}
+
+// multipart/mixed message (HTML body + optional attachment) with To and CC lists
+function buildRawEmailWithAttachment(args: {
+  from: string; to: string[]; cc: string[]; subject: string; html: string
+  attachment?: { name: string; mimeType: string; data: Buffer } | null
+}): string {
+  const boundary = `----talentos-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
+  const wrap = (b64: string) => b64.replace(/.{1,76}/g, (l) => `${l}\r\n`).trimEnd()
+  const encodeName = (n: string) => (/[^\x20-\x7E]/.test(n) || /["\\]/.test(n) ? `=?UTF-8?B?${Buffer.from(n, 'utf-8').toString('base64')}?=` : n)
+  const lines = [
+    `From: ${args.from}`,
+    `To: ${args.to.join(', ')}`,
+    ...(args.cc.length > 0 ? [`Cc: ${args.cc.join(', ')}`] : []),
+    `Subject: ${encodeSubject(args.subject)}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    wrap(Buffer.from(args.html, 'utf-8').toString('base64')),
+  ]
+  if (args.attachment) {
+    const name = encodeName(args.attachment.name)
+    lines.push(
+      `--${boundary}`,
+      `Content-Type: ${args.attachment.mimeType}; name="${name}"`,
+      `Content-Disposition: attachment; filename="${name}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      wrap(args.attachment.data.toString('base64')),
+    )
+  }
+  lines.push(`--${boundary}--`, '')
+  return Buffer.from(lines.join('\r\n')).toString('base64url')
+}
+
+// Sends from the user's own connected Gmail (lands in their Sent folder, replies go to them) and returns the
+// Gmail message id. Throws GmailNotConnectedError / GmailTokenExpiredError (connection cleared) / Gmail errors.
+export async function sendEmailViaGmailWithAttachment(
+  userId: string,
+  args: { to: string[]; cc: string[]; subject: string; html: string; attachment?: { name: string; mimeType: string; data: Buffer } | null },
+): Promise<{ messageId: string | null; from: string }> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { gmailAccessToken: true, gmailRefreshToken: true, gmailTokenExpiry: true, gmailConnectedEmail: true },
+  })
+  if (!user?.gmailRefreshToken) throw new GmailNotConnectedError()
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_OAUTH_CLIENT_ID,
+    process.env.GMAIL_OAUTH_CLIENT_SECRET,
+    `${process.env.NEXTAUTH_URL}/api/auth/gmail/callback`,
+  )
+  oauth2Client.setCredentials({
+    access_token: user.gmailAccessToken,
+    refresh_token: user.gmailRefreshToken,
+    expiry_date: user.gmailTokenExpiry?.getTime(),
+  })
+  oauth2Client.on('tokens', async (tokens) => {
+    await db.user.update({
+      where: { id: userId },
+      data: {
+        gmailAccessToken: tokens.access_token ?? undefined,
+        gmailTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+      },
+    })
+  })
+
+  const from = user.gmailConnectedEmail ?? 'me'
+  const raw = buildRawEmailWithAttachment({ from, ...args })
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+  try {
+    const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+    return { messageId: res.data.id ?? null, from }
+  } catch (err) {
+    if (isInvalidGrant(err)) {
+      await db.user.update({
+        where: { id: userId },
+        data: { gmailAccessToken: null, gmailRefreshToken: null, gmailTokenExpiry: null, gmailConnectedEmail: null },
+      })
+      throw new GmailTokenExpiredError()
+    }
+    throw err
+  }
+}
+
 async function getHeaderHtml(html: string): Promise<string> {
   const headerSetting = await db.systemSettings.findUnique({ where: { key: 'EMAIL_HEADER_IMAGE_URL' } })
   const headerImageUrl = headerSetting?.value || null

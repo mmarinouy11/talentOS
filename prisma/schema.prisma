@@ -491,6 +491,7 @@ model RedeploymentProfile {
   candidate             Candidate?         @relation(fields: [candidateId], references: [id])
   possibleDuplicateOfId String?
   parsedSnapshot        Json?
+  statusReason          String?
   lwd                   DateTime?
   lastJobTitle          String?
   lastClient            String?
@@ -574,6 +575,7 @@ model GlobalOpportunityImport {
   discardedUsWfo         Int
   discardedOtherLocation Int
   discardedOther         Int
+  discardedFilled        Int      @default(0)
   deactivated            Int
   newCount               Int
 }
@@ -647,8 +649,10 @@ model OpportunityProposal {
   sentAt                DateTime @default(now())
   gmailMessageId        String?
   method                String
+  batchId               String?
 
   @@index([matchId])
+  @@index([batchId])
   @@index([redeploymentProfileId])
 }
 

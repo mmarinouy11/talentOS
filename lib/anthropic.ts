@@ -67,6 +67,14 @@ export const MODELS = {
 export interface ClaudeCallOptions {
   // Omitted = API default (1.0). Use 0 for deterministic outputs such as scoring.
   temperature?: number
+  // Omitted = 4096
+  maxTokens?: number
+  // Throw ClaudeOutputTruncatedError instead of returning a cut-off answer (stop_reason "max_tokens")
+  failOnTruncation?: boolean
+}
+
+export class ClaudeOutputTruncatedError extends Error {
+  constructor(maxTokens: number) { super(`the AI answer was cut off at ${maxTokens} tokens (output too long)`); this.name = 'ClaudeOutputTruncatedError' }
 }
 
 export async function callClaude(
@@ -78,11 +86,12 @@ export async function callClaude(
   const anthropic = getAnthropic()
   const response = await anthropic.messages.create({
     model: MODELS[model],
-    max_tokens: 4096,
+    max_tokens: options.maxTokens ?? 4096,
     system: systemPrompt,
     ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
     messages: [{ role: 'user', content: prompt }],
   })
+  if (options.failOnTruncation && response.stop_reason === 'max_tokens') throw new ClaudeOutputTruncatedError(options.maxTokens ?? 4096)
   const block = response.content[0]
   if (block.type !== 'text') throw new Error('Unexpected response type from Claude')
   return block.text

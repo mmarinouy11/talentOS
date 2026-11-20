@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { pickCandidatePositionInterview } from '@/lib/interview-display'
 import { BulkUploadBanner } from '@/components/app/BulkUploadBanner'
 import { db } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
@@ -25,32 +26,13 @@ import { randomBytes } from 'crypto'
 
 // Stage order for picking the "most meaningful" interview to display.
 // Higher = more advanced.
-const INTERVIEW_STAGE_ORDER: Record<string, number> = {
-  OFFER: 6,
-  CLIENT_INTERVIEW: 5,
-  MANAGER_INTERVIEW: 4,
-  TECHNICAL_INTERVIEW: 3,
-  SCREENING: 2,
-  APPLIED: 1,
-}
 
+// Upcoming non-cancelled → most recent non-cancelled → "Cancelled" only when all are (lib/interview-display)
 function pickLatestInterview(
-  interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null }[],
+  interviews: { status: string; decision: string | null; stage: string; scheduledAt: Date | null; createdAt: Date }[],
   cpStage: string
 ) {
-  if (!interviews.length) return null
-  // If the candidate's current stage is a terminal or APPLIED stage, fall back
-  // to the most recent round (highest stage order), preferring a REJECT decision.
-  if (cpStage === 'APPLIED' || cpStage === 'REJECTED' || cpStage === 'WITHDRAWN' || cpStage === 'HIRED') {
-    const rejected = interviews.find((i) => i.decision === 'REJECT')
-    if (rejected) return rejected
-    return interviews.reduce((best, cur) =>
-      (INTERVIEW_STAGE_ORDER[cur.stage] ?? 0) >= (INTERVIEW_STAGE_ORDER[best.stage] ?? 0) ? cur : best
-    )
-  }
-  // For all active pipeline stages: only show a round that matches the
-  // candidate's current stage. If none exists, return null (show "—").
-  return interviews.find((i) => i.stage === cpStage) ?? null
+  return pickCandidatePositionInterview(interviews, cpStage)
 }
 
 function fmt(date: Date) {
@@ -92,7 +74,7 @@ export default async function PositionDetailPage({
         where: { candidate: { deletedAt: null } },
         include: {
           candidate: { select: { id: true, firstName: true, lastName: true, email: true, country: true, seniority: true, minimumCompensation: true, startAvailability: true, availabilityUpdatedAt: true, redeploymentProfile: { select: { status: true, lwd: true } } } },
-          interviews: { select: { status: true, decision: true, stage: true, scheduledAt: true } },
+          interviews: { select: { status: true, decision: true, stage: true, scheduledAt: true, createdAt: true } },
           recruiter: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },

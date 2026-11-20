@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { fillCvExperienceFromDrive } from '@/lib/cv-experience'
 import { findCandidateMatches } from '@/lib/candidate-identity'
 import { normalizeLinkedinHandle } from '@/lib/linkedin'
 import type { Prisma } from '@prisma/client'
@@ -180,6 +181,9 @@ export async function POST(
         recruiterId: position.recruiterId,
       },
     })
+    // Store the parsed work history now (shared parser, background) so the Tenarai CV never depends on an on-demand parse
+    const newCandidateId = candidate.id
+    void fillCvExperienceFromDrive(newCandidateId).then((r) => { if (r.status === 'failed') console.error(`[portal] Work history not stored for candidate ${newCandidateId}: ${r.reason}`) }).catch(() => {})
     createdCandidate = true
   }
 

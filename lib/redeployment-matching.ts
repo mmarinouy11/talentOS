@@ -87,6 +87,15 @@ export function groupAsPosition(g: OpportunityGroup): PositionLike {
   }
 }
 
+// Targets excluded for everyone (MatchTargetExclusion): skipped by matching, their matches hidden
+export async function getExcludedTargets(): Promise<{ groupKeys: Set<string>; positionIds: Set<string> }> {
+  const rows = await db.matchTargetExclusion.findMany({ select: { targetType: true, groupKey: true, positionId: true } })
+  return {
+    groupKeys: new Set(rows.filter((r) => r.targetType === 'GLOBAL_GROUP' && r.groupKey).map((r) => r.groupKey!)),
+    positionIds: new Set(rows.filter((r) => r.targetType === 'TALENTOS_POSITION' && r.positionId).map((r) => r.positionId!)),
+  }
+}
+
 export interface MatchingSummary { people: number; groups: number; positions: number; pairs: number; scored: number; unchanged: number; failed: number }
 
 const g = globalThis as unknown as { __redeploymentMatching?: { running: boolean; again: boolean } }
@@ -110,15 +119,18 @@ export async function runRedeploymentMatching(): Promise<MatchingSummary | null>
 
 async function match(): Promise<MatchingSummary> {
   const settings = await getGlobalOpportunitySettings()
-  const [profiles, groups] = await Promise.all([
+  const [profiles, allGroups] = await Promise.all([
     db.redeploymentProfile.findMany({
-      where: { status: 'ACTIVE', candidateId: { not: null }, candidate: { deletedAt: null } },
+      // Excluded people get no matches at all (no AI calls)
+      where: { status: 'ACTIVE', excludedFromMatching: false, candidateId: { not: null }, candidate: { deletedAt: null } },
       select: { id: true, candidateId: true, primarySkill: true, subSkill: true, lastJobTitle: true, candidate: { select: { skills: true } } },
     }),
     getActiveOpportunityGroups(),
   ])
+  const excluded = await getExcludedTargets()
+  const groups = allGroups.filter((g) => !excluded.groupKeys.has(g.groupKey))
   const summary: MatchingSummary = { people: profiles.length, groups: groups.length, positions: 0, pairs: 0, scored: 0, unchanged: 0, failed: 0 }
-  await matchTalentOsPositions(profiles, settings.topN, summary)
+  await matchTalentOsPositions(profiles, settings.topN, summary, excluded.positionIds)
   if (groups.length === 0) return summary
 
   const pairs: { profileId: string; candidateId: string; group: OpportunityGroup }[] = []
@@ -175,9 +187,10 @@ type PoolProfile = { id: string; candidateId: string | null; primarySkill: strin
 
 // TalentOS positions that can take each person (lib/assignable-positions), prefiltered the same way, scored with
 // getOrComputeFitScore so the numbers equal Find Candidates / add-to-position (FitScoreCache)
-async function matchTalentOsPositions(profiles: PoolProfile[], topN: number, summary: MatchingSummary) {
+async function matchTalentOsPositions(profiles: PoolProfile[], topN: number, summary: MatchingSummary, excludedPositions: Set<string>) {
   const withCandidate = profiles.filter((p): p is PoolProfile & { candidateId: string } => !!p.candidateId)
   const assignable = await getAssignablePositionsForCandidates(withCandidate.map((p) => p.candidateId))
+  for (const [k, list] of assignable) assignable.set(k, list.filter((p) => !excludedPositions.has(p.id)))
   const positionIds = [...new Set([...assignable.values()].flat().map((p) => p.id))]
   summary.positions = positionIds.length
   if (positionIds.length === 0) return
