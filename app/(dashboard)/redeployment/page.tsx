@@ -60,6 +60,7 @@ export default async function RedeploymentPage({ searchParams }: { searchParams:
       location: p.subLocation,
       lwd: p.lwd?.toISOString() ?? null,
       status: p.status,
+      statusReason: p.statusReason,
       pipelines: candidate?.candidatePositions.map((cp) => ({ cpId: cp.id, positionId: cp.position.id, title: cp.position.title, client: cp.position.client, stage: cp.stage })) ?? [],
       rosterCvId: p.sourceCvDriveFileId,
       duplicateOf: !p.candidateId && dup ? { id: dup.id, name: `${dup.firstName} ${dup.lastName}`.trim(), email: dup.email } : null,
@@ -80,7 +81,7 @@ export default async function RedeploymentPage({ searchParams }: { searchParams:
           </p>
           <p className="text-xs text-gray-500 mt-2">
             {lastSync
-              ? <>Last sync {new Date(lastSync.finishedAt).toLocaleString('en-US', { timeZone: 'America/Montevideo', dateStyle: 'medium', timeStyle: 'short' })} · {lastSync.created} created · {lastSync.linked} linked · {lastSync.pendingDecision} need a decision · {lastSync.updated} updated · {lastSync.outOfWindow} out of window · {lastSync.removed} removed · {lastSync.cvMissing} CV missing{(lastSync.invalidLwd ?? 0) > 0 && <> · {lastSync.invalidLwd} invalid LWD</>}{lastSync.errors.length > 0 && <span className="text-red-600"> · {lastSync.errors.length} error{lastSync.errors.length === 1 ? '' : 's'} (roster {lastSync.errors.slice(0, 5).map((e) => e.rosterId).join(', ')}{lastSync.errors.length > 5 ? '…' : ''}: {lastSync.errors[0].error})</span>}</>
+              ? <>Last sync {new Date(lastSync.finishedAt).toLocaleString('en-US', { timeZone: 'America/Montevideo', dateStyle: 'medium', timeStyle: 'short' })} · {lastSync.created} created · {lastSync.linked} linked · {lastSync.pendingDecision} need a decision · {lastSync.updated} updated · {lastSync.outOfWindow} out of window · {lastSync.removed} removed · {lastSync.cvMissing} CV missing{(lastSync.invalidLwd ?? 0) > 0 && <> · {lastSync.invalidLwd} invalid LWD</>}{(lastSync.activeElsewhere ?? 0) > 0 && <> · {lastSync.activeElsewhere} active in another roster entry</>}{(lastSync.superseded ?? 0) > 0 && <> · {lastSync.superseded} superseded by a newer entry</>}{lastSync.errors.length > 0 && <span className="text-red-600"> · {lastSync.errors.length} error{lastSync.errors.length === 1 ? '' : 's'} (roster {lastSync.errors.slice(0, 5).map((e) => e.rosterId).join(', ')}{lastSync.errors.length > 5 ? '…' : ''}: {lastSync.errors[0].error})</span>}</>
               : 'Never synced'}
           </p>
         </div>

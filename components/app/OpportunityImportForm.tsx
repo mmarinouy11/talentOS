@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 
-type Summary = { kept: number; newCount: number; deactivated: number; otherLocations: string[] }
+type Summary = { kept: number; newCount: number; deactivated: number; discardedFilled?: number; otherLocations: string[] }
 
 export function OpportunityImportForm() {
   const router = useRouter()
@@ -41,7 +41,7 @@ export function OpportunityImportForm() {
       {error && <p className="text-sm text-red-600">{error}</p>}
       {result && (
         <p className="text-sm text-[#2F2C29]">
-          Imported: {result.kept} kept, {result.newCount} new, {result.deactivated} deactivated.
+          Imported: {result.kept} kept, {result.newCount} new, {result.deactivated} deactivated{(result.discardedFilled ?? 0) > 0 ? `, ${result.discardedFilled} headcount covered (offered / YTJ)` : ''}.
           {result.otherLocations.length > 0 && <span className="block text-amber-700">Other locations discarded: {result.otherLocations.join(', ')}</span>}
         </p>
       )}

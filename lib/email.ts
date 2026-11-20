@@ -109,6 +109,7 @@ export class GmailNotConnectedError extends Error {
 function buildRawEmailWithAttachment(args: {
   from: string; to: string[]; cc: string[]; subject: string; html: string
   attachment?: { name: string; mimeType: string; data: Buffer } | null
+  attachments?: { name: string; mimeType: string; data: Buffer }[]
 }): string {
   const boundary = `----talentos-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
   const wrap = (b64: string) => b64.replace(/.{1,76}/g, (l) => `${l}\r\n`).trimEnd()
@@ -127,15 +128,15 @@ function buildRawEmailWithAttachment(args: {
     '',
     wrap(Buffer.from(args.html, 'utf-8').toString('base64')),
   ]
-  if (args.attachment) {
-    const name = encodeName(args.attachment.name)
+  for (const att of [...(args.attachment ? [args.attachment] : []), ...(args.attachments ?? [])]) {
+    const name = encodeName(att.name)
     lines.push(
       `--${boundary}`,
-      `Content-Type: ${args.attachment.mimeType}; name="${name}"`,
+      `Content-Type: ${att.mimeType}; name="${name}"`,
       `Content-Disposition: attachment; filename="${name}"`,
       'Content-Transfer-Encoding: base64',
       '',
-      wrap(args.attachment.data.toString('base64')),
+      wrap(att.data.toString('base64')),
     )
   }
   lines.push(`--${boundary}--`, '')
@@ -146,7 +147,7 @@ function buildRawEmailWithAttachment(args: {
 // Gmail message id. Throws GmailNotConnectedError / GmailTokenExpiredError (connection cleared) / Gmail errors.
 export async function sendEmailViaGmailWithAttachment(
   userId: string,
-  args: { to: string[]; cc: string[]; subject: string; html: string; attachment?: { name: string; mimeType: string; data: Buffer } | null },
+  args: { to: string[]; cc: string[]; subject: string; html: string; attachment?: { name: string; mimeType: string; data: Buffer } | null; attachments?: { name: string; mimeType: string; data: Buffer }[] },
 ): Promise<{ messageId: string | null; from: string }> {
   const user = await db.user.findUnique({
     where: { id: userId },

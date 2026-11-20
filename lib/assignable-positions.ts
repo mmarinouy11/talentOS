@@ -1,7 +1,10 @@
 import { db } from './db'
 import { HIRED_CANDIDATE_POSITION_WHERE, isPositionFulfilled } from './position-fulfillment'
 
-export type AssignablePosition = { id: string; title: string; client: string; type: 'REQUISITION' | 'PROACTIVE' }
+export type AssignablePosition = {
+  id: string; title: string; client: string; type: 'REQUISITION' | 'PROACTIVE'
+  location?: string[]; openings?: number | null // openings = headcount − hires (null for proactive)
+}
 
 // Positions that can take a new candidate: not deleted, OPEN (no ON_HOLD / FILLED / CLOSED / CANCELLED),
 // REQUISITION or PROACTIVE, not fulfilled. Sorted by title.
@@ -9,13 +12,16 @@ async function getOpenUnfulfilledPositions(): Promise<AssignablePosition[]> {
   const rows = await db.position.findMany({
     where: { deletedAt: null, status: 'OPEN', type: { in: ['REQUISITION', 'PROACTIVE'] } },
     select: {
-      id: true, title: true, client: true, type: true, headcount: true,
+      id: true, title: true, client: true, type: true, headcount: true, location: true,
       _count: { select: { candidatePositions: { where: HIRED_CANDIDATE_POSITION_WHERE } } },
     },
   })
   return rows
     .filter((p) => !isPositionFulfilled(p.headcount, p._count.candidatePositions))
-    .map((p) => ({ id: p.id, title: p.title, client: p.client, type: p.type }))
+    .map((p) => ({
+      id: p.id, title: p.title, client: p.client, type: p.type, location: p.location,
+      openings: p.type === 'PROACTIVE' ? null : Math.max(0, (p.headcount ?? 1) - p._count.candidatePositions),
+    }))
     .sort((a, b) => a.title.localeCompare(b.title) || a.client.localeCompare(b.client))
 }
 

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { REDEPLOYMENT_PROPOSAL_KEY, REDEPLOYMENT_PROPOSAL_PLACEHOLDERS, REDEPLOYMENT_PROPOSAL_DEFAULT_SUBJECT, REDEPLOYMENT_PROPOSAL_DEFAULT_BODY } from '@/lib/redeployment-proposal-template'
+import { REDEPLOYMENT_PROPOSAL_KEY, REDEPLOYMENT_PROPOSAL_PLACEHOLDERS, REDEPLOYMENT_PROPOSAL_DEFAULT_SUBJECT, REDEPLOYMENT_PROPOSAL_DEFAULT_BODY, templateSupportsSeveralPeople } from '@/lib/redeployment-proposal-template'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { SettingsNav } from '@/components/app/SettingsNav'
@@ -65,7 +65,7 @@ export const SYSTEM_EMAIL_TEMPLATES = [
   {
     key: REDEPLOYMENT_PROPOSAL_KEY,
     name: 'Redeployment Proposal (global opportunity)',
-    description: 'Prefills the "Propose by email" composer on the Redeployment Matches tab (plain text; sent from the user\'s own Gmail with the roster CV attached). Never include the fit score or personal contact details.',
+    description: 'Prefills the "Propose by email" composer on the Redeployment Matches tab (plain text; sent from the user\'s own Gmail with each person\'s roster CV attached; one email can propose several people). {{peopleSummary}} renders one block per person, {{peopleCount}} / {{peopleNames}} work for 1 or many; the per-person placeholders only fill in when one person is proposed. Never include the fit score or personal contact details.',
     placeholders: REDEPLOYMENT_PROPOSAL_PLACEHOLDERS,
     defaultSubject: REDEPLOYMENT_PROPOSAL_DEFAULT_SUBJECT,
     defaultHtml: REDEPLOYMENT_PROPOSAL_DEFAULT_BODY,
@@ -79,6 +79,8 @@ export default async function EmailTemplatesPage() {
 
   const overrides = await db.systemEmailTemplate.findMany({ orderBy: { key: 'asc' } })
   const overrideMap = Object.fromEntries(overrides.map((t) => [t.key, t]))
+  const proposal = overrideMap[REDEPLOYMENT_PROPOSAL_KEY]
+  const proposalNeedsSummary = !!proposal && !!(proposal.subject || proposal.htmlBody) && !templateSupportsSeveralPeople(proposal.subject, proposal.htmlBody)
 
   return (
     <div className="space-y-6">
@@ -93,6 +95,11 @@ export default async function EmailTemplatesPage() {
           Override the default system email templates. Leave blank to use the built-in defaults.
           Use <code className="bg-gray-100 px-1 rounded text-xs">{`{{placeholderName}}`}</code> for dynamic values.
         </p>
+        {proposalNeedsSummary && (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Your Redeployment proposal template has no <code className="text-xs">{'{{peopleSummary}}'}</code> placeholder. It is used as-is when one person is proposed; when several people are proposed in one email the default template is used instead. Add <code className="text-xs">{'{{peopleSummary}}'}</code> to use your template for both.
+          </p>
+        )}
         <EmailTemplatesEditor
           templates={SYSTEM_EMAIL_TEMPLATES.map((t) => ({
             ...t,

@@ -60,7 +60,8 @@ export default async function OpportunitiesPage() {
                   ['Rows read', lastImport.totalRows], ['Kept', lastImport.kept], ['New', lastImport.newCount], ['Deactivated', lastImport.deactivated],
                   ['Discarded · Offshore', lastImport.discardedOffshore], ['Discarded · LATAM', lastImport.discardedLatam],
                   ['Discarded · US work from office', lastImport.discardedUsWfo], ['Discarded · Other location', lastImport.discardedOtherLocation],
-                  ['Discarded · Closed / no openings / other', lastImport.discardedOther],
+                  ['Discarded · Headcount covered (offered / YTJ)', lastImport.discardedFilled],
+                  ['Discarded · Closed / other', lastImport.discardedOther],
                 ] as const).map(([label, n]) => (
                   <div key={label} className="flex justify-between gap-2 border-b border-gray-100 py-0.5">
                     <dt className="text-gray-500">{label}</dt><dd className="font-medium text-[#2F2C29]">{n}</dd>

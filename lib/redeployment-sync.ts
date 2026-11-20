@@ -48,6 +48,9 @@ export interface RedeploymentSyncSummary {
   removed: number
   cvMissing: number
   invalidLwd: number
+  // Same person on several roster rows: one row still active (empty LWD) / older rows superseded by the latest LWD
+  activeElsewhere?: number
+  superseded?: number
   errors: { rosterId: string | null; error: string }[]
   finishedAt: string
 }
@@ -325,6 +328,59 @@ async function resolveProfile(profile: RedeploymentProfile, cv: DriveFolderFile 
   }
 }
 
+// ── Several roster rows for one person ──────────────────────────────────────
+const normText = (v: string | null) => (v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+// Transitive grouping: same personal email, same work email, or same full name + phone digits
+export function groupRosterRows<T extends Pick<RosterRow, 'personalEmail' | 'workEmail' | 'firstName' | 'lastName' | 'preferredName' | 'phone'>>(rows: T[]): T[][] {
+  const parent = rows.map((_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])))
+  const union = (a: number, b: number) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[rb] = ra }
+  const firstByKey = new Map<string, number>()
+  rows.forEach((r, i) => {
+    const keys: string[] = []
+    const pe = realEmailOrNull(r.personalEmail)?.trim().toLowerCase()
+    const we = realEmailOrNull(r.workEmail)?.trim().toLowerCase()
+    if (pe) keys.push(`pe:${pe}`)
+    if (we) keys.push(`we:${we}`)
+    const name = normText([r.firstName || r.preferredName, r.lastName].filter(Boolean).join(' '))
+    const digits = (r.phone ?? '').replace(/\D/g, '')
+    if (name && digits.length >= 6) keys.push(`np:${name}|${digits}`)
+    for (const k of keys) {
+      const j = firstByKey.get(k)
+      if (j === undefined) firstByKey.set(k, i); else union(j, i)
+    }
+  })
+  const groups = new Map<number, T[]>()
+  rows.forEach((r, i) => { const root = find(i); groups.set(root, [...(groups.get(root) ?? []), r]) })
+  return [...groups.values()]
+}
+
+export const REASON_ACTIVE_ELSEWHERE = 'Currently active in another roster entry'
+export const REASON_SUPERSEDED = 'Superseded by a newer roster entry'
+
+// Per rosterId: 'evaluate' (normal flow) or the reason its profile (if any) goes to REMOVED
+function planRosterRows(rows: RosterRow[], format: 'MDY' | 'DMY'): Map<string, 'evaluate' | string> {
+  const plan = new Map<string, 'evaluate' | string>()
+  for (const group of groupRosterRows(rows)) {
+    if (group.length === 1) { plan.set(group[0].rosterId!, 'evaluate'); continue }
+    if (group.some((r) => r.lwdRaw == null)) {
+      for (const r of group) plan.set(r.rosterId!, REASON_ACTIVE_ELSEWHERE)
+      continue
+    }
+    // Latest readable LWD wins; unreadable dates never beat a readable one
+    let best = group[0]
+    let bestTime = -Infinity
+    for (const r of group) {
+      const d = parseLwd(r.lwdRaw, format)
+      const t = d instanceof Date ? d.getTime() : -Infinity
+      if (t > bestTime) { best = r; bestTime = t }
+    }
+    for (const r of group) plan.set(r.rosterId!, r === best ? 'evaluate' : REASON_SUPERSEDED)
+  }
+  return plan
+}
+
 const g = globalThis as unknown as { __redeploymentSyncRunning?: boolean }
 
 export async function runRedeploymentSync(opts: { recruiterId?: string } = {}): Promise<RedeploymentSyncSummary> {
@@ -343,7 +399,7 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
   const now = new Date()
   const today = todayUtc(now)
   const summary: RedeploymentSyncSummary = {
-    created: 0, linked: 0, pendingDecision: 0, updated: 0, outOfWindow: 0, removed: 0, cvMissing: 0, invalidLwd: 0, errors: [], finishedAt: '',
+    created: 0, linked: 0, pendingDecision: 0, updated: 0, outOfWindow: 0, removed: 0, cvMissing: 0, invalidLwd: 0, activeElsewhere: 0, superseded: 0, errors: [], finishedAt: '',
   }
 
   const rows = await readRoster(s)
@@ -351,12 +407,31 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
   const cvFiles = async () => (files ??= await listRosterCvFiles(s))
   const recruiterId = opts.recruiterId ?? await defaultRecruiterId()
 
+  // One row per rosterId (first wins), then group rows that are the same person
+  const unique: RosterRow[] = []
   const seen = new Set<string>()
   for (const row of rows) {
-    const rosterId = row.rosterId
-    if (!rosterId || seen.has(rosterId)) continue
-    seen.add(rosterId)
+    if (!row.rosterId || seen.has(row.rosterId)) continue
+    seen.add(row.rosterId)
+    unique.push(row)
+  }
+  const plan = planRosterRows(unique, s.lwdFormat)
+
+  for (const row of unique) {
+    const rosterId = row.rosterId!
     try {
+      const action = plan.get(rosterId) ?? 'evaluate'
+      if (action !== 'evaluate') {
+        // Not eligible because of another roster row of the same person; the linked candidate is never touched
+        if (action === REASON_ACTIVE_ELSEWHERE) summary.activeElsewhere = (summary.activeElsewhere ?? 0) + 1
+        else summary.superseded = (summary.superseded ?? 0) + 1
+        const existing = await db.redeploymentProfile.findUnique({ where: { rosterId }, select: { id: true, status: true, statusReason: true } })
+        if (existing && (existing.status !== 'REMOVED' || existing.statusReason !== action)) {
+          await db.redeploymentProfile.update({ where: { id: existing.id }, data: { status: 'REMOVED', statusReason: action, lastSyncedAt: now } })
+          console.log(`[redeployment] Roster ${rosterId}: removed (${action === REASON_ACTIVE_ELSEWHERE ? 'active elsewhere' : 'superseded'})`)
+        }
+        continue
+      }
       const parsedLwd = parseLwd(row.lwdRaw, s.lwdFormat)
       const existing = await db.redeploymentProfile.findUnique({ where: { rosterId } })
       if (parsedLwd === 'invalid') {
@@ -390,7 +465,7 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
         if (lwdChanged) console.log(`[redeployment] Roster ${rosterId}: reactivated automatically (new LWD)`)
         const updated = await db.redeploymentProfile.update({
           where: { id: existing.id },
-          data: { ...fields, ...reactivation, status, lastSyncedAt: now, sourceCvDriveFileId: cv?.id ?? existing.sourceCvDriveFileId },
+          data: { ...fields, ...reactivation, status, statusReason: null, lastSyncedAt: now, sourceCvDriveFileId: cv?.id ?? existing.sourceCvDriveFileId },
         })
         summary.updated++
         if (status === 'OUT_OF_WINDOW' && existing.status !== 'OUT_OF_WINDOW') summary.outOfWindow++
@@ -416,7 +491,7 @@ async function sync(opts: { recruiterId?: string }): Promise<RedeploymentSyncSum
   // People no longer on the roster; their candidates are never deleted
   const removed = await db.redeploymentProfile.updateMany({
     where: { rosterId: { notIn: [...seen] }, status: { not: 'REMOVED' } },
-    data: { status: 'REMOVED', lastSyncedAt: now },
+    data: { status: 'REMOVED', statusReason: 'No longer on the roster', lastSyncedAt: now },
   })
   summary.removed = removed.count
 

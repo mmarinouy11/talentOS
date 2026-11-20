@@ -31,6 +31,7 @@ const COLUMNS = {
   jobDescription: 'Job Description',
   positions: 'No. Of Position',
   joined: 'Total Joined',
+  offered: 'Total Offered',
   plannedOnboarding: 'Latest Planned OnBoarding Date',
   createdOn: 'Created On',
   tidStatus: 'TID Status',
@@ -53,6 +54,7 @@ export interface ImportSummary {
   discardedUsWfo: number
   discardedOtherLocation: number
   discardedOther: number
+  discardedFilled: number
   deactivated: number
   newCount: number
   otherLocations: string[]
@@ -152,7 +154,7 @@ export async function importGlobalOpportunities(buffer: Buffer, fileName: string
   const settings = await getGlobalOpportunitySettings()
   const extra = new Map(settings.extraLocations.map((l) => [l.toLowerCase(), l]))
   const now = new Date()
-  const counts = { totalRows: 0, kept: 0, discardedOffshore: 0, discardedLatam: 0, discardedUsWfo: 0, discardedOtherLocation: 0, discardedOther: 0 }
+  const counts = { totalRows: 0, kept: 0, discardedOffshore: 0, discardedLatam: 0, discardedUsWfo: 0, discardedOtherLocation: 0, discardedOther: 0, discardedFilled: 0 }
   const otherLocations = new Set<string>()
   const kept = new Map<string, Parameters<typeof db.globalOpportunity.create>[0]['data']>()
 
@@ -181,8 +183,9 @@ export async function importGlobalOpportunities(buffer: Buffer, fileName: string
       continue
     }
 
-    const openings = (int(get('positions')) ?? 0) - (int(get('joined')) ?? 0)
-    if (openings <= 0) { counts.discardedOther++; continue }
+    // Headcount covered by people offered / yet to join (YTJ) or already joined
+    const openings = (int(get('positions')) ?? 0) - Math.max(int(get('offered')) ?? 0, int(get('joined')) ?? 0)
+    if (openings <= 0) { counts.discardedFilled++; continue }
 
     const designation = text(get('designation')) ?? 'Untitled role'
     const accountName = text(get('accountName'))

@@ -21,6 +21,7 @@ export interface RedeploymentRow {
   location: string | null
   lwd: string | null
   status: 'ACTIVE' | 'OUT_OF_WINDOW' | 'REMOVED'
+  statusReason?: string | null
   pipelines: { cpId: string; positionId: string; title: string; client: string; stage: string }[]
   rosterCvId: string | null
   duplicateOf: { id: string; name: string; email: string | null } | null
@@ -129,7 +130,7 @@ export function RedeploymentTable({ rows, canAct }: { rows: RedeploymentRow[]; c
         <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Status">
           <option value="ACTIVE">Active</option>
           <option value="OUT_OF_WINDOW">Out of window</option>
-          <option value="REMOVED">Removed from roster</option>
+          <option value="REMOVED">Removed</option>
           <option value="ALL">All statuses</option>
         </select>
         <select className={selectCls} value={timing} onChange={(e) => setTiming(e.target.value as Timing)} aria-label="Release timing">
@@ -170,7 +171,7 @@ export function RedeploymentTable({ rows, canAct }: { rows: RedeploymentRow[]; c
                   {r.candidateId
                     ? <Link href={`/candidates/${r.candidateId}`} className="font-medium text-gray-900 hover:underline">{r.name}</Link>
                     : <span className="font-medium text-gray-900">{r.name}</span>}
-                  {r.status !== 'ACTIVE' && <span className="block text-xs text-gray-400">{r.status === 'REMOVED' ? 'Removed from roster' : 'Out of window'}</span>}
+                  {r.status !== 'ACTIVE' && <span className="block text-xs text-gray-400">{r.status === 'REMOVED' ? (r.statusReason ?? 'Removed from roster') : 'Out of window'}</span>}
                   {r.excluded && (
                     <span className="mt-1 block text-xs text-gray-600">
                       <span className="inline-flex rounded-full bg-gray-200 px-2 py-0.5 font-medium text-[#2F2C29]">Excluded</span>

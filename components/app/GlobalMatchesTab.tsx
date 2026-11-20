@@ -61,11 +61,37 @@ export async function GlobalMatchesTab({ isAdmin, canAct }: { isAdmin: boolean; 
   const users = new Map((await db.user.findMany({
     where: { id: { in: [...userIds, ...exclusionsData.userIds] } }, select: { id: true, name: true, email: true },
   })).map((u) => [u.id, u.name ?? u.email]))
+  // Everyone included in the same email (batchId) and every CV attached to it
+  const batchIds = [...new Set(proposals.map((p) => p.batchId).filter((x): x is string => !!x))]
+  const batchRows = batchIds.length > 0
+    ? await db.opportunityProposal.findMany({
+      where: { batchId: { in: batchIds } },
+      select: { batchId: true, attachmentName: true, redeploymentProfileId: true },
+    })
+    : []
+  const batchProfiles = new Map((batchRows.length > 0
+    ? await db.redeploymentProfile.findMany({
+      where: { id: { in: [...new Set(batchRows.map((r) => r.redeploymentProfileId))] } },
+      select: { id: true, preferredName: true, firstName: true, lastName: true, candidate: { select: { firstName: true, lastName: true } } },
+    })
+    : []).map((p) => [p.id, p]))
+  const batchPeople = new Map<string, { names: string[]; attachments: string[] }>()
+  for (const r of batchRows) {
+    const p = batchProfiles.get(r.redeploymentProfileId)
+    const name = !p ? '—' : p.candidate ? `${p.candidate.firstName} ${p.candidate.lastName}`.trim() : [p.preferredName || p.firstName, p.lastName].filter(Boolean).join(' ')
+    const b = batchPeople.get(r.batchId!) ?? { names: [], attachments: [] }
+    b.names.push(name)
+    if (r.attachmentName) b.attachments.push(r.attachmentName)
+    batchPeople.set(r.batchId!, b)
+  }
   const latestProposal = new Map<string, ProposalInfo>()
   for (const pr of proposals) {
     if (latestProposal.has(pr.matchId)) continue
+    const batch = pr.batchId ? batchPeople.get(pr.batchId) : undefined
     latestProposal.set(pr.matchId, {
-      to: pr.toEmails, cc: pr.ccEmails, subject: pr.subject, body: pr.body, attachmentName: pr.attachmentName,
+      to: pr.toEmails, cc: pr.ccEmails, subject: pr.subject, body: pr.body,
+      attachmentName: batch ? (batch.attachments.join(', ') || null) : pr.attachmentName,
+      people: batch?.names ?? [],
       sentAt: pr.sentAt.toISOString(), by: users.get(pr.sentById) ?? '—', method: pr.method,
     })
   }
@@ -81,6 +107,7 @@ export async function GlobalMatchesTab({ isAdmin, canAct }: { isAdmin: boolean; 
         ...p.positionMatches.map((m) => ({
           id: m.id, kind: 'position' as const, targetKey: m.position.id, score: m.score, status: m.status, rationale: m.rationale, strengths: m.strengths, gaps: m.gaps, notes: m.notes,
           positionId: m.position.id, title: m.position.title, client: m.position.client, proactive: m.position.type === 'PROACTIVE',
+          positionLocation: (m.position.location ?? []).join(', ') || null, positionOpenings: m.position.openings ?? null,
         })),
         ...p.groupMatches.map((m) => ({
           id: m.id, kind: 'group' as const, targetKey: m.group.groupKey, proposal: latestProposal.get(m.id) ?? null, score: m.score, status: m.status, rationale: m.rationale, strengths: m.strengths, gaps: m.gaps, notes: m.notes,

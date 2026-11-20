@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { LwdChip } from './RedeployBadge'
+import { LwdChip, RedeployBadge } from './RedeployBadge'
 import { ProposeByEmailModal } from './ProposeByEmailModal'
 
 type Status = 'NEW' | 'PROPOSED' | 'DISMISSED'
@@ -22,9 +22,10 @@ export interface MatchPerson {
 type MatchBase = { id: string; score: number; status: Status; rationale: string; strengths: string[]; gaps: string[]; notes: string | null }
 export type ProposalInfo = {
   to: string[]; cc: string[]; subject: string; body: string; attachmentName: string | null; sentAt: string; by: string; method: string
+  people: string[] // everyone included in the same email (batch); empty for older single proposals
 }
 export type Match =
-  | (MatchBase & { kind: 'position'; targetKey: string; positionId: string; title: string; client: string; proactive: boolean })
+  | (MatchBase & { kind: 'position'; targetKey: string; positionId: string; title: string; client: string; proactive: boolean; positionLocation: string | null; positionOpenings: number | null })
   | (MatchBase & {
       kind: 'group'; targetKey: string; proposal: ProposalInfo | null; designation: string; account: string | null; location: string
       workMode: string | null; openings: number; requisitionIds: string[]; plannedOnboarding: string | null
@@ -48,7 +49,8 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
 }) {
   const router = useRouter()
   const [view, setView] = useState<'matches' | 'exclusions'>('matches')
-  const [proposing, setProposing] = useState<{ person: MatchPerson; match: Extract<Match, { kind: 'group' }> } | null>(null)
+  const [mode, setMode] = useState<'position' | 'person'>('position')
+  const [proposing, setProposing] = useState<{ matchIds: string[]; designation: string } | null>(null)
   const [openEmail, setOpenEmail] = useState<string | null>(null)
 
   // Exclusions: optional reason; reversible from the Exclusions view
@@ -158,12 +160,17 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
       <ViewToggle view={view} setView={setView} exclusionCount={exclusionCount} />
       {proposing && (
         <ProposeByEmailModal
-          matchId={proposing.match.id} profileId={proposing.person.id} personName={proposing.person.name} designation={proposing.match.designation}
+          matchIds={proposing.matchIds} designation={proposing.designation}
           onClose={() => setProposing(null)}
           onDone={(text) => { setProposing(null); setMsg(text); router.refresh() }}
         />
       )}
       <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex gap-1 rounded-lg border border-gray-200 bg-white p-1">
+          {([['position', 'By position'], ['person', 'By person']] as const).map(([v, l]) => (
+            <button key={v} type="button" className={`px-2.5 py-1 text-xs rounded-md ${mode === v ? 'bg-[#2F2C29] text-white' : 'text-gray-600 hover:bg-[#F5F0EB]'}`} onClick={() => setMode(v)}>{l}</button>
+          ))}
+        </div>
         <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value as typeof status)} aria-label="Status">
           <option value="OPEN">New + Proposed</option>
           <option value="NEW">New</option>
@@ -190,7 +197,13 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
       {msg && <p className="text-sm text-gray-700">{msg}</p>}
 
       {visible.length === 0 && <div className="bg-white rounded-xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-400">No matches for these filters</div>}
-      {visible.map((p) => (
+      {mode === 'position' && (
+        <ByPositionView people={visible} canAct={canAct} busy={busy !== null} setBusy={setBusy} setMsg={setMsg}
+          onPropose={(matchIds, designation) => setProposing({ matchIds, designation })}
+          onDismiss={(id) => act(id, 'dismiss')} onReopen={(id) => act(id, 'reopen')} onExcludeTarget={excludeTarget}
+          onRefresh={() => router.refresh()} />
+      )}
+      {mode === 'person' && visible.map((p) => (
         <div key={p.id} className="bg-white rounded-xl border border-gray-200">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100">
             {p.candidateId ? <Link href={`/candidates/${p.candidateId}`} className="font-medium text-gray-900 hover:underline">{p.name}</Link> : <span className="font-medium text-gray-900">{p.name}</span>}
@@ -228,20 +241,7 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
                               <p className="text-xs text-gray-400">Req {m.requisitionIds.join(', ')}</p>
                             </>
                           )}
-                          {m.kind === 'group' && m.proposal && (
-                            <p className="text-xs text-gray-600 mt-1">
-                              Proposed to {m.proposal.to.join(', ')} · {fmt(m.proposal.sentAt)} · by {m.proposal.by}{m.proposal.method === 'MANUAL' ? ' (sent manually)' : ''}
-                              {' · '}<button type="button" className="underline underline-offset-2" onClick={() => setOpenEmail(openEmail === m.id ? null : m.id)}>{openEmail === m.id ? 'Hide email' : 'View email'}</button>
-                            </p>
-                          )}
-                          {m.kind === 'group' && m.proposal && openEmail === m.id && (
-                            <div className="mt-2 rounded-lg border border-gray-200 bg-[#F5F0EB] p-3 text-xs text-gray-700 space-y-1">
-                              <p><span className="font-medium">To:</span> {m.proposal.to.join(', ')}{m.proposal.cc.length > 0 && <> · <span className="font-medium">CC:</span> {m.proposal.cc.join(', ')}</>}</p>
-                              <p><span className="font-medium">Subject:</span> {m.proposal.subject}</p>
-                              {m.proposal.attachmentName && <p><span className="font-medium">Attachment:</span> {m.proposal.attachmentName}</p>}
-                              <pre className="whitespace-pre-wrap font-sans text-xs text-gray-800 pt-1">{m.proposal.body}</pre>
-                            </div>
-                          )}
+                          {m.kind === 'group' && m.proposal && <ProposalLine proposal={m.proposal} open={openEmail === m.id} onToggle={() => setOpenEmail(openEmail === m.id ? null : m.id)} />}
                           {m.notes && <p className="text-xs text-gray-600 mt-1">Note: {m.notes}</p>}
                           <button type="button" className="mt-1 text-xs font-medium text-gray-600 underline underline-offset-2" onClick={() => toggle(m.id)}>{expanded.has(m.id) ? '▾ Hide details' : '▸ Rationale, strengths, gaps'}</button>
                           {expanded.has(m.id) && (
@@ -265,7 +265,7 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
                                 {m.kind === 'position' && m.status !== 'DISMISSED' && (
                                   <Button size="sm" disabled={busy !== null || !p.candidateId} onClick={() => addToPosition(p, m)}>{busy === m.id ? 'Adding…' : 'Add to position'}</Button>
                                 )}
-                                {m.kind === 'group' && m.status !== 'DISMISSED' && <Button size="sm" disabled={busy !== null} onClick={() => setProposing({ person: p, match: m })}>{m.status === 'PROPOSED' ? 'Propose again' : 'Propose by email'}</Button>}
+                                {m.kind === 'group' && m.status !== 'DISMISSED' && <Button size="sm" disabled={busy !== null} onClick={() => setProposing({ matchIds: [m.id], designation: m.designation })}>{m.status === 'PROPOSED' ? 'Propose again' : 'Propose by email'}</Button>}
                                 {m.status !== 'DISMISSED' && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => act(m.id, 'dismiss')}>Dismiss</Button>}
                                 {m.status !== 'NEW' && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => act(m.id, 'reopen')}>Reopen</Button>}
                               </div>
@@ -284,6 +284,180 @@ export function GlobalMatchesView({ people, defaultMinScore, isAdmin, canAct, gr
           })}
         </div>
       ))}
+    </div>
+  )
+}
+
+const statusLabel = (st: Status) => (st === 'NEW' ? 'New' : st === 'PROPOSED' ? 'Proposed' : 'Dismissed')
+
+// "Proposed to … · date · by …" + the full email and everyone included in it
+function ProposalLine({ proposal, open, onToggle }: { proposal: ProposalInfo; open: boolean; onToggle: () => void }) {
+  return (
+    <>
+      <p className="text-xs text-gray-600 mt-1">
+        Proposed to {proposal.to.join(', ')} · {fmt(proposal.sentAt)} · by {proposal.by}{proposal.method === 'MANUAL' ? ' (sent manually)' : ''}
+        {proposal.people.length > 1 ? ` · with ${proposal.people.length - 1} other${proposal.people.length === 2 ? '' : 's'}` : ''}
+        {' · '}<button type="button" className="underline underline-offset-2" onClick={onToggle}>{open ? 'Hide email' : 'View email'}</button>
+      </p>
+      {open && (
+        <div className="mt-2 rounded-lg border border-gray-200 bg-[#F5F0EB] p-3 text-xs text-gray-700 space-y-1">
+          <p><span className="font-medium">To:</span> {proposal.to.join(', ')}{proposal.cc.length > 0 && <> · <span className="font-medium">CC:</span> {proposal.cc.join(', ')}</>}</p>
+          <p><span className="font-medium">Subject:</span> {proposal.subject}</p>
+          {proposal.people.length > 0 && <p><span className="font-medium">People in this email:</span> {proposal.people.join(', ')}</p>}
+          {proposal.attachmentName && <p><span className="font-medium">Attachments:</span> {proposal.attachmentName}</p>}
+          <pre className="whitespace-pre-wrap font-sans text-xs text-gray-800 pt-1">{proposal.body}</pre>
+        </div>
+      )}
+    </>
+  )
+}
+
+type Row = { person: MatchPerson; match: Match }
+type Target = { key: string; kind: 'position' | 'group'; first: Match; rows: Row[] }
+
+// "By position": one card per target (TalentOS positions first, then global groups), matched people by score,
+// multi-select → "Add selected to position" / "Propose selected by email"
+function ByPositionView({ people, canAct, busy, setBusy, setMsg, onPropose, onDismiss, onReopen, onExcludeTarget, onRefresh }: {
+  people: MatchPerson[]; canAct: boolean; busy: boolean
+  setBusy: (v: string | null) => void; setMsg: (v: string) => void
+  onPropose: (matchIds: string[], designation: string) => void
+  onDismiss: (id: string) => void; onReopen: (id: string) => void; onExcludeTarget: (m: Match) => void; onRefresh: () => void
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [openEmail, setOpenEmail] = useState<string | null>(null)
+  const [results, setResults] = useState<Record<string, { name: string; ok: boolean; text: string }[]>>({})
+
+  const byKey = new Map<string, Target>()
+  for (const person of people) {
+    for (const match of person.matches) {
+      const key = `${match.kind}:${match.targetKey}`
+      const t = byKey.get(key) ?? { key, kind: match.kind, first: match, rows: [] }
+      t.rows.push({ person, match })
+      byKey.set(key, t)
+    }
+  }
+  const targets = [...byKey.values()]
+    .map((t) => ({ ...t, rows: t.rows.sort((a, b) => b.match.score - a.match.score) }))
+    .sort((a, b) => (a.kind === b.kind ? b.rows[0].match.score - a.rows[0].match.score : a.kind === 'position' ? -1 : 1))
+
+  const flip = (set: Set<string>, id: string) => { const n = new Set(set); if (n.has(id)) n.delete(id); else n.add(id); return n }
+  const selectable = (r: Row) => r.match.status !== 'DISMISSED' && (r.match.kind === 'group' || !!r.person.candidateId)
+
+  async function addSelected(t: Target, rows: Row[]) {
+    if (t.first.kind !== 'position') return
+    const positionId = t.first.positionId
+    setBusy(t.key); setMsg('')
+    const out: { name: string; ok: boolean; text: string }[] = []
+    try {
+      for (const r of rows) {
+        try {
+          const res = await fetch('/api/redeployment/add-to-position', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidateId: r.person.candidateId, positionId }),
+          })
+          const d = await res.json().catch(() => ({}))
+          out.push({ name: r.person.name, ok: res.ok, text: res.ok ? 'added' : (typeof d.error === 'string' ? d.error : 'Could not add') })
+        } catch {
+          out.push({ name: r.person.name, ok: false, text: 'connection error' })
+        }
+      }
+    } finally {
+      setResults((prev) => ({ ...prev, [t.key]: out }))
+      setSelected((prev) => { const n = new Set(prev); rows.forEach((r) => n.delete(r.match.id)); return n })
+      setBusy(null)
+      if (out.some((o) => o.ok)) onRefresh()
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {targets.map((t) => {
+        const m = t.first
+        const selectableRows = t.rows.filter(selectable)
+        const chosen = t.rows.filter((r) => selected.has(r.match.id))
+        const allChosen = selectableRows.length > 0 && selectableRows.every((r) => selected.has(r.match.id))
+        return (
+          <div key={t.key} className="bg-white rounded-xl border border-gray-200">
+            <div className="flex flex-wrap items-start gap-2 px-4 py-3 border-b border-gray-100">
+              <div className="flex-1 min-w-[240px]">
+                {m.kind === 'position' ? (
+                  <>
+                    <p className="text-sm font-semibold text-gray-900">
+                      <Link href={`/positions/${m.positionId}`} className="hover:underline">{m.title}</Link>
+                      <span className="ml-1 inline-flex rounded-full bg-[#F5F0EB] px-2 py-0.5 text-xs font-medium text-[#2F2C29]">{m.proactive ? 'Proactive' : 'TalentOS position'}</span>
+                    </p>
+                    <p className="text-xs text-gray-600">{m.client}{m.positionLocation ? ` · ${m.positionLocation}` : ''}{m.positionOpenings != null ? ` · ${m.positionOpenings} opening${m.positionOpenings === 1 ? '' : 's'}` : ''}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-gray-900">{m.designation} <span className="ml-1 inline-flex rounded-full bg-[#F5F0EB] px-2 py-0.5 text-xs font-medium text-[#2F2C29]">Global opportunity</span></p>
+                    <p className="text-xs text-gray-600">{m.account ?? '—'} · {m.location} · {m.workMode ?? 'Unknown'} · {m.openings} opening{m.openings === 1 ? '' : 's'} · Onboarding {fmt(m.plannedOnboarding)}</p>
+                    <p className="text-xs text-gray-400">Req {m.requisitionIds.join(', ')}</p>
+                  </>
+                )}
+              </div>
+              {canAct && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {m.kind === 'position'
+                    ? <Button size="sm" disabled={busy || chosen.length === 0} onClick={() => addSelected(t, chosen)}>Add selected to position{chosen.length > 0 ? ` (${chosen.length})` : ''}</Button>
+                    : <Button size="sm" disabled={busy || chosen.length === 0} onClick={() => onPropose(chosen.map((r) => r.match.id), m.designation)}>Propose selected by email{chosen.length > 0 ? ` (${chosen.length})` : ''}</Button>}
+                  <button type="button" className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-900" disabled={busy} onClick={() => onExcludeTarget(m)}>Exclude for everyone</button>
+                </div>
+              )}
+            </div>
+            {results[t.key] && (
+              <ul className="px-4 py-2 border-b border-gray-100 text-xs space-y-0.5">
+                {results[t.key].map((r, i) => <li key={i} className={r.ok ? 'text-[#2F2C29]' : 'text-red-600'}>{r.name}: {r.ok ? 'added — scoring in progress' : `not added — ${r.text}`}</li>)}
+              </ul>
+            )}
+            {canAct && selectableRows.length > 1 && (
+              <label className="flex items-center gap-2 px-4 pt-2 text-xs text-gray-600">
+                <input type="checkbox" className="h-4 w-4 accent-[#2F2C29]" checked={allChosen}
+                  onChange={() => setSelected((prev) => { const n = new Set(prev); selectableRows.forEach((r) => (allChosen ? n.delete(r.match.id) : n.add(r.match.id))); return n })} />
+                Select all
+              </label>
+            )}
+            <ul className="divide-y divide-gray-100">
+              {t.rows.map(({ person: p, match: r }) => (
+                <li key={r.id} className="px-4 py-3 hover:bg-[#F5F0EB] transition-colors">
+                  <div className="flex flex-wrap items-start gap-3">
+                    {canAct && (
+                      <input type="checkbox" className="mt-1 h-4 w-4 accent-[#2F2C29]" aria-label={`Select ${p.name}`}
+                        disabled={!selectable({ person: p, match: r })} checked={selected.has(r.id)} onChange={() => setSelected((prev) => flip(prev, r.id))} />
+                    )}
+                    <span className="text-lg font-semibold text-[#2F2C29] w-10">{r.score}</span>
+                    <div className="flex-1 min-w-[220px]">
+                      <p className="text-sm font-medium text-gray-900 flex flex-wrap items-center gap-1.5">
+                        {p.candidateId ? <Link href={`/candidates/${p.candidateId}`} className="hover:underline">{p.name}</Link> : p.name}
+                        <RedeployBadge /><LwdChip lwd={p.lwd} />
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[r.status]}`}>{statusLabel(r.status)}</span>
+                      </p>
+                      <p className="text-xs text-gray-600">{[p.lastJobTitle, p.grade && `Grade ${p.grade}`].filter(Boolean).join(' · ') || '—'}</p>
+                      {r.kind === 'group' && r.proposal && <p className="text-xs text-gray-500">Already proposed on {fmt(r.proposal.sentAt)}</p>}
+                      {r.kind === 'group' && r.proposal && <ProposalLine proposal={r.proposal} open={openEmail === r.id} onToggle={() => setOpenEmail(openEmail === r.id ? null : r.id)} />}
+                      {r.notes && <p className="text-xs text-gray-600 mt-1">Note: {r.notes}</p>}
+                      <button type="button" className="mt-1 text-xs font-medium text-gray-600 underline underline-offset-2" onClick={() => setExpanded((prev) => flip(prev, r.id))}>{expanded.has(r.id) ? '▾ Hide details' : '▸ Rationale, strengths, gaps'}</button>
+                      {expanded.has(r.id) && (
+                        <div className="mt-2 space-y-2 text-sm text-gray-700">
+                          <p>{r.rationale}</p>
+                          {r.strengths.length > 0 && <ul className="space-y-0.5">{r.strengths.map((x, i) => <li key={i}><span className="text-[#2F2C29] font-semibold">+</span> {x}</li>)}</ul>}
+                          {r.gaps.length > 0 && <ul className="space-y-0.5">{r.gaps.map((x, i) => <li key={i}><span className="text-amber-600 font-semibold">−</span> {x}</li>)}</ul>}
+                        </div>
+                      )}
+                    </div>
+                    {canAct && (
+                      <div className="flex gap-1.5">
+                        {r.status !== 'DISMISSED' && <Button size="sm" variant="outline" disabled={busy} onClick={() => onDismiss(r.id)}>Dismiss</Button>}
+                        {r.status === 'DISMISSED' && <Button size="sm" variant="outline" disabled={busy} onClick={() => onReopen(r.id)}>Reopen</Button>}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })}
     </div>
   )
 }
